@@ -1,18 +1,16 @@
-# AI-PMO
+# AI PMO — Your AI-Powered Project Management Office
 
-AI-powered Project Management Office
+Landing page for AI PMO service.
+
+## Tech Stack
+- Static HTML/CSS/JS
+- Deployed on Vercel
+- Fonts: DM Sans, Instrument Sans (Google Fonts)
 
 ## Development
+- Edit `index.html` for the landing page
+- Push to `main` → auto-deploys to Vercel
 
-- **Production branch:** `main`
-- **Development branch:** `dev`
-
-### Getting Started
-
-1. Clone the repository
-2. Open in Cursor
-3. Create a feature branch from `dev`
-4. Make changes and push
-5. Open a Pull Request to `dev`
-
-Dev version is automatically deployed to Vercel on every push to `dev`.
+## Links
+- [Live site](https://ai-pmo.vercel.app)
+- [Product page in Notion](https://www.notion.so/33a2fbb64c0e80baa2e4f8cac9adb618)

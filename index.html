@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI PMO — Your AI-Powered Project Management Office</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&amp;family=Instrument+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<meta property="og:title" content="AI PMO — Your AI-Powered Project Management Office"><meta property="og:type" content="website"><style>
+  /* Container styles */
+  .bb-custom-select-container {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+  }
+
+  /* Opener button styles */
+  .bb-custom-select-opener {
+    display: none;
+  }
+
+  /* Disabled state styles */
+  .bb-custom-select-container.bb-is-disabled .bb-custom-select-opener {
+    background-color: #e9ecef;
+    border-color: #505050;
+    color: #6c757d;
+    cursor: not-allowed;
+  }
+
+  /* Add not-allowed cursor to the entire container when disabled */
+  .bb-custom-select-container.bb-is-disabled {
+    cursor: not-allowed;
+  }
+
+  /* Also ensure the select element shows not-allowed cursor when disabled */
+  .bb-custom-select-container.bb-is-disabled select {
+    cursor: not-allowed;
+  }
+
+  .bb-custom-select-container.bb-is-disabled .bb-custom-select-opener::after {
+    border-top-color: #6c757d;
+  }
+
+  /* Add dropdown arrow */
+  .bb-custom-select-opener::after {
+    content: '';
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid #666;
+  }
+
+  /* Rotate arrow when open */
+  .bb-custom-select-opener.bb-is-open::after {
+    transform: translateY(-50%) rotate(180deg);
+  }
+
+  /* Keep native select visible */
+  .bb-customSelect select {
+    position: relative;
+    width: 100%;
+  }
+
+  /* Dropdown panel */
+  .bb-custom-select-panel {
+    display: none;  /* Hide by default */
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 999999; /* Should always be on top of other elements */
+    margin-top: 4px;
+    width: max-content; /* Allow panel to grow based on content */
+    min-width: 100%;   /* But ensure it's at least as wide as the opener */
+    background-color: #fff;
+    border: 1px solid #d0d0d0;
+    border-radius: 4px;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  /* Show panel when container has bb-is-open class */
+  .bb-custom-select-container.bb-is-open .bb-custom-select-panel {
+    display: block;
+  }
+
+  /* Option styles */
+  .bb-custom-select-option {
+    padding: 6px 12px;
+    line-height: 1.5;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .bb-custom-select-option:hover,
+  .bb-custom-select-option.bb-has-focus {
+    background-color: #f0f9fa;
+  }
+
+  .bb-custom-select-option.bb-is-selected {
+    background-color: #e9ecef;
+  }
+</style>
+</head>
+<body>
+<!-- NAV -->
+<nav id="nav" style="top: 0;">
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">
+      <div class="logo-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+      </div>
+      AI PMO
+    </a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="#features" data-i18n="nav.features">Features</a></li>
+      <li><a href="#how" data-i18n="nav.how">How It Works</a></li>
+      <li><a href="#dashboard" data-i18n="nav.dashboard">Dashboard</a></li>
+      <li><a href="#pricing" data-i18n="nav.pricing">Pricing</a></li>
+      <li><button class="nav-cta" onclick="document.getElementById('cta').scrollIntoView({behavior:'smooth'})" data-i18n="nav.cta">Get Started</button></li>
+    </ul>
+    <div class="lang-toggle" id="langToggle">
+      <button class="active" data-lang="en">EN</button>
+      <button data-lang="ru">RU</button>
+    </div>
+    <button class="nav-burger" id="burger" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-glow"></div>
+  <div class="container">
+    <div class="hero-badge fade-up visible" style="transition-delay: 0s;"><span class="dot"></span> <span data-i18n="hero.badge">Now with GPT-powered risk analysis</span></div>
+    <h1 class="fade-up visible" data-i18n-html="hero.title" style="transition-delay: 0.05s;">Your AI-Powered<br><span class="gradient-text">Project Management Office</span></h1>
+    <p class="fade-up visible" data-i18n="hero.sub" style="transition-delay: 0.1s;">Connect your email, plans, and documents. AI PMO keeps every project on budget, on time, and at the highest quality — automatically.</p>
+    <div class="hero-buttons fade-up visible" style="transition-delay: 0.15s;">
+      <button class="btn-primary" onclick="document.getElementById('cta').scrollIntoView({behavior:'smooth'})">
+        <span data-i18n="hero.cta1">Get Started Free</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5l7 7-7 7"></path></svg>
+      </button>
+      <button class="btn-secondary" onclick="document.getElementById('dashboard').scrollIntoView({behavior:'smooth'})">
+        <span data-i18n="hero.cta2">See Dashboard</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+      </button>
+    </div>
+
+    <div class="hero-dashboard fade-up visible" style="transition-delay: 0.2s;">
+      <div class="dash-inner">
+        <div class="dash-topbar">
+          <div class="dash-dots"><span></span><span></span><span></span></div>
+          <div class="dash-search" data-i18n="dash.search">Search projects, risks, budgets...</div>
+          <div style="font-size:0.75rem;color:var(--text-muted)">AI PMO Dashboard</div>
+        </div>
+        <div class="dash-grid">
+          <div class="dash-card">
+            <h4 data-i18n="dash.health">Project Health</h4>
+            <div class="val gradient-text">92%</div>
+            <div class="sub" data-i18n="dash.health_sub">+3% from last week</div>
+            <div class="mini-chart">
+              <span style="--h:45%"></span><span style="--h:60%"></span><span style="--h:35%"></span>
+              <span style="--h:70%"></span><span style="--h:55%"></span><span style="--h:80%"></span>
+              <span style="--h:65%"></span><span style="--h:90%"></span>
+            </div>
+          </div>
+          <div class="dash-card">
+            <h4 data-i18n="dash.budget">Budget Status</h4>
+            <div class="val">$1.2M <span style="font-size:0.8rem;color:var(--text-muted)">/ $1.5M</span></div>
+            <div class="sub" data-i18n="dash.budget_sub">On track — 78% utilized</div>
+            <div class="mini-bar-row">
+              <div class="mini-bar-item">Engineering<div class="bar-track"><div class="bar-fill" style="width:82%;background:linear-gradient(90deg,#06B6D4,#3B82F6)"></div></div>82%</div>
+              <div class="mini-bar-item">Design<div class="bar-track"><div class="bar-fill" style="width:64%;background:linear-gradient(90deg,#06B6D4,#22C55E)"></div></div>64%</div>
+              <div class="mini-bar-item">QA<div class="bar-track"><div class="bar-fill" style="width:45%;background:linear-gradient(90deg,#06B6D4,#8B5CF6)"></div></div>45%</div>
+            </div>
+          </div>
+          <div class="dash-card">
+            <h4 data-i18n="dash.risks">Risk Alerts</h4>
+            <div class="alert-list">
+              <div class="alert-item"><span class="alert-dot" style="background:#EF4444"></span><span data-i18n="dash.risk1">API deadline at risk — 2 days behind</span></div>
+              <div class="alert-item"><span class="alert-dot" style="background:#F59E0B"></span><span data-i18n="dash.risk2">Design budget 92% consumed</span></div>
+              <div class="alert-item"><span class="alert-dot" style="background:#22C55E"></span><span data-i18n="dash.risk3">QA pass rate improved to 97%</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- LOGOS -->
+<section class="logos fade-up" style="transition-delay: 0.25s;">
+  <p data-i18n="logos.title">Trusted by forward-thinking teams</p>
+  <div class="logos-track">
+    <span>Deloitte</span><span>Accenture</span><span>McKinsey</span><span>Bain</span><span>Siemens</span><span>SAP</span><span>Capgemini</span><span>Infosys</span>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section class="problem fade-up" style="transition-delay: 0.3s;">
+  <div class="container">
+    <div class="problem-stat gradient-text">67%</div>
+    <h2 data-i18n-html="problem.text">of projects fail to meet budget, timeline, or quality targets.<br><strong style="color:var(--text-bright)">AI PMO changes that.</strong></h2>
+  </div>
+</section>
+
+<!-- INTEGRATIONS -->
+<section class="integrations" id="features">
+  <div class="container">
+    <div class="section-label fade-up" data-i18n="int.label" style="transition-delay: 0.35s;">Integrations</div>
+    <div class="section-title fade-up" data-i18n="int.title" style="transition-delay: 0.4s;">Connects with your entire stack</div>
+    <p class="section-sub fade-up" data-i18n="int.sub" style="transition-delay: 0.4s;">AI PMO plugs into the tools you already use — no migration, no disruption.</p>
+    <div class="int-grid fade-up" style="transition-delay: 0.4s;">
+      <div class="int-card">
+        <div class="int-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M22 7l-10 7L2 7"></path></svg>
+        </div>
+        <h4>Gmail</h4><p data-i18n="int.email">Email</p>
+      </div>
+      <div class="int-card">
+        <div class="int-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M22 7l-10 7L2 7"></path></svg>
+        </div>
+        <h4>Outlook</h4><p data-i18n="int.email">Email</p>
+      </div>
+      <div class="int-card">
+        <div class="int-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"></path><path d="M4 12h16"></path><path d="M4 18h10"></path><rect x="2" y="3" width="20" height="18" rx="2"></rect></svg>
+        </div>
+        <h4>Jira</h4><p data-i18n="int.plans">Project Plans</p>
+      </div>
+      <div class="int-card">
+        <div class="int-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 12l3 3 5-5"></path></svg>
+        </div>
+        <h4>Asana</h4><p data-i18n="int.plans">Project Plans</p>
+      </div>
+      <div class="int-card">
+        <div class="int-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18"></path><path d="M9 3v18"></path></svg>
+        </div>
+        <h4>Monday.com</h4><p data-i18n="int.plans">Project Plans</p>
+      </div>
+      <div class="int-card">
+        <div class="int-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path><path d="M14 2v6h6"></path></svg>
+        </div>
+        <h4>Google Docs</h4><p data-i18n="int.docs">Documents</p>
+      </div>
+      <div class="int-card">
+        <div class="int-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"></path></svg>
+        </div>
+        <h4>Slack</h4><p data-i18n="int.comm">Communication</p>
+      </div>
+      <div class="int-card">
+        <div class="int-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 00-3-3.87"></path><path d="M16 3.13a4 4 0 010 7.75"></path></svg>
+        </div>
+        <h4>Teams</h4><p data-i18n="int.comm">Communication</p>
+      </div>
+      <div class="int-card">
+        <div class="int-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"></path></svg>
+        </div>
+        <h4>SAP</h4><p data-i18n="int.finance">Finance</p>
+      </div>
+      <div class="int-card">
+        <div class="int-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
+        </div>
+        <h4>QuickBooks</h4><p data-i18n="int.finance">Finance</p>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- PILLARS -->
+<section class="pillars">
+  <div class="container">
+    <div style="text-align:center">
+      <div class="section-label fade-up" style="justify-content: center; transition-delay: 0.4s;" data-i18n="pillars.label">Core Capabilities</div>
+      <div class="section-title fade-up" data-i18n="pillars.title" style="transition-delay: 0.4s;">Three pillars of project success</div>
+      <p class="section-sub fade-up" style="margin: 0px auto; transition-delay: 0.4s;" data-i18n="pillars.sub">AI that monitors, predicts, and protects across every dimension of project delivery.</p>
+    </div>
+    <div class="pillars-grid">
+      <div class="pillar fade-up" style="transition-delay: 0.4s;">
+        <div class="pillar-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"></path></svg>
+        </div>
+        <h3 data-i18n="p1.title">Budget Intelligence</h3>
+        <p data-i18n="p1.desc">AI continuously monitors spend against forecasts, detecting overruns before they happen.</p>
+        <ul class="pillar-features">
+          <li data-i18n="p1.f1">Real-time spend vs. forecast tracking</li>
+          <li data-i18n="p1.f2">Predictive cost overrun alerts</li>
+          <li data-i18n="p1.f3">Auto-categorized expense analysis</li>
+          <li data-i18n="p1.f4">Vendor spend optimization</li>
+        </ul>
+      </div>
+      <div class="pillar fade-up" style="transition-delay: 0.4s;">
+        <div class="pillar-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        </div>
+        <h3 data-i18n="p2.title">Timeline Guardian</h3>
+        <p data-i18n="p2.desc">Predictive scheduling that scans emails and docs to detect delays before milestones slip.</p>
+        <ul class="pillar-features">
+          <li data-i18n="p2.f1">Predictive milestone scheduling</li>
+          <li data-i18n="p2.f2">Dependency tracking from emails</li>
+          <li data-i18n="p2.f3">Critical path risk detection</li>
+          <li data-i18n="p2.f4">Automated timeline adjustments</li>
+        </ul>
+      </div>
+      <div class="pillar fade-up" style="transition-delay: 0.4s;">
+        <div class="pillar-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+        </div>
+        <h3 data-i18n="p3.title">Quality Assurance Engine</h3>
+        <p data-i18n="p3.desc">Scans deliverables against requirements and tracks quality trends across the portfolio.</p>
+        <ul class="pillar-features">
+          <li data-i18n="p3.f1">Requirement-to-deliverable matching</li>
+          <li data-i18n="p3.f2">Defect trend analysis</li>
+          <li data-i18n="p3.f3">Compliance standard enforcement</li>
+          <li data-i18n="p3.f4">Automated quality scoring</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how" id="how">
+  <div class="container">
+    <div class="section-label fade-up" style="justify-content: center; transition-delay: 0.4s;" data-i18n="how.label">How It Works</div>
+    <div class="section-title fade-up" data-i18n="how.title" style="transition-delay: 0.4s;">Up and running in minutes</div>
+    <p class="section-sub fade-up" style="margin: 0px auto; transition-delay: 0.4s;" data-i18n="how.sub">No complex setup. No training required. AI PMO learns your projects and starts delivering value immediately.</p>
+    <div class="how-steps">
+      <div class="step fade-up" style="transition-delay: 0.4s;">
+        <div class="step-num">1</div>
+        <h4 data-i18n="how.s1t">Connect Your Tools</h4>
+        <p data-i18n="how.s1d">Link email, project plans, docs, and finance tools in one click</p>
+      </div>
+      <div class="step fade-up" style="transition-delay: 0.4s;">
+        <div class="step-num">2</div>
+        <h4 data-i18n="how.s2t">AI Builds the Graph</h4>
+        <p data-i18n="how.s2d">AI maps people, tasks, budgets, and dependencies into a unified project graph</p>
+      </div>
+      <div class="step fade-up" style="transition-delay: 0.4s;">
+        <div class="step-num">3</div>
+        <h4 data-i18n="how.s3t">Real-Time Monitoring</h4>
+        <p data-i18n="how.s3d">Continuous scanning with smart alerts for budget, timeline, and quality risks</p>
+      </div>
+      <div class="step fade-up" style="transition-delay: 0.4s;">
+        <div class="step-num">4</div>
+        <h4 data-i18n="how.s4t">Insights &amp; Reports</h4>
+        <p data-i18n="how.s4d">Actionable recommendations and auto-generated executive reports</p>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- DASHBOARD PREVIEW -->
+<section class="dash-preview" id="dashboard">
+  <div class="container">
+    <div class="section-label fade-up" style="justify-content: center; transition-delay: 0.4s;" data-i18n="dashp.label">Live Dashboard</div>
+    <div class="section-title fade-up" data-i18n="dashp.title" style="transition-delay: 0.4s;">Command center for your portfolio</div>
+    <p class="section-sub fade-up" style="margin: 0px auto; transition-delay: 0.4s;" data-i18n="dashp.sub">Every metric, risk, and insight in one place. No more spreadsheet chaos.</p>
+    <div class="dash-frame fade-up" style="transition-delay: 0.4s;">
+      <div class="dash-frame-bar">
+        <div class="bar-circle" style="background:#EF4444"></div>
+        <div class="bar-circle" style="background:#F59E0B"></div>
+        <div class="bar-circle" style="background:#22C55E"></div>
+        <span style="flex:1;text-align:center;font-size:0.7rem;color:var(--text-muted)">app.aipmo.com/dashboard</span>
+      </div>
+      <div class="dash-frame-body">
+        <div class="dash-sidebar">
+          <div class="dash-sidebar-item active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>
+            <span data-i18n="sb.overview">Overview</span>
+          </div>
+          <div class="dash-sidebar-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+            <span data-i18n="sb.analytics">Analytics</span>
+          </div>
+          <div class="dash-sidebar-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"></path></svg>
+            <span data-i18n="sb.budget">Budget</span>
+          </div>
+          <div class="dash-sidebar-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            <span data-i18n="sb.timeline">Timeline</span>
+          </div>
+          <div class="dash-sidebar-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            <span data-i18n="sb.risks">Risks</span>
+          </div>
+          <div class="dash-sidebar-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            <span data-i18n="sb.quality">Quality</span>
+          </div>
+          <div class="dash-sidebar-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path><path d="M14 2v6h6"></path></svg>
+            <span data-i18n="sb.reports">Reports</span>
+          </div>
+        </div>
+        <div class="dash-main">
+          <div class="dash-kpi">
+            <div class="kpi-card"><div class="kpi-label" data-i18n="kpi.active">Active Projects</div><div class="kpi-val">24</div><div class="kpi-change up" data-i18n="kpi.active_c">+2 this month</div></div>
+            <div class="kpi-card"><div class="kpi-label" data-i18n="kpi.track">On Track</div><div class="kpi-val gradient-text">87%</div><div class="kpi-change up" data-i18n="kpi.track_c">+5% vs last quarter</div></div>
+            <div class="kpi-card"><div class="kpi-label" data-i18n="kpi.bhealth">Budget Health</div><div class="kpi-val">$4.2M</div><div class="kpi-change up" data-i18n="kpi.bhealth_c">8% under budget</div></div>
+            <div class="kpi-card"><div class="kpi-label" data-i18n="kpi.qscore">Quality Score</div><div class="kpi-val">94</div><div class="kpi-change down" data-i18n="kpi.qscore_c">-1 from last week</div></div>
+          </div>
+          <div class="dash-chart-area">
+            <h5 data-i18n="dashp.burn">Budget Burn Rate</h5>
+            <svg class="svg-chart" viewBox="0 0 400 140" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="burnGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--cyan)" stop-opacity="0.3"></stop><stop offset="100%" stop-color="var(--cyan)" stop-opacity="0"></stop></linearGradient>
+                <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="var(--cyan)"></stop><stop offset="100%" stop-color="var(--blue)"></stop></linearGradient>
+              </defs>
+              <path d="M0 120 Q50 110,80 95 T160 80 T240 50 T320 40 T400 20 V140 H0Z" fill="url(#burnGrad)"></path>
+              <path d="M0 120 Q50 110,80 95 T160 80 T240 50 T320 40 T400 20" fill="none" stroke="url(#lineGrad)" stroke-width="2.5"></path>
+              <line x1="0" y1="70" x2="400" y2="70" stroke="var(--text-muted)" stroke-width="0.5" stroke-dasharray="4,4" opacity="0.3"></line>
+              <text x="390" y="66" fill="var(--text-muted)" font-size="8" text-anchor="end">Forecast</text>
+            </svg>
+          </div>
+          <div class="dash-chart-area">
+            <h5 data-i18n="dashp.timeline">Project Timeline</h5>
+            <div class="gantt-rows">
+              <div class="gantt-row"><span>API v2</span><div class="gantt-bar-track"><div class="gantt-bar" style="left:5%;width:55%;background:linear-gradient(90deg,#06B6D4,#3B82F6);border-radius:4px"></div></div></div>
+              <div class="gantt-row"><span>Mobile</span><div class="gantt-bar-track"><div class="gantt-bar" style="left:20%;width:45%;background:linear-gradient(90deg,#8B5CF6,#EC4899);border-radius:4px"></div></div></div>
+              <div class="gantt-row"><span>Auth</span><div class="gantt-bar-track"><div class="gantt-bar" style="left:0;width:35%;background:linear-gradient(90deg,#22C55E,#06B6D4);border-radius:4px"></div></div></div>
+              <div class="gantt-row"><span>Design</span><div class="gantt-bar-track"><div class="gantt-bar" style="left:10%;width:70%;background:linear-gradient(90deg,#F59E0B,#EF4444);border-radius:4px"></div></div></div>
+              <div class="gantt-row"><span>Testing</span><div class="gantt-bar-track"><div class="gantt-bar" style="left:40%;width:50%;background:linear-gradient(90deg,#06B6D4,#22C55E);border-radius:4px"></div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="testimonials">
+  <div class="container">
+    <div class="section-label fade-up" style="justify-content: center; transition-delay: 0.4s;" data-i18n="test.label">What Leaders Say</div>
+    <div class="section-title fade-up" data-i18n="test.title" style="transition-delay: 0.4s;">Trusted by PMO leaders worldwide</div>
+    <div class="test-grid">
+      <div class="test-card fade-up" style="transition-delay: 0.4s;">
+        <div class="stars">★★★★★</div>
+        <blockquote data-i18n="test.q1">"AI PMO caught a $340K budget overrun three weeks before it would have hit. That single alert paid for our entire annual subscription."</blockquote>
+        <div class="test-author">
+          <div class="test-avatar">SR</div>
+          <div class="test-info"><h5>Sarah Reynolds</h5><p data-i18n="test.r1">VP of PMO, Meridian Systems</p></div>
+        </div>
+      </div>
+      <div class="test-card fade-up" style="transition-delay: 0.4s;">
+        <div class="stars">★★★★★</div>
+        <blockquote data-i18n="test.q2">"We went from 60% on-time delivery to 94% in two quarters. The timeline prediction alone is worth it. Our execs finally trust the estimates."</blockquote>
+        <div class="test-author">
+          <div class="test-avatar">MK</div>
+          <div class="test-info"><h5>Marcus Kim</h5><p data-i18n="test.r2">CTO, Arcadia Digital</p></div>
+        </div>
+      </div>
+      <div class="test-card fade-up" style="transition-delay: 0.4s;">
+        <div class="stars">★★★★★</div>
+        <blockquote data-i18n="test.q3">"The quality engine flagged compliance gaps in 3 deliverables that our manual reviews missed. It's like having a senior PMO analyst that never sleeps."</blockquote>
+        <div class="test-author">
+          <div class="test-avatar">LP</div>
+          <div class="test-info"><h5>Laura Petrov</h5><p data-i18n="test.r3">Director of Delivery, NovaTech</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- PRICING -->
+<section class="pricing" id="pricing">
+  <div class="container">
+    <div class="section-label fade-up" style="justify-content: center; transition-delay: 0.4s;" data-i18n="price.label">Pricing</div>
+    <div class="section-title fade-up" data-i18n="price.title" style="transition-delay: 0.4s;">Plans that scale with you</div>
+    <p class="section-sub fade-up" style="margin: 0px auto; transition-delay: 0.4s;" data-i18n="price.sub">Start free. Upgrade when your portfolio grows.</p>
+    <div class="price-grid">
+      <div class="price-card fade-up" style="transition-delay: 0.4s;">
+        <div class="price-tier">Starter</div>
+        <div class="price-amount" data-i18n="price.free">Free</div>
+        <div class="price-desc" data-i18n="price.s_desc">Perfect for small teams exploring AI-powered project management.</div>
+        <ul class="price-features">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span data-i18n="price.s_f1">Up to 3 projects</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span data-i18n="price.s_f2">Email integration</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span data-i18n="price.s_f3">Basic budget tracking</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span data-i18n="price.s_f4">Weekly AI reports</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span data-i18n="price.s_f5">Community support</span></li>
+        </ul>
+        <button class="price-btn outline" data-i18n="price.s_btn">Get Started</button>
+      </div>
+      <div class="price-card featured fade-up" style="transition-delay: 0.4s;">
+        <div class="price-tier">Professional</div>
+        <div class="price-amount">$29<span data-i18n="price.per">/user/mo</span></div>
+        <div class="price-desc" data-i18n="price.p_desc">For growing teams that need full AI-powered project oversight.</div>
+        <ul class="price-features">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span data-i18n="price.p_f1">Unlimited projects</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span data-i18n="price.p_f2">All integrations</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span data-i18n="p1.title">Budget Intelligence</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span data-i18n="p2.title">Timeline Guardian</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span data-i18n="p3.title">Quality Assurance Engine</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span data-i18n="price.p_f6">Daily AI reports</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span data-i18n="price.p_f7">Priority support</span></li>
+        </ul>
+        <button class="price-btn primary" data-i18n="price.p_btn">Start Free Trial</button>
+      </div>
+      <div class="price-card fade-up" style="transition-delay: 0.4s;">
+        <div class="price-tier">Enterprise</div>
+        <div class="price-amount" data-i18n="price.custom">Custom</div>
+        <div class="price-desc" data-i18n="price.e_desc">For organizations managing complex portfolios at scale.</div>
+        <ul class="price-features">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span data-i18n="price.e_f1">Everything in Professional</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span data-i18n="price.e_f2">Custom AI models</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span>SSO &amp; SAML</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span data-i18n="price.e_f4">On-prem deployment</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span data-i18n="price.e_f5">Dedicated success manager</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span data-i18n="price.e_f6">SLA guarantee</span></li>
+        </ul>
+        <button class="price-btn outline" data-i18n="price.e_btn">Contact Sales</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section" id="cta">
+  <div class="container">
+    <div class="cta-box fade-up" style="transition-delay: 0.4s;">
+      <h2 data-i18n-html="cta.title">Stop firefighting.<br><span class="gradient-text">Start predicting.</span></h2>
+      <p data-i18n="cta.sub">Join 2,000+ project leaders who deliver on time and under budget with AI PMO.</p>
+      <form class="cta-form" onsubmit="event.preventDefault();this.querySelector('button').textContent=currentLang==='ru'?'\u0412\u044B \u0432 \u0441\u043f\u0438\u0441\u043a\u0435!':'You\'re in!';this.querySelector('input').disabled=true">
+        <input type="email" placeholder="Enter your work email" data-i18n-placeholder="cta.placeholder" required="">
+        <button type="submit" class="btn-primary" data-i18n="cta.btn">Get Early Access</button>
+      </form>
+    </div>
+  </div>
+</section>
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="nav-logo">
+          <div class="logo-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+          </div>
+          AI PMO
+        </div>
+        <p data-i18n="footer.brand_desc">AI-powered project management that keeps every initiative on track, on budget, and at the highest quality.</p>
+      </div>
+      <div class="footer-col">
+        <h5 data-i18n="footer.product">Product</h5>
+        <ul>
+          <li><a href="#features" data-i18n="nav.features">Features</a></li>
+          <li><a href="#pricing" data-i18n="nav.pricing">Pricing</a></li>
+          <li><a href="#" data-i18n="int.label">Integrations</a></li>
+          <li><a href="#" data-i18n="footer.changelog">Changelog</a></li>
+          <li><a href="#" data-i18n="footer.roadmap">Roadmap</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5 data-i18n="footer.resources">Resources</h5>
+        <ul>
+          <li><a href="#" data-i18n="footer.docs">Documentation</a></li>
+          <li><a href="#">API Reference</a></li>
+          <li><a href="#" data-i18n="footer.blog">Blog</a></li>
+          <li><a href="#" data-i18n="footer.cases">Case Studies</a></li>
+          <li><a href="#" data-i18n="footer.webinars">Webinars</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5 data-i18n="footer.company">Company</h5>
+        <ul>
+          <li><a href="#" data-i18n="footer.about">About</a></li>
+          <li><a href="#" data-i18n="footer.careers">Careers</a></li>
+          <li><a href="#" data-i18n="footer.contact">Contact</a></li>
+          <li><a href="#" data-i18n="footer.privacy">Privacy Policy</a></li>
+          <li><a href="#" data-i18n="footer.terms">Terms of Service</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p data-i18n="footer.copy">© 2026 AI PMO. All rights reserved.</p>
+      <div class="footer-socials">
+        <a href="#" aria-label="Twitter">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></svg>
+        </a>
+        <a href="#" aria-label="LinkedIn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"></path></svg>
+        </a>
+        <a href="#" aria-label="GitHub">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"></path></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+// ===== i18n Translation System =====
+let currentLang = 'en';
+const translations = {
+  ru: {
+    // Nav
+    'nav.features': '\u0412\u043e\u0437\u043c\u043e\u0436\u043d\u043e\u0441\u0442\u0438',
+    'nav.how': '\u041a\u0430\u043a \u044d\u0442\u043e \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442',
+    'nav.dashboard': '\u041f\u0430\u043d\u0435\u043b\u044c \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u044f',
+    'nav.pricing': '\u0422\u0430\u0440\u0438\u0444\u044b',
+    'nav.cta': '\u041d\u0430\u0447\u0430\u0442\u044c',
+    // Hero
+    'hero.badge': '\u0422\u0435\u043f\u0435\u0440\u044c \u0441 GPT-\u0430\u043d\u0430\u043b\u0438\u0437\u043e\u043c \u0440\u0438\u0441\u043a\u043e\u0432',
+    'hero.title': '\u0412\u0430\u0448 \u043e\u0444\u0438\u0441 \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u044f \u043f\u0440\u043e\u0435\u043a\u0442\u0430\u043c\u0438<br><span class="gradient-text">\u043d\u0430 \u0431\u0430\u0437\u0435 \u0418\u0418</span>',
+    'hero.sub': '\u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0438\u0442\u0435 \u043f\u043e\u0447\u0442\u0443, \u043f\u043b\u0430\u043d\u044b \u0438 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u044b. AI PMO \u043e\u0431\u0435\u0441\u043f\u0435\u0447\u0438\u0432\u0430\u0435\u0442 \u0441\u043e\u0431\u043b\u044e\u0434\u0435\u043d\u0438\u0435 \u0431\u044e\u0434\u0436\u0435\u0442\u0430, \u0441\u0440\u043e\u043a\u043e\u0432 \u0438 \u043a\u0430\u0447\u0435\u0441\u0442\u0432\u0430 \u2014 \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438.',
+    'hero.cta1': '\u041d\u0430\u0447\u0430\u0442\u044c \u0431\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u043e',
+    'hero.cta2': '\u0421\u043c\u043e\u0442\u0440\u0435\u0442\u044c \u043f\u0430\u043d\u0435\u043b\u044c',
+    // Dashboard hero
+    'dash.search': '\u041f\u043e\u0438\u0441\u043a \u043f\u0440\u043e\u0435\u043a\u0442\u043e\u0432, \u0440\u0438\u0441\u043a\u043e\u0432, \u0431\u044e\u0434\u0436\u0435\u0442\u043e\u0432...',
+    'dash.health': '\u0417\u0434\u043e\u0440\u043e\u0432\u044c\u0435 \u043f\u0440\u043e\u0435\u043a\u0442\u0430',
+    'dash.health_sub': '+3% \u0437\u0430 \u043d\u0435\u0434\u0435\u043b\u044e',
+    'dash.budget': '\u0421\u0442\u0430\u0442\u0443\u0441 \u0431\u044e\u0434\u0436\u0435\u0442\u0430',
+    'dash.budget_sub': '\u0412 \u043d\u043e\u0440\u043c\u0435 \u2014 78% \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d\u043e',
+    'dash.risks': '\u041e\u043f\u043e\u0432\u0435\u0449\u0435\u043d\u0438\u044f \u043e \u0440\u0438\u0441\u043a\u0430\u0445',
+    'dash.risk1': '\u0414\u0435\u0434\u043b\u0430\u0439\u043d API \u043f\u043e\u0434 \u0443\u0433\u0440\u043e\u0437\u043e\u0439 \u2014 \u043e\u0442\u0441\u0442\u0430\u0432\u0430\u043d\u0438\u0435 2 \u0434\u043d\u044f',
+    'dash.risk2': '\u0411\u044e\u0434\u0436\u0435\u0442 \u043d\u0430 \u0434\u0438\u0437\u0430\u0439\u043d \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d \u043d\u0430 92%',
+    'dash.risk3': '\u041f\u0440\u043e\u0446\u0435\u043d\u0442 \u043f\u0440\u043e\u0445\u043e\u0436\u0434\u0435\u043d\u0438\u044f QA \u0432\u044b\u0440\u043e\u0441 \u0434\u043e 97%',
+    // Logos
+    'logos.title': '\u041d\u0430\u043c \u0434\u043e\u0432\u0435\u0440\u044f\u044e\u0442 \u043f\u0435\u0440\u0435\u0434\u043e\u0432\u044b\u0435 \u043a\u043e\u043c\u0430\u043d\u0434\u044b',
+    // Problem
+    'problem.text': '\u043f\u0440\u043e\u0435\u043a\u0442\u043e\u0432 \u043d\u0435 \u0443\u043a\u043b\u0430\u0434\u044b\u0432\u0430\u044e\u0442\u0441\u044f \u0432 \u0431\u044e\u0434\u0436\u0435\u0442, \u0441\u0440\u043e\u043a\u0438 \u0438\u043b\u0438 \u0441\u0442\u0430\u043d\u0434\u0430\u0440\u0442\u044b \u043a\u0430\u0447\u0435\u0441\u0442\u0432\u0430.<br><strong style="color:var(--text-bright)">AI PMO \u043c\u0435\u043d\u044f\u0435\u0442 \u044d\u0442\u043e.</strong>',
+    // Integrations
+    'int.label': '\u0418\u043d\u0442\u0435\u0433\u0440\u0430\u0446\u0438\u0438',
+    'int.title': '\u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0430\u0435\u0442\u0441\u044f \u043a\u043e \u0432\u0441\u0435\u043c \u0432\u0430\u0448\u0438\u043c \u0438\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442\u0430\u043c',
+    'int.sub': 'AI PMO \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442 \u0441 \u0438\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442\u0430\u043c\u0438, \u043a\u043e\u0442\u043e\u0440\u044b\u0435 \u0432\u044b \u0443\u0436\u0435 \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0435\u0442\u0435 \u2014 \u0431\u0435\u0437 \u043c\u0438\u0433\u0440\u0430\u0446\u0438\u0438 \u0438 \u0441\u0431\u043e\u0435\u0432.',
+    'int.email': '\u042d\u043b. \u043f\u043e\u0447\u0442\u0430',
+    'int.plans': '\u041f\u043b\u0430\u043d\u044b \u043f\u0440\u043e\u0435\u043a\u0442\u043e\u0432',
+    'int.docs': '\u0414\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u044b',
+    'int.comm': '\u041a\u043e\u043c\u043c\u0443\u043d\u0438\u043a\u0430\u0446\u0438\u044f',
+    'int.finance': '\u0424\u0438\u043d\u0430\u043d\u0441\u044b',
+    // Pillars
+    'pillars.label': '\u041a\u043b\u044e\u0447\u0435\u0432\u044b\u0435 \u0432\u043e\u0437\u043c\u043e\u0436\u043d\u043e\u0441\u0442\u0438',
+    'pillars.title': '\u0422\u0440\u0438 \u0441\u0442\u043e\u043b\u043f\u0430 \u0443\u0441\u043f\u0435\u0445\u0430 \u043f\u0440\u043e\u0435\u043a\u0442\u0430',
+    'pillars.sub': '\u0418\u0418, \u043a\u043e\u0442\u043e\u0440\u044b\u0439 \u043e\u0442\u0441\u043b\u0435\u0436\u0438\u0432\u0430\u0435\u0442, \u043f\u0440\u043e\u0433\u043d\u043e\u0437\u0438\u0440\u0443\u0435\u0442 \u0438 \u0437\u0430\u0449\u0438\u0449\u0430\u0435\u0442 \u043a\u0430\u0436\u0434\u044b\u0439 \u0430\u0441\u043f\u0435\u043a\u0442 \u0440\u0435\u0430\u043b\u0438\u0437\u0430\u0446\u0438\u0438 \u043f\u0440\u043e\u0435\u043a\u0442\u0430.',
+    'p1.title': '\u0411\u044e\u0434\u0436\u0435\u0442\u043d\u0430\u044f \u0430\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0430',
+    'p1.desc': '\u0418\u0418 \u043d\u0435\u043f\u0440\u0435\u0440\u044b\u0432\u043d\u043e \u043e\u0442\u0441\u043b\u0435\u0436\u0438\u0432\u0430\u0435\u0442 \u0440\u0430\u0441\u0445\u043e\u0434\u044b \u043e\u0442\u043d\u043e\u0441\u0438\u0442\u0435\u043b\u044c\u043d\u043e \u043f\u0440\u043e\u0433\u043d\u043e\u0437\u043e\u0432, \u0432\u044b\u044f\u0432\u043b\u044f\u044f \u043f\u0435\u0440\u0435\u0440\u0430\u0441\u0445\u043e\u0434\u044b \u0434\u043e \u0438\u0445 \u0432\u043e\u0437\u043d\u0438\u043a\u043d\u043e\u0432\u0435\u043d\u0438\u044f.',
+    'p1.f1': '\u041e\u0442\u0441\u043b\u0435\u0436\u0438\u0432\u0430\u043d\u0438\u0435 \u0440\u0430\u0441\u0445\u043e\u0434\u043e\u0432 \u0432\u0441. \u043f\u0440\u043e\u0433\u043d\u043e\u0437\u0430 \u0432 \u0440\u0435\u0430\u043b\u044c\u043d\u043e\u043c \u0432\u0440\u0435\u043c\u0435\u043d\u0438',
+    'p1.f2': '\u041f\u0440\u043e\u0433\u043d\u043e\u0437\u043d\u044b\u0435 \u043e\u043f\u043e\u0432\u0435\u0449\u0435\u043d\u0438\u044f \u043e \u043f\u0435\u0440\u0435\u0440\u0430\u0441\u0445\u043e\u0434\u0435',
+    'p1.f3': '\u0410\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0430\u044f \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u0437\u0430\u0446\u0438\u044f \u0437\u0430\u0442\u0440\u0430\u0442',
+    'p1.f4': '\u041e\u043f\u0442\u0438\u043c\u0438\u0437\u0430\u0446\u0438\u044f \u0440\u0430\u0441\u0445\u043e\u0434\u043e\u0432 \u043d\u0430 \u043f\u043e\u0434\u0440\u044f\u0434\u0447\u0438\u043a\u043e\u0432',
+    'p2.title': '\u0421\u0442\u0440\u0430\u0436 \u0441\u0440\u043e\u043a\u043e\u0432',
+    'p2.desc': '\u041f\u0440\u043e\u0433\u043d\u043e\u0437\u043d\u043e\u0435 \u043f\u043b\u0430\u043d\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435, \u043a\u043e\u0442\u043e\u0440\u043e\u0435 \u0441\u043a\u0430\u043d\u0438\u0440\u0443\u0435\u0442 \u043f\u043e\u0447\u0442\u0443 \u0438 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u044b \u0434\u043b\u044f \u0432\u044b\u044f\u0432\u043b\u0435\u043d\u0438\u044f \u0437\u0430\u0434\u0435\u0440\u0436\u0435\u043a \u0434\u043e \u0441\u0440\u044b\u0432\u0430 \u0441\u0440\u043e\u043a\u043e\u0432.',
+    'p2.f1': '\u041f\u0440\u043e\u0433\u043d\u043e\u0437\u043d\u043e\u0435 \u043f\u043b\u0430\u043d\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435 \u0432\u0435\u0445',
+    'p2.f2': '\u041e\u0442\u0441\u043b\u0435\u0436\u0438\u0432\u0430\u043d\u0438\u0435 \u0437\u0430\u0432\u0438\u0441\u0438\u043c\u043e\u0441\u0442\u0435\u0439 \u0438\u0437 \u043f\u0438\u0441\u0435\u043c',
+    'p2.f3': '\u041e\u0431\u043d\u0430\u0440\u0443\u0436\u0435\u043d\u0438\u0435 \u0440\u0438\u0441\u043a\u043e\u0432 \u043a\u0440\u0438\u0442\u0438\u0447\u0435\u0441\u043a\u043e\u0433\u043e \u043f\u0443\u0442\u0438',
+    'p2.f4': '\u0410\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0430\u044f \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u0438\u0440\u043e\u0432\u043a\u0430 \u0441\u0440\u043e\u043a\u043e\u0432',
+    'p3.title': '\u041c\u043e\u0434\u0443\u043b\u044c \u043a\u043e\u043d\u0442\u0440\u043e\u043b\u044f \u043a\u0430\u0447\u0435\u0441\u0442\u0432\u0430',
+    'p3.desc': '\u041f\u0440\u043e\u0432\u0435\u0440\u044f\u0435\u0442 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u044b \u043d\u0430 \u0441\u043e\u043e\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0438\u0435 \u0442\u0440\u0435\u0431\u043e\u0432\u0430\u043d\u0438\u044f\u043c \u0438 \u043e\u0442\u0441\u043b\u0435\u0436\u0438\u0432\u0430\u0435\u0442 \u0442\u0440\u0435\u043d\u0434\u044b \u043a\u0430\u0447\u0435\u0441\u0442\u0432\u0430 \u043f\u043e \u043f\u043e\u0440\u0442\u0444\u0435\u043b\u044e.',
+    'p3.f1': '\u0421\u043e\u043f\u043e\u0441\u0442\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u0442\u0440\u0435\u0431\u043e\u0432\u0430\u043d\u0438\u0439 \u0438 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u043e\u0432',
+    'p3.f2': '\u0410\u043d\u0430\u043b\u0438\u0437 \u0442\u0440\u0435\u043d\u0434\u043e\u0432 \u0434\u0435\u0444\u0435\u043a\u0442\u043e\u0432',
+    'p3.f3': '\u041e\u0431\u0435\u0441\u043f\u0435\u0447\u0435\u043d\u0438\u0435 \u0441\u043e\u043e\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0438\u044f \u0441\u0442\u0430\u043d\u0434\u0430\u0440\u0442\u0430\u043c',
+    'p3.f4': '\u0410\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0430\u044f \u043e\u0446\u0435\u043d\u043a\u0430 \u043a\u0430\u0447\u0435\u0441\u0442\u0432\u0430',
+    // How
+    'how.label': '\u041a\u0430\u043a \u044d\u0442\u043e \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442',
+    'how.title': '\u0417\u0430\u043f\u0443\u0441\u043a \u0437\u0430 \u043d\u0435\u0441\u043a\u043e\u043b\u044c\u043a\u043e \u043c\u0438\u043d\u0443\u0442',
+    'how.sub': '\u0411\u0435\u0437 \u0441\u043b\u043e\u0436\u043d\u043e\u0439 \u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438. \u0411\u0435\u0437 \u043e\u0431\u0443\u0447\u0435\u043d\u0438\u044f. AI PMO \u0438\u0437\u0443\u0447\u0430\u0435\u0442 \u0432\u0430\u0448\u0438 \u043f\u0440\u043e\u0435\u043a\u0442\u044b \u0438 \u0441\u0440\u0430\u0437\u0443 \u043d\u0430\u0447\u0438\u043d\u0430\u0435\u0442 \u043f\u0440\u0438\u043d\u043e\u0441\u0438\u0442\u044c \u043f\u043e\u043b\u044c\u0437\u0443.',
+    'how.s1t': '\u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0438\u0442\u0435 \u0438\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442\u044b',
+    'how.s1d': '\u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0438\u0442\u0435 \u043f\u043e\u0447\u0442\u0443, \u043f\u043b\u0430\u043d\u044b, \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u044b \u0438 \u0444\u0438\u043d\u0430\u043d\u0441\u044b \u0432 \u043e\u0434\u0438\u043d \u043a\u043b\u0438\u043a',
+    'how.s2t': '\u0418\u0418 \u0441\u0442\u0440\u043e\u0438\u0442 \u0433\u0440\u0430\u0444',
+    'how.s2d': '\u0418\u0418 \u0441\u043e\u0437\u0434\u0430\u0451\u0442 \u0435\u0434\u0438\u043d\u044b\u0439 \u0433\u0440\u0430\u0444 \u043b\u044e\u0434\u0435\u0439, \u0437\u0430\u0434\u0430\u0447, \u0431\u044e\u0434\u0436\u0435\u0442\u043e\u0432 \u0438 \u0437\u0430\u0432\u0438\u0441\u0438\u043c\u043e\u0441\u0442\u0435\u0439',
+    'how.s3t': '\u041c\u043e\u043d\u0438\u0442\u043e\u0440\u0438\u043d\u0433 \u0432 \u0440\u0435\u0430\u043b\u044c\u043d\u043e\u043c \u0432\u0440\u0435\u043c\u0435\u043d\u0438',
+    'how.s3d': '\u041d\u0435\u043f\u0440\u0435\u0440\u044b\u0432\u043d\u043e\u0435 \u0441\u043a\u0430\u043d\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435 \u0441 \u0443\u043c\u043d\u044b\u043c\u0438 \u043e\u043f\u043e\u0432\u0435\u0449\u0435\u043d\u0438\u044f\u043c\u0438 \u043e \u0440\u0438\u0441\u043a\u0430\u0445',
+    'how.s4t': '\u0418\u043d\u0441\u0430\u0439\u0442\u044b \u0438 \u043e\u0442\u0447\u0451\u0442\u044b',
+    'how.s4d': '\u041f\u0440\u0430\u043a\u0442\u0438\u0447\u0435\u0441\u043a\u0438\u0435 \u0440\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u0438 \u0438 \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438\u0435 \u043e\u0442\u0447\u0451\u0442\u044b \u0434\u043b\u044f \u0440\u0443\u043a\u043e\u0432\u043e\u0434\u0441\u0442\u0432\u0430',
+    // Dashboard preview
+    'dashp.label': '\u041f\u0430\u043d\u0435\u043b\u044c \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u044f',
+    'dashp.title': '\u0426\u0435\u043d\u0442\u0440 \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u044f \u043f\u043e\u0440\u0442\u0444\u0435\u043b\u0435\u043c',
+    'dashp.sub': '\u0412\u0441\u0435 \u043c\u0435\u0442\u0440\u0438\u043a\u0438, \u0440\u0438\u0441\u043a\u0438 \u0438 \u0438\u043d\u0441\u0430\u0439\u0442\u044b \u0432 \u043e\u0434\u043d\u043e\u043c \u043c\u0435\u0441\u0442\u0435. \u041d\u0438\u043a\u0430\u043a\u043e\u0433\u043e \u0445\u0430\u043e\u0441\u0430 \u0442\u0430\u0431\u043b\u0438\u0446.',
+    'dashp.burn': '\u0421\u043a\u043e\u0440\u043e\u0441\u0442\u044c \u0440\u0430\u0441\u0445\u043e\u0434\u043e\u0432\u0430\u043d\u0438\u044f \u0431\u044e\u0434\u0436\u0435\u0442\u0430',
+    'dashp.timeline': '\u0413\u0440\u0430\u0444\u0438\u043a \u043f\u0440\u043e\u0435\u043a\u0442\u0430',
+    // Sidebar
+    'sb.overview': '\u041e\u0431\u0437\u043e\u0440',
+    'sb.analytics': '\u0410\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0430',
+    'sb.budget': '\u0411\u044e\u0434\u0436\u0435\u0442',
+    'sb.timeline': '\u0421\u0440\u043e\u043a\u0438',
+    'sb.risks': '\u0420\u0438\u0441\u043a\u0438',
+    'sb.quality': '\u041a\u0430\u0447\u0435\u0441\u0442\u0432\u043e',
+    'sb.reports': '\u041e\u0442\u0447\u0451\u0442\u044b',
+    // KPIs
+    'kpi.active': '\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435 \u043f\u0440\u043e\u0435\u043a\u0442\u044b',
+    'kpi.active_c': '+2 \u0432 \u044d\u0442\u043e\u043c \u043c\u0435\u0441\u044f\u0446\u0435',
+    'kpi.track': '\u0412 \u0433\u0440\u0430\u0444\u0438\u043a\u0435',
+    'kpi.track_c': '+5% \u043a \u043f\u0440\u043e\u0448\u043b\u043e\u043c\u0443 \u043a\u0432\u0430\u0440\u0442\u0430\u043b\u0443',
+    'kpi.bhealth': '\u0417\u0434\u043e\u0440\u043e\u0432\u044c\u0435 \u0431\u044e\u0434\u0436\u0435\u0442\u0430',
+    'kpi.bhealth_c': '\u041d\u0430 8% \u043d\u0438\u0436\u0435 \u0431\u044e\u0434\u0436\u0435\u0442\u0430',
+    'kpi.qscore': '\u041e\u0446\u0435\u043d\u043a\u0430 \u043a\u0430\u0447\u0435\u0441\u0442\u0432\u0430',
+    'kpi.qscore_c': '-1 \u0437\u0430 \u043d\u0435\u0434\u0435\u043b\u044e',
+    // Testimonials
+    'test.label': '\u041e\u0442\u0437\u044b\u0432\u044b \u043b\u0438\u0434\u0435\u0440\u043e\u0432',
+    'test.title': '\u041d\u0430\u043c \u0434\u043e\u0432\u0435\u0440\u044f\u044e\u0442 \u0440\u0443\u043a\u043e\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u0438 PMO \u043f\u043e \u0432\u0441\u0435\u043c\u0443 \u043c\u0438\u0440\u0443',
+    'test.q1': '\u00abAI PMO \u043e\u0431\u043d\u0430\u0440\u0443\u0436\u0438\u043b \u043f\u0435\u0440\u0435\u0440\u0430\u0441\u0445\u043e\u0434 \u043d\u0430 $340\u0442\u044b\u0441. \u0437\u0430 \u0442\u0440\u0438 \u043d\u0435\u0434\u0435\u043b\u0438 \u0434\u043e \u0435\u0433\u043e \u043d\u0430\u0441\u0442\u0443\u043f\u043b\u0435\u043d\u0438\u044f. \u042d\u0442\u043e \u0435\u0434\u0438\u043d\u0441\u0442\u0432\u0435\u043d\u043d\u043e\u0435 \u043e\u043f\u043e\u0432\u0435\u0449\u0435\u043d\u0438\u0435 \u043e\u043a\u0443\u043f\u0438\u043b\u043e \u0433\u043e\u0434\u043e\u0432\u0443\u044e \u043f\u043e\u0434\u043f\u0438\u0441\u043a\u0443.\u00bb',
+    'test.r1': '\u0412\u0438\u0446\u0435-\u043f\u0440\u0435\u0437\u0438\u0434\u0435\u043d\u0442 PMO, Meridian Systems',
+    'test.q2': '\u00ab\u041c\u044b \u043f\u043e\u0434\u043d\u044f\u043b\u0438 \u0441\u0432\u043e\u0435\u0432\u0440\u0435\u043c\u0435\u043d\u043d\u0443\u044e \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0443 \u0441 60% \u0434\u043e 94% \u0437\u0430 \u0434\u0432\u0430 \u043a\u0432\u0430\u0440\u0442\u0430\u043b\u0430. \u041e\u0434\u043d\u043e \u043f\u0440\u043e\u0433\u043d\u043e\u0437\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435 \u0441\u0440\u043e\u043a\u043e\u0432 \u0443\u0436\u0435 \u0441\u0442\u043e\u0438\u0442 \u0442\u043e\u0433\u043e. \u0420\u0443\u043a\u043e\u0432\u043e\u0434\u0441\u0442\u0432\u043e \u043d\u0430\u043a\u043e\u043d\u0435\u0446 \u0434\u043e\u0432\u0435\u0440\u044f\u0435\u0442 \u043e\u0446\u0435\u043d\u043a\u0430\u043c.\u00bb',
+    'test.r2': '\u0422\u0435\u0445\u043d\u0438\u0447\u0435\u0441\u043a\u0438\u0439 \u0434\u0438\u0440\u0435\u043a\u0442\u043e\u0440, Arcadia Digital',
+    'test.q3': '\u00ab\u041c\u043e\u0434\u0443\u043b\u044c \u043a\u0430\u0447\u0435\u0441\u0442\u0432\u0430 \u043e\u0431\u043d\u0430\u0440\u0443\u0436\u0438\u043b \u043d\u0435\u0441\u043e\u043e\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0438\u044f \u0432 3 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u0430\u0445, \u043a\u043e\u0442\u043e\u0440\u044b\u0435 \u043d\u0430\u0448\u0438 \u0440\u0443\u0447\u043d\u044b\u0435 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0438 \u043f\u0440\u043e\u043f\u0443\u0441\u0442\u0438\u043b\u0438. \u042d\u0442\u043e \u043a\u0430\u043a \u0441\u0442\u0430\u0440\u0448\u0438\u0439 \u0430\u043d\u0430\u043b\u0438\u0442\u0438\u043a, \u043a\u043e\u0442\u043e\u0440\u044b\u0439 \u043d\u0438\u043a\u043e\u0433\u0434\u0430 \u043d\u0435 \u0441\u043f\u0438\u0442.\u00bb',
+    'test.r3': '\u0414\u0438\u0440\u0435\u043a\u0442\u043e\u0440 \u043f\u043e \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0435, NovaTech',
+    // Pricing
+    'price.label': '\u0422\u0430\u0440\u0438\u0444\u044b',
+    'price.title': '\u041f\u043b\u0430\u043d\u044b, \u0440\u0430\u0441\u0442\u0443\u0449\u0438\u0435 \u0432\u043c\u0435\u0441\u0442\u0435 \u0441 \u0432\u0430\u043c\u0438',
+    'price.sub': '\u041d\u0430\u0447\u043d\u0438\u0442\u0435 \u0431\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u043e. \u041e\u0431\u043d\u043e\u0432\u0438\u0442\u0435\u0441\u044c, \u043a\u043e\u0433\u0434\u0430 \u043f\u043e\u0440\u0442\u0444\u0435\u043b\u044c \u0432\u044b\u0440\u0430\u0441\u0442\u0435\u0442.',
+    'price.free': '\u0411\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u043e',
+    'price.s_desc': '\u0418\u0434\u0435\u0430\u043b\u044c\u043d\u043e \u0434\u043b\u044f \u043d\u0435\u0431\u043e\u043b\u044c\u0448\u0438\u0445 \u043a\u043e\u043c\u0430\u043d\u0434, \u0438\u0437\u0443\u0447\u0430\u044e\u0449\u0438\u0445 \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u043f\u0440\u043e\u0435\u043a\u0442\u0430\u043c\u0438 \u043d\u0430 \u0431\u0430\u0437\u0435 \u0418\u0418.',
+    'price.s_f1': '\u0414\u043e 3 \u043f\u0440\u043e\u0435\u043a\u0442\u043e\u0432',
+    'price.s_f2': '\u0418\u043d\u0442\u0435\u0433\u0440\u0430\u0446\u0438\u044f \u0441 \u043f\u043e\u0447\u0442\u043e\u0439',
+    'price.s_f3': '\u0411\u0430\u0437\u043e\u0432\u043e\u0435 \u043e\u0442\u0441\u043b\u0435\u0436\u0438\u0432\u0430\u043d\u0438\u0435 \u0431\u044e\u0434\u0436\u0435\u0442\u0430',
+    'price.s_f4': '\u0415\u0436\u0435\u043d\u0435\u0434\u0435\u043b\u044c\u043d\u044b\u0435 \u0418\u0418-\u043e\u0442\u0447\u0451\u0442\u044b',
+    'price.s_f5': '\u041f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u0430 \u0441\u043e\u043e\u0431\u0449\u0435\u0441\u0442\u0432\u0430',
+    'price.s_btn': '\u041d\u0430\u0447\u0430\u0442\u044c',
+    'price.per': '/\u043f\u043e\u043b\u044c\u0437./\u043c\u0435\u0441.',
+    'price.p_desc': '\u0414\u043b\u044f \u0440\u0430\u0441\u0442\u0443\u0449\u0438\u0445 \u043a\u043e\u043c\u0430\u043d\u0434, \u043a\u043e\u0442\u043e\u0440\u044b\u043c \u043d\u0443\u0436\u0435\u043d \u043f\u043e\u043b\u043d\u044b\u0439 \u0418\u0418-\u043a\u043e\u043d\u0442\u0440\u043e\u043b\u044c \u043f\u0440\u043e\u0435\u043a\u0442\u043e\u0432.',
+    'price.p_f1': '\u041d\u0435\u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u043d\u043e\u0435 \u043a\u043e\u043b-\u0432\u043e \u043f\u0440\u043e\u0435\u043a\u0442\u043e\u0432',
+    'price.p_f2': '\u0412\u0441\u0435 \u0438\u043d\u0442\u0435\u0433\u0440\u0430\u0446\u0438\u0438',
+    'price.p_f6': '\u0415\u0436\u0435\u0434\u043d\u0435\u0432\u043d\u044b\u0435 \u0418\u0418-\u043e\u0442\u0447\u0451\u0442\u044b',
+    'price.p_f7': '\u041f\u0440\u0438\u043e\u0440\u0438\u0442\u0435\u0442\u043d\u0430\u044f \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u0430',
+    'price.p_btn': '\u041d\u0430\u0447\u0430\u0442\u044c \u043f\u0440\u043e\u0431\u043d\u044b\u0439 \u043f\u0435\u0440\u0438\u043e\u0434',
+    'price.custom': '\u0418\u043d\u0434\u0438\u0432\u0438\u0434\u0443\u0430\u043b\u044c\u043d\u043e',
+    'price.e_desc': '\u0414\u043b\u044f \u043e\u0440\u0433\u0430\u043d\u0438\u0437\u0430\u0446\u0438\u0439, \u0443\u043f\u0440\u0430\u0432\u043b\u044f\u044e\u0449\u0438\u0445 \u0441\u043b\u043e\u0436\u043d\u044b\u043c\u0438 \u043f\u043e\u0440\u0442\u0444\u0435\u043b\u044f\u043c\u0438 \u0432 \u043c\u0430\u0441\u0448\u0442\u0430\u0431\u0435.',
+    'price.e_f1': '\u0412\u0441\u0451 \u0438\u0437 Professional',
+    'price.e_f2': '\u041f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044c\u0441\u043a\u0438\u0435 \u0418\u0418-\u043c\u043e\u0434\u0435\u043b\u0438',
+    'price.e_f4': '\u0420\u0430\u0437\u0432\u0451\u0440\u0442\u044b\u0432\u0430\u043d\u0438\u0435 \u043d\u0430 \u0441\u0432\u043e\u0435\u043c \u0441\u0435\u0440\u0432\u0435\u0440\u0435',
+    'price.e_f5': '\u041f\u0435\u0440\u0441\u043e\u043d\u0430\u043b\u044c\u043d\u044b\u0439 \u043c\u0435\u043d\u0435\u0434\u0436\u0435\u0440 \u0443\u0441\u043f\u0435\u0445\u0430',
+    'price.e_f6': '\u0413\u0430\u0440\u0430\u043d\u0442\u0438\u044f SLA',
+    'price.e_btn': '\u0421\u0432\u044f\u0437\u0430\u0442\u044c\u0441\u044f \u0441 \u043e\u0442\u0434\u0435\u043b\u043e\u043c \u043f\u0440\u043e\u0434\u0430\u0436',
+    // CTA
+    'cta.title': '\u0425\u0432\u0430\u0442\u0438\u0442 \u0442\u0443\u0448\u0438\u0442\u044c \u043f\u043e\u0436\u0430\u0440\u044b.<br><span class="gradient-text">\u041d\u0430\u0447\u043d\u0438\u0442\u0435 \u043f\u0440\u043e\u0433\u043d\u043e\u0437\u0438\u0440\u043e\u0432\u0430\u0442\u044c.</span>',
+    'cta.sub': '\u041f\u0440\u0438\u0441\u043e\u0435\u0434\u0438\u043d\u044f\u0439\u0442\u0435\u0441\u044c \u043a 2 000+ \u0440\u0443\u043a\u043e\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u044f\u043c \u043f\u0440\u043e\u0435\u043a\u0442\u043e\u0432, \u043a\u043e\u0442\u043e\u0440\u044b\u0435 \u0441\u0434\u0430\u044e\u0442 \u0432\u043e\u0432\u0440\u0435\u043c\u044f \u0438 \u0432 \u0440\u0430\u043c\u043a\u0430\u0445 \u0431\u044e\u0434\u0436\u0435\u0442\u0430 \u0441 AI PMO.',
+    'cta.placeholder': '\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0440\u0430\u0431\u043e\u0447\u0438\u0439 email',
+    'cta.btn': '\u041f\u043e\u043b\u0443\u0447\u0438\u0442\u044c \u0440\u0430\u043d\u043d\u0438\u0439 \u0434\u043e\u0441\u0442\u0443\u043f',
+    // Footer
+    'footer.brand_desc': '\u0423\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u043f\u0440\u043e\u0435\u043a\u0442\u0430\u043c\u0438 \u043d\u0430 \u0431\u0430\u0437\u0435 \u0418\u0418, \u043a\u043e\u0442\u043e\u0440\u043e\u0435 \u0434\u0435\u0440\u0436\u0438\u0442 \u043a\u0430\u0436\u0434\u0443\u044e \u0438\u043d\u0438\u0446\u0438\u0430\u0442\u0438\u0432\u0443 \u0432 \u0433\u0440\u0430\u0444\u0438\u043a\u0435, \u0432 \u0431\u044e\u0434\u0436\u0435\u0442\u0435 \u0438 \u043d\u0430 \u0432\u044b\u0441\u0448\u0435\u043c \u0443\u0440\u043e\u0432\u043d\u0435 \u043a\u0430\u0447\u0435\u0441\u0442\u0432\u0430.',
+    'footer.product': '\u041f\u0440\u043e\u0434\u0443\u043a\u0442',
+    'footer.changelog': '\u0418\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u044f',
+    'footer.roadmap': '\u0414\u043e\u0440\u043e\u0436\u043d\u0430\u044f \u043a\u0430\u0440\u0442\u0430',
+    'footer.resources': '\u0420\u0435\u0441\u0443\u0440\u0441\u044b',
+    'footer.docs': '\u0414\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u0430\u0446\u0438\u044f',
+    'footer.blog': '\u0411\u043b\u043e\u0433',
+    'footer.cases': '\u041a\u0435\u0439\u0441\u044b',
+    'footer.webinars': '\u0412\u0435\u0431\u0438\u043d\u0430\u0440\u044b',
+    'footer.company': '\u041a\u043e\u043c\u043f\u0430\u043d\u0438\u044f',
+    'footer.about': '\u041e \u043d\u0430\u0441',
+    'footer.careers': '\u041a\u0430\u0440\u044c\u0435\u0440\u0430',
+    'footer.contact': '\u041a\u043e\u043d\u0442\u0430\u043a\u0442\u044b',
+    'footer.privacy': '\u041f\u043e\u043b\u0438\u0442\u0438\u043a\u0430 \u043a\u043e\u043d\u0444\u0438\u0434\u0435\u043d\u0446\u0438\u0430\u043b\u044c\u043d\u043e\u0441\u0442\u0438',
+    'footer.terms': '\u0423\u0441\u043b\u043e\u0432\u0438\u044f \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d\u0438\u044f',
+    'footer.copy': '\u00a9 2026 AI PMO. \u0412\u0441\u0435 \u043f\u0440\u0430\u0432\u0430 \u0437\u0430\u0449\u0438\u0449\u0435\u043d\u044b.',
+  }
+};
+
+// Store original EN text
+const originals = {};
+document.querySelectorAll('[data-i18n]').forEach(el => {
+  originals[el] = el.textContent;
+});
+document.querySelectorAll('[data-i18n-html]').forEach(el => {
+  originals[el] = el.innerHTML;
+});
+document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+  originals[el] = el.placeholder;
+});
+
+function setLang(lang) {
+  currentLang = lang;
+  document.documentElement.lang = lang;
+  // Toggle button states
+  document.querySelectorAll('#langToggle button').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.lang === lang);
+  });
+  if (lang === 'en') {
+    // Restore originals
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      if (originals[el] !== undefined) el.textContent = originals[el];
+    });
+    document.querySelectorAll('[data-i18n-html]').forEach(el => {
+      if (originals[el] !== undefined) el.innerHTML = originals[el];
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+      if (originals[el] !== undefined) el.placeholder = originals[el];
+    });
+  } else {
+    const t = translations[lang];
+    if (!t) return;
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.getAttribute('data-i18n');
+      if (t[key]) el.textContent = t[key];
+    });
+    document.querySelectorAll('[data-i18n-html]').forEach(el => {
+      const key = el.getAttribute('data-i18n-html');
+      if (t[key]) el.innerHTML = t[key];
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+      const key = el.getAttribute('data-i18n-placeholder');
+      if (t[key]) el.placeholder = t[key];
+    });
+  }
+}
+
+// Lang toggle click
+document.getElementById('langToggle').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-lang]');
+  if (btn) setLang(btn.dataset.lang);
+});
+
+// ===== Nav scroll effect =====
+const nav=document.getElementById('nav');
+window.addEventListener('scroll',()=>{nav.classList.toggle('scrolled',window.scrollY>40)});
+
+// ===== Mobile menu =====
+const burger=document.getElementById('burger');
+const navLinks=document.getElementById('navLinks');
+burger.addEventListener('click',()=>{
+  navLinks.classList.toggle('open');
+  const spans=burger.querySelectorAll('span');
+  if(navLinks.classList.contains('open')){
+    spans[0].style.transform='rotate(45deg) translate(5px,5px)';
+    spans[1].style.opacity='0';
+    spans[2].style.transform='rotate(-45deg) translate(5px,-5px)';
+  }else{
+    spans[0].style.transform='';spans[1].style.opacity='';spans[2].style.transform='';
+  }
+});
+navLinks.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{
+  navLinks.classList.remove('open');
+  burger.querySelectorAll('span').forEach(s=>{s.style.transform='';s.style.opacity=''});
+}));
+
+// ===== Intersection Observer for fade-up animations =====
+const observer=new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');observer.unobserve(e.target)}});
+},{threshold:0.1,rootMargin:'0px 0px -40px 0px'});
+document.querySelectorAll('.fade-up').forEach(el=>observer.observe(el));
+
+// ===== Stagger children animations =====
+document.querySelectorAll('.fade-up').forEach((el,i)=>{
+  el.style.transitionDelay=`${Math.min(i*0.05,0.4)}s`;
+});
+</script>
+</body>
+</html>
