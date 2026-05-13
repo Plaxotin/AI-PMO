@@ -490,6 +490,9 @@ footer{padding:60px clamp(20px,5vw,80px) 30px;border-top:1px solid var(--border)
   .int-grid{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
 }
 
+
+@media(max-width:900px){.how-steps{grid-template-columns:repeat(3,1fr) !important}}
+@media(max-width:600px){.how-steps{grid-template-columns:1fr 1fr !important}}
 </style>
 <style>
 
@@ -688,11 +691,25 @@ footer{padding:60px clamp(20px,5vw,80px) 30px;border-top:1px solid var(--border)
   </div>
 </section>
 
-<!-- PROBLEM -->
+<!-- PROBLEM — 3-stat block (PMI, Bain, McKinsey) -->
 <section class="problem fade-up" style="transition-delay: 0.3s;">
   <div class="container">
-    <div class="problem-stat gradient-text">67%</div>
-    <h2 data-i18n-html="problem.text">of projects fail to meet budget, timeline, or quality targets.<br><strong style="color:var(--text-bright)">AI PMO changes that.</strong></h2>
+    <div style="display:flex;justify-content:center;gap:clamp(30px,6vw,80px);flex-wrap:wrap;margin-bottom:32px;">
+      <div style="text-align:center">
+        <div class="problem-stat gradient-text" style="margin-bottom:4px">75%</div>
+        <div style="font-size:0.95rem;color:var(--text-secondary)" data-i18n="stat1.desc">of PMOs close<br>within 3 years</div>
+      </div>
+      <div style="text-align:center">
+        <div class="problem-stat gradient-text" style="margin-bottom:4px">41%</div>
+        <div style="font-size:0.95rem;color:var(--text-secondary)" data-i18n="stat2.desc">of PM time is<br>replaceable by AI</div>
+      </div>
+      <div style="text-align:center">
+        <div class="problem-stat gradient-text" style="margin-bottom:4px">90%</div>
+        <div style="font-size:0.95rem;color:var(--text-secondary)" data-i18n="stat3.desc">of data tasks<br>are automatable</div>
+      </div>
+    </div>
+    <h2 data-i18n-html="problem.text">Traditional PMOs drown in bureaucracy and manual reports.<br><strong style="color:var(--text-bright)">AI PMO changes that.</strong></h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:16px" data-i18n="stat.sources">Sources: PMI, Bain & Co, McKinsey — via «Next Generation PMO» by Martin Paver</p>
   </div>
 </section>
 
@@ -824,24 +841,29 @@ footer{padding:60px clamp(20px,5vw,80px) 30px;border-top:1px solid var(--border)
     <div class="section-label fade-up" style="justify-content: center; transition-delay: 0.4s;" data-i18n="how.label">How It Works</div>
     <div class="section-title fade-up" data-i18n="how.title" style="transition-delay: 0.4s;">Up and running in minutes</div>
     <p class="section-sub fade-up" style="margin: 0px auto; transition-delay: 0.4s;" data-i18n="how.sub">No complex setup. No training required. AI PMO learns your projects and starts delivering value immediately.</p>
-    <div class="how-steps">
+    <div class="how-steps" style="grid-template-columns:repeat(5,1fr)">
       <div class="step fade-up" style="transition-delay: 0.4s;">
         <div class="step-num">1</div>
+        <h4 data-i18n="how.s0t">Smart Intake</h4>
+        <p data-i18n="how.s0d">AI classifies your project complexity and auto-configures the right governance level</p>
+      </div>
+      <div class="step fade-up" style="transition-delay: 0.4s;">
+        <div class="step-num">2</div>
         <h4 data-i18n="how.s1t">Connect Your Tools</h4>
         <p data-i18n="how.s1d">Link email, project plans, docs, and finance tools in one click</p>
       </div>
       <div class="step fade-up" style="transition-delay: 0.4s;">
-        <div class="step-num">2</div>
+        <div class="step-num">3</div>
         <h4 data-i18n="how.s2t">AI Builds the Graph</h4>
         <p data-i18n="how.s2d">AI maps people, tasks, budgets, and dependencies into a unified project graph</p>
       </div>
       <div class="step fade-up" style="transition-delay: 0.4s;">
-        <div class="step-num">3</div>
+        <div class="step-num">4</div>
         <h4 data-i18n="how.s3t">Real-Time Monitoring</h4>
         <p data-i18n="how.s3d">Continuous scanning with smart alerts for budget, timeline, and quality risks</p>
       </div>
       <div class="step fade-up" style="transition-delay: 0.4s;">
-        <div class="step-num">4</div>
+        <div class="step-num">5</div>
         <h4 data-i18n="how.s4t">Insights &amp; Reports</h4>
         <p data-i18n="how.s4d">Actionable recommendations and auto-generated executive reports</p>
       </div>
@@ -1018,8 +1040,8 @@ footer{padding:60px clamp(20px,5vw,80px) 30px;border-top:1px solid var(--border)
 <section class="cta-section" id="cta">
   <div class="container">
     <div class="cta-box fade-up" style="transition-delay: 0.4s;">
-      <h2 data-i18n-html="cta.title">Stop firefighting.<br><span class="gradient-text">Start predicting.</span></h2>
-      <p data-i18n="cta.sub">Join 2,000+ project leaders who deliver on time and under budget with AI PMO.</p>
+      <h2 data-i18n-html="cta.title">Stop firefighting.<br><span class="gradient-text">Start predicting with AI.</span></h2>
+      <p data-i18n="cta.sub">75% of PMOs close within 3 years. The ones that survive are data-driven. Start delivering on time and under budget — in minutes, not months.</p>
       <form class="cta-form" onsubmit="event.preventDefault();this.querySelector('button').textContent=currentLang==='ru'?'\u0412\u044B \u0432 \u0441\u043f\u0438\u0441\u043a\u0435!':'You\'re in!';this.querySelector('input').disabled=true">
         <input type="email" placeholder="Enter your work email" data-i18n-placeholder="cta.placeholder" required="">
         <button type="submit" class="btn-primary" data-i18n="cta.btn">Get Early Access</button>
@@ -1118,7 +1140,7 @@ const translations = {
     // Logos
     'logos.title': '\u041d\u0430\u043c \u0434\u043e\u0432\u0435\u0440\u044f\u044e\u0442 \u043f\u0435\u0440\u0435\u0434\u043e\u0432\u044b\u0435 \u043a\u043e\u043c\u0430\u043d\u0434\u044b',
     // Problem
-    'problem.text': '\u043f\u0440\u043e\u0435\u043a\u0442\u043e\u0432 \u043d\u0435 \u0443\u043a\u043b\u0430\u0434\u044b\u0432\u0430\u044e\u0442\u0441\u044f \u0432 \u0431\u044e\u0434\u0436\u0435\u0442, \u0441\u0440\u043e\u043a\u0438 \u0438\u043b\u0438 \u0441\u0442\u0430\u043d\u0434\u0430\u0440\u0442\u044b \u043a\u0430\u0447\u0435\u0441\u0442\u0432\u0430.<br><strong style="color:var(--text-bright)">AI PMO \u043c\u0435\u043d\u044f\u0435\u0442 \u044d\u0442\u043e.</strong>',
+    'problem.text': 'Традиционные PMO тонут в бюрократии и ручных отчётах.<br><strong style="color:var(--text-bright)">AI PMO меняет это.</strong>',
     // Integrations
     'int.label': '\u0418\u043d\u0442\u0435\u0433\u0440\u0430\u0446\u0438\u0438',
     'int.title': '\u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0430\u0435\u0442\u0441\u044f \u043a\u043e \u0432\u0441\u0435\u043c \u0432\u0430\u0448\u0438\u043c \u0438\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442\u0430\u043c',
@@ -1221,9 +1243,17 @@ const translations = {
     'price.e_f5': '\u041f\u0435\u0440\u0441\u043e\u043d\u0430\u043b\u044c\u043d\u044b\u0439 \u043c\u0435\u043d\u0435\u0434\u0436\u0435\u0440 \u0443\u0441\u043f\u0435\u0445\u0430',
     'price.e_f6': '\u0413\u0430\u0440\u0430\u043d\u0442\u0438\u044f SLA',
     'price.e_btn': '\u0421\u0432\u044f\u0437\u0430\u0442\u044c\u0441\u044f \u0441 \u043e\u0442\u0434\u0435\u043b\u043e\u043c \u043f\u0440\u043e\u0434\u0430\u0436',
+    // Stats (problem section)
+    'stat1.desc': 'PMO закрываются\nза 3 года',
+    'stat2.desc': 'времени PM\nзаменяемо ИИ',
+    'stat3.desc': 'задач с данными\nавтоматизируемы',
+    'stat.sources': 'Источники: PMI, Bain & Co, McKinsey — «Next Generation PMO», Martin Paver',
+    // Smart Intake step
+    'how.s0t': 'Умный приём',
+    'how.s0d': 'ИИ классифицирует сложность проекта и настраивает уровень управления',
     // CTA
-    'cta.title': '\u0425\u0432\u0430\u0442\u0438\u0442 \u0442\u0443\u0448\u0438\u0442\u044c \u043f\u043e\u0436\u0430\u0440\u044b.<br><span class="gradient-text">\u041d\u0430\u0447\u043d\u0438\u0442\u0435 \u043f\u0440\u043e\u0433\u043d\u043e\u0437\u0438\u0440\u043e\u0432\u0430\u0442\u044c.</span>',
-    'cta.sub': '\u041f\u0440\u0438\u0441\u043e\u0435\u0434\u0438\u043d\u044f\u0439\u0442\u0435\u0441\u044c \u043a 2 000+ \u0440\u0443\u043a\u043e\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u044f\u043c \u043f\u0440\u043e\u0435\u043a\u0442\u043e\u0432, \u043a\u043e\u0442\u043e\u0440\u044b\u0435 \u0441\u0434\u0430\u044e\u0442 \u0432\u043e\u0432\u0440\u0435\u043c\u044f \u0438 \u0432 \u0440\u0430\u043c\u043a\u0430\u0445 \u0431\u044e\u0434\u0436\u0435\u0442\u0430 \u0441 AI PMO.',
+    'cta.title': 'Хватит тушить пожары.<br><span class="gradient-text">Начните прогнозировать с ИИ.</span>',
+    'cta.sub': '75% PMO закрываются за 3 года. Те, кто выживает — управляют данными. Сдавайте вовремя и в бюджете — за минуты, а не месяцы.',
     'cta.placeholder': '\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0440\u0430\u0431\u043e\u0447\u0438\u0439 email',
     'cta.btn': '\u041f\u043e\u043b\u0443\u0447\u0438\u0442\u044c \u0440\u0430\u043d\u043d\u0438\u0439 \u0434\u043e\u0441\u0442\u0443\u043f',
     // Footer
