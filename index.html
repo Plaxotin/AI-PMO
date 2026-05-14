@@ -170,7 +170,7 @@ nav.scrolled{background:rgba(6,11,24,0.85);backdrop-filter:blur(20px);border-bot
   pointer-events:none;z-index:-1;
 }
 .hero-dashboard{
-  max-width:960px;margin:0 auto;border-radius:var(--radius);
+  max-width:1040px;margin:0 auto;border-radius:var(--radius);
   border:1px solid var(--glass-border);
   background:var(--glass-bg);
   padding:3px;overflow:hidden;
@@ -179,6 +179,28 @@ nav.scrolled{background:rgba(6,11,24,0.85);backdrop-filter:blur(20px);border-bot
 .hero-dashboard .dash-inner{
   background:var(--bg-deep);border-radius:13px;overflow:hidden;
   padding:20px;min-height:380px;position:relative;
+}
+.hero-dashboard .dash-inner.agent-chat-inner{
+  padding:0;min-height:0;
+}
+.agent-chat-header{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);
+  background:rgba(0,0,0,0.25);
+}
+.agent-chat-title{
+  flex:1;text-align:center;font-size:0.8rem;color:var(--text-secondary);
+  line-height:1.35;
+}
+.agent-chat-open{
+  font-size:0.72rem;font-weight:500;color:var(--cyan);
+  text-decoration:none;white-space:nowrap;
+}
+.agent-chat-open:hover{text-decoration:underline}
+.agent-iframe-frame{line-height:0;background:var(--bg-deep)}
+.agent-iframe-frame iframe{
+  display:block;width:100%;height:700px;border:none;
+  border-radius:0 0 12px 12px;
 }
 .dash-topbar{
   display:flex;align-items:center;justify-content:space-between;
@@ -488,6 +510,9 @@ footer{padding:60px clamp(20px,5vw,80px) 30px;border-top:1px solid var(--border)
   .kpi-card{min-width:calc(50% - 7px)}
   .dash-main{grid-template-columns:1fr}
   .int-grid{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
+  .agent-chat-title{font-size:0.72rem;padding:0 4px}
+  .agent-chat-open{font-size:0.62rem}
+  .agent-iframe-frame iframe{height:min(560px,72vh)}
 }
 
 
@@ -642,42 +667,21 @@ footer{padding:60px clamp(20px,5vw,80px) 30px;border-top:1px solid var(--border)
       </button>
     </div>
 
-    <div class="hero-dashboard fade-up visible" style="transition-delay: 0.2s;">
-      <div class="dash-inner">
-        <div class="dash-topbar">
+    <div id="agent-prototype" class="hero-dashboard fade-up visible" style="transition-delay: 0.2s;">
+      <div class="dash-inner agent-chat-inner">
+        <div class="agent-chat-header">
           <div class="dash-dots"><span></span><span></span><span></span></div>
-          <div class="dash-search" data-i18n="dash.search">Search projects, risks, budgets...</div>
-          <div style="font-size:0.75rem;color:var(--text-muted)">AI PMO Dashboard</div>
+          <div class="agent-chat-title" data-i18n="hero.agent_title">First AI PMO tool prototype · Project plan analysis</div>
+          <a class="agent-chat-open" href="https://www.gumloop.com/agents/vrmtwTLMe7USpb5H1dG8XR" target="_blank" rel="noopener noreferrer" data-i18n="hero.agent_open">Open in Gumloop</a>
         </div>
-        <div class="dash-grid">
-          <div class="dash-card">
-            <h4 data-i18n="dash.health">Project Health</h4>
-            <div class="val gradient-text">92%</div>
-            <div class="sub" data-i18n="dash.health_sub">+3% from last week</div>
-            <div class="mini-chart">
-              <span style="--h:45%"></span><span style="--h:60%"></span><span style="--h:35%"></span>
-              <span style="--h:70%"></span><span style="--h:55%"></span><span style="--h:80%"></span>
-              <span style="--h:65%"></span><span style="--h:90%"></span>
-            </div>
-          </div>
-          <div class="dash-card">
-            <h4 data-i18n="dash.budget">Budget Status</h4>
-            <div class="val">$1.2M <span style="font-size:0.8rem;color:var(--text-muted)">/ $1.5M</span></div>
-            <div class="sub" data-i18n="dash.budget_sub">On track — 78% utilized</div>
-            <div class="mini-bar-row">
-              <div class="mini-bar-item">Engineering<div class="bar-track"><div class="bar-fill" style="width:82%;background:linear-gradient(90deg,#06B6D4,#3B82F6)"></div></div>82%</div>
-              <div class="mini-bar-item">Design<div class="bar-track"><div class="bar-fill" style="width:64%;background:linear-gradient(90deg,#06B6D4,#22C55E)"></div></div>64%</div>
-              <div class="mini-bar-item">QA<div class="bar-track"><div class="bar-fill" style="width:45%;background:linear-gradient(90deg,#06B6D4,#8B5CF6)"></div></div>45%</div>
-            </div>
-          </div>
-          <div class="dash-card">
-            <h4 data-i18n="dash.risks">Risk Alerts</h4>
-            <div class="alert-list">
-              <div class="alert-item"><span class="alert-dot" style="background:#EF4444"></span><span data-i18n="dash.risk1">API deadline at risk — 2 days behind</span></div>
-              <div class="alert-item"><span class="alert-dot" style="background:#F59E0B"></span><span data-i18n="dash.risk2">Design budget 92% consumed</span></div>
-              <div class="alert-item"><span class="alert-dot" style="background:#22C55E"></span><span data-i18n="dash.risk3">QA pass rate improved to 97%</span></div>
-            </div>
-          </div>
+        <div class="agent-iframe-frame">
+          <iframe
+            title="AI PMO — project plan analysis agent"
+            src="https://gumloop.com/agents/vrmtwTLMe7USpb5H1dG8XR/chat"
+            width="100%"
+            height="700"
+            allow="clipboard-write">
+          </iframe>
         </div>
       </div>
     </div>
@@ -1137,6 +1141,8 @@ const translations = {
     'dash.risk1': '\u0414\u0435\u0434\u043b\u0430\u0439\u043d API \u043f\u043e\u0434 \u0443\u0433\u0440\u043e\u0437\u043e\u0439 \u2014 \u043e\u0442\u0441\u0442\u0430\u0432\u0430\u043d\u0438\u0435 2 \u0434\u043d\u044f',
     'dash.risk2': '\u0411\u044e\u0434\u0436\u0435\u0442 \u043d\u0430 \u0434\u0438\u0437\u0430\u0439\u043d \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d \u043d\u0430 92%',
     'dash.risk3': '\u041f\u0440\u043e\u0446\u0435\u043d\u0442 \u043f\u0440\u043e\u0445\u043e\u0436\u0434\u0435\u043d\u0438\u044f QA \u0432\u044b\u0440\u043e\u0441 \u0434\u043e 97%',
+    'hero.agent_title': '\u041f\u0440\u043e\u0442\u043e\u0442\u0438\u043f \u043f\u0435\u0440\u0432\u043e\u0433\u043e \u0438\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442\u0430 AI PMO \u00b7 \u0410\u043d\u0430\u043b\u0438\u0437 \u043f\u0440\u043e\u0435\u043a\u0442\u043d\u044b\u0445 \u043f\u043b\u0430\u043d\u043e\u0432',
+    'hero.agent_open': '\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0432 Gumloop',
     // Logos
     'logos.title': '\u041d\u0430\u043c \u0434\u043e\u0432\u0435\u0440\u044f\u044e\u0442 \u043f\u0435\u0440\u0435\u0434\u043e\u0432\u044b\u0435 \u043a\u043e\u043c\u0430\u043d\u0434\u044b',
     // Problem
