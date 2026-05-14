@@ -197,11 +197,18 @@ nav.scrolled{background:rgba(6,11,24,0.85);backdrop-filter:blur(20px);border-bot
   text-decoration:none;white-space:nowrap;
 }
 .agent-chat-open:hover{text-decoration:underline}
-.agent-iframe-frame{line-height:0;background:var(--bg-deep)}
-.agent-iframe-frame iframe{
-  display:block;width:100%;height:700px;border:none;
+a.btn-primary{text-decoration:none;cursor:pointer}
+.agent-launcher{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:22px;padding:clamp(36px,7vw,64px) clamp(20px,4vw,40px);
+  min-height:420px;text-align:center;
+  background:
+    radial-gradient(ellipse 75% 55% at 50% 35%,rgba(6,182,212,0.1),transparent 62%),
+    var(--bg-deep);
   border-radius:0 0 12px 12px;
 }
+.agent-launcher p{max-width:460px;margin:0;font-size:0.92rem;color:var(--text-muted);line-height:1.65}
+.agent-launch-btn svg{flex-shrink:0}
 .dash-topbar{
   display:flex;align-items:center;justify-content:space-between;
   margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);
@@ -512,7 +519,7 @@ footer{padding:60px clamp(20px,5vw,80px) 30px;border-top:1px solid var(--border)
   .int-grid{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
   .agent-chat-title{font-size:0.72rem;padding:0 4px}
   .agent-chat-open{font-size:0.62rem}
-  .agent-iframe-frame iframe{height:min(560px,72vh)}
+  .agent-launcher{min-height:340px;padding:28px 18px}
 }
 
 
@@ -674,14 +681,12 @@ footer{padding:60px clamp(20px,5vw,80px) 30px;border-top:1px solid var(--border)
           <div class="agent-chat-title" data-i18n="hero.agent_title">First AI PMO tool prototype · Project plan analysis</div>
           <a class="agent-chat-open" href="https://www.gumloop.com/agents/vrmtwTLMe7USpb5H1dG8XR" target="_blank" rel="noopener noreferrer" data-i18n="hero.agent_open">Open in Gumloop</a>
         </div>
-        <div class="agent-iframe-frame">
-          <iframe
-            title="AI PMO — project plan analysis agent"
-            src="https://gumloop.com/agents/vrmtwTLMe7USpb5H1dG8XR/chat"
-            width="100%"
-            height="700"
-            allow="clipboard-write">
-          </iframe>
+        <div class="agent-launcher">
+          <p data-i18n="hero.agent_hint">Gumloop blocks embedding this agent on other sites (browser security). Open it in a new tab to use the prototype.</p>
+          <a class="btn-primary agent-launch-btn" href="https://www.gumloop.com/agents/vrmtwTLMe7USpb5H1dG8XR" target="_blank" rel="noopener noreferrer">
+            <span data-i18n="hero.agent_launch">Launch prototype</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7"></path><path d="M7 7h10v10"></path></svg>
+          </a>
         </div>
       </div>
     </div>
@@ -1143,6 +1148,8 @@ const translations = {
     'dash.risk3': '\u041f\u0440\u043e\u0446\u0435\u043d\u0442 \u043f\u0440\u043e\u0445\u043e\u0436\u0434\u0435\u043d\u0438\u044f QA \u0432\u044b\u0440\u043e\u0441 \u0434\u043e 97%',
     'hero.agent_title': '\u041f\u0440\u043e\u0442\u043e\u0442\u0438\u043f \u043f\u0435\u0440\u0432\u043e\u0433\u043e \u0438\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442\u0430 AI PMO \u00b7 \u0410\u043d\u0430\u043b\u0438\u0437 \u043f\u0440\u043e\u0435\u043a\u0442\u043d\u044b\u0445 \u043f\u043b\u0430\u043d\u043e\u0432',
     'hero.agent_open': '\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0432 Gumloop',
+    'hero.agent_hint': 'Gumloop \u043d\u0435 \u043f\u043e\u0437\u0432\u043e\u043b\u044f\u0435\u0442 \u0432\u0441\u0442\u0440\u0430\u0438\u0432\u0430\u0442\u044c \u044d\u0442\u043e\u0433\u043e \u0430\u0433\u0435\u043d\u0442\u0430 \u0432 iframe \u043d\u0430 \u0447\u0443\u0436\u0438\u0445 \u0441\u0430\u0439\u0442\u0430\u0445 (\u043f\u043e\u043b\u0438\u0442\u0438\u043a\u0430 \u0431\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u043e\u0441\u0442\u0438 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0430). \u041e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 \u0430\u0433\u0435\u043d\u0442\u0430 \u0432 \u043d\u043e\u0432\u043e\u0439 \u0432\u043a\u043b\u0430\u0434\u043a\u0435, \u0447\u0442\u043e\u0431\u044b \u043f\u043e\u043f\u0440\u043e\u0431\u043e\u0432\u0430\u0442\u044c \u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f.',
+    'hero.agent_launch': '\u0417\u0430\u043f\u0443\u0441\u0442\u0438\u0442\u044c \u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f',
     // Logos
     'logos.title': '\u041d\u0430\u043c \u0434\u043e\u0432\u0435\u0440\u044f\u044e\u0442 \u043f\u0435\u0440\u0435\u0434\u043e\u0432\u044b\u0435 \u043a\u043e\u043c\u0430\u043d\u0434\u044b',
     // Problem
