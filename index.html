@@ -198,17 +198,76 @@ nav.scrolled{background:rgba(6,11,24,0.85);backdrop-filter:blur(20px);border-bot
 }
 .agent-chat-open:hover{text-decoration:underline}
 a.btn-primary{text-decoration:none;cursor:pointer}
-.agent-launcher{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:22px;padding:clamp(36px,7vw,64px) clamp(20px,4vw,40px);
-  min-height:420px;text-align:center;
+.agent-audit-slot{
+  display:flex;align-items:center;justify-content:center;
+  padding:clamp(28px,5vw,52px) clamp(16px,4vw,28px);
+  min-height:200px;text-align:center;
   background:
     radial-gradient(ellipse 75% 55% at 50% 35%,rgba(6,182,212,0.1),transparent 62%),
     var(--bg-deep);
   border-radius:0 0 12px 12px;
 }
-.agent-launcher p{max-width:460px;margin:0;font-size:0.92rem;color:var(--text-muted);line-height:1.65}
-.agent-launch-btn svg{flex-shrink:0}
+.btn-audit-plan{
+  display:inline-flex;align-items:center;gap:0;
+  padding:16px 30px;border-radius:12px;border:none;
+  background:var(--accent-gradient);color:#fff;
+  font-weight:600;font-size:1rem;font-family:var(--font-body);
+  box-shadow:0 0 34px rgba(6,182,212,0.22);
+  transition:transform 0.22s,box-shadow 0.22s;
+}
+.btn-audit-plan:hover{transform:translateY(-2px);box-shadow:0 0 48px rgba(6,182,212,0.35)}
+/* Plan audit modal */
+.pmo-modal-backdrop{
+  position:fixed;inset:0;z-index:5000;
+  display:flex;align-items:center;justify-content:center;
+  padding:max(16px,3vw);
+  background:rgba(6,11,24,0.82);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  opacity:0;visibility:hidden;
+  transition:opacity 0.24s ease,visibility 0.24s;
+}
+.pmo-modal-backdrop.is-open{opacity:1;visibility:visible}
+body.modal-open{overflow:hidden;touch-action:none}
+.pmo-modal-panel{
+  position:relative;width:100%;max-width:460px;
+  background:linear-gradient(165deg,rgba(18,26,48,0.97),rgba(11,17,32,0.99));
+  border:1px solid var(--glass-border);
+  border-radius:var(--radius);
+  padding:clamp(28px,5vw,42px) clamp(22px,4vw,36px) 32px;
+  text-align:center;
+  box-shadow:0 28px 90px rgba(0,0,0,0.55),0 0 80px rgba(6,182,212,0.06);
+  transform:translateY(14px) scale(0.97);
+  transition:transform 0.26s cubic-bezier(0.22,1,0.36,1);
+}
+.pmo-modal-backdrop.is-open .pmo-modal-panel{
+  transform:translateY(0) scale(1);
+}
+.pmo-modal-x{
+  position:absolute;top:12px;right:12px;
+  width:40px;height:40px;border-radius:10px;
+  display:grid;place-items:center;
+  border:1px solid var(--border);background:rgba(255,255,255,0.04);
+  color:var(--text-secondary);font-size:1.35rem;line-height:1;
+  transition:border-color 0.2s,color 0.2s,background 0.2s;
+}
+.pmo-modal-x:hover{border-color:var(--border-hover);color:var(--text-bright);background:rgba(255,255,255,0.07)}
+.pmo-modal-icon{
+  width:56px;height:56px;margin:0 auto 14px;border-radius:14px;
+  display:grid;place-items:center;
+  font-size:1.75rem;line-height:1;
+  background:linear-gradient(135deg,rgba(6,182,212,0.15),rgba(59,130,246,0.12));
+  border:1px solid rgba(6,182,212,0.2);
+}
+.pmo-modal-panel h2{
+  font-family:var(--font-display);font-size:clamp(1.2rem,3.5vw,1.45rem);
+  font-weight:700;color:var(--text-bright);margin:0 0 12px;line-height:1.25;
+}
+.pmo-modal-panel .pmo-modal-lead{
+  font-size:0.95rem;color:var(--text-secondary);line-height:1.65;margin:0 0 26px;
+}
+.pmo-modal-actions{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;align-items:center}
+.pmo-modal-actions .btn-primary{padding:13px 26px;border-radius:12px;font-size:0.92rem}
+.pmo-modal-actions .btn-secondary{padding:13px 22px;border-radius:12px;font-size:0.92rem}
 .dash-topbar{
   display:flex;align-items:center;justify-content:space-between;
   margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);
@@ -519,7 +578,8 @@ footer{padding:60px clamp(20px,5vw,80px) 30px;border-top:1px solid var(--border)
   .int-grid{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
   .agent-chat-title{font-size:0.72rem;padding:0 4px}
   .agent-chat-open{font-size:0.62rem}
-  .agent-launcher{min-height:340px;padding:28px 18px}
+  .agent-audit-slot{min-height:180px;padding:22px 14px}
+  .btn-audit-plan{width:100%;max-width:340px;justify-content:center;padding:14px 22px;font-size:0.95rem}
 }
 
 
@@ -681,12 +741,10 @@ footer{padding:60px clamp(20px,5vw,80px) 30px;border-top:1px solid var(--border)
           <div class="agent-chat-title" data-i18n="hero.agent_title">First AI PMO tool prototype · Project plan analysis</div>
           <a class="agent-chat-open" href="https://www.gumloop.com/agents/vrmtwTLMe7USpb5H1dG8XR" target="_blank" rel="noopener noreferrer" data-i18n="hero.agent_open">Open in Gumloop</a>
         </div>
-        <div class="agent-launcher">
-          <p data-i18n="hero.agent_hint">Gumloop blocks embedding this agent on other sites (browser security). Open it in a new tab to use the prototype.</p>
-          <a class="btn-primary agent-launch-btn" href="https://www.gumloop.com/agents/vrmtwTLMe7USpb5H1dG8XR" target="_blank" rel="noopener noreferrer">
-            <span data-i18n="hero.agent_launch">Launch prototype</span>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7"></path><path d="M7 7h10v10"></path></svg>
-          </a>
+        <div class="agent-audit-slot">
+          <button type="button" class="btn-audit-plan" data-pmo-open>
+            <span data-i18n="hero.audit_btn">📊 Check project plan</span>
+          </button>
         </div>
       </div>
     </div>
@@ -1119,6 +1177,19 @@ footer{padding:60px clamp(20px,5vw,80px) 30px;border-top:1px solid var(--border)
   </div>
 </footer>
 
+<div id="pmo-modal" class="pmo-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="pmo-modal-title" aria-hidden="true">
+  <div class="pmo-modal-panel">
+    <button type="button" class="pmo-modal-x" data-pmo-close aria-label="Close">×</button>
+    <div class="pmo-modal-icon" aria-hidden="true">📊</div>
+    <h2 id="pmo-modal-title" data-i18n="hero.modal_title">AI PMO · Plan audit</h2>
+    <p class="pmo-modal-lead" data-i18n="hero.modal_body">Upload your Excel project plan and get a full audit: critical path, issues, risks, and recommendations in about 60 seconds.</p>
+    <div class="pmo-modal-actions">
+      <a class="btn-primary" href="https://gumloop.com/agents/vrmtwTLMe7USpb5H1dG8XR/chat" target="_blank" rel="noopener noreferrer" data-i18n="hero.modal_start">Start audit →</a>
+      <button type="button" class="btn-secondary" data-pmo-close data-i18n="hero.modal_cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ===== i18n Translation System =====
 let currentLang = 'en';
@@ -1148,8 +1219,11 @@ const translations = {
     'dash.risk3': '\u041f\u0440\u043e\u0446\u0435\u043d\u0442 \u043f\u0440\u043e\u0445\u043e\u0436\u0434\u0435\u043d\u0438\u044f QA \u0432\u044b\u0440\u043e\u0441 \u0434\u043e 97%',
     'hero.agent_title': '\u041f\u0440\u043e\u0442\u043e\u0442\u0438\u043f \u043f\u0435\u0440\u0432\u043e\u0433\u043e \u0438\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442\u0430 AI PMO \u00b7 \u0410\u043d\u0430\u043b\u0438\u0437 \u043f\u0440\u043e\u0435\u043a\u0442\u043d\u044b\u0445 \u043f\u043b\u0430\u043d\u043e\u0432',
     'hero.agent_open': '\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0432 Gumloop',
-    'hero.agent_hint': 'Gumloop \u043d\u0435 \u043f\u043e\u0437\u0432\u043e\u043b\u044f\u0435\u0442 \u0432\u0441\u0442\u0440\u0430\u0438\u0432\u0430\u0442\u044c \u044d\u0442\u043e\u0433\u043e \u0430\u0433\u0435\u043d\u0442\u0430 \u0432 iframe \u043d\u0430 \u0447\u0443\u0436\u0438\u0445 \u0441\u0430\u0439\u0442\u0430\u0445 (\u043f\u043e\u043b\u0438\u0442\u0438\u043a\u0430 \u0431\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u043e\u0441\u0442\u0438 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0430). \u041e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 \u0430\u0433\u0435\u043d\u0442\u0430 \u0432 \u043d\u043e\u0432\u043e\u0439 \u0432\u043a\u043b\u0430\u0434\u043a\u0435, \u0447\u0442\u043e\u0431\u044b \u043f\u043e\u043f\u0440\u043e\u0431\u043e\u0432\u0430\u0442\u044c \u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f.',
-    'hero.agent_launch': '\u0417\u0430\u043f\u0443\u0441\u0442\u0438\u0442\u044c \u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f',
+    'hero.audit_btn': '\ud83d\udcca \u041f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c \u043f\u043b\u0430\u043d \u043f\u0440\u043e\u0435\u043a\u0442\u0430',
+    'hero.modal_title': 'AI PMO \u00b7 \u0410\u0443\u0434\u0438\u0442 \u043f\u043b\u0430\u043d\u0430',
+    'hero.modal_body': '\u0417\u0430\u0433\u0440\u0443\u0437\u0438 Excel-\u043f\u043b\u0430\u043d \u043f\u0440\u043e\u0435\u043a\u0442\u0430 \u0438 \u043f\u043e\u043b\u0443\u0447\u0438 \u043f\u043e\u043b\u043d\u044b\u0439 \u0430\u0443\u0434\u0438\u0442: \u043a\u0440\u0438\u0442\u0438\u0447\u0435\u0441\u043a\u0438\u0439 \u043f\u0443\u0442\u044c, \u043e\u0448\u0438\u0431\u043a\u0438, \u0440\u0438\u0441\u043a\u0438 \u0438 \u0440\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u0438 \u0437\u0430 60 \u0441\u0435\u043a\u0443\u043d\u0434.',
+    'hero.modal_start': '\u041d\u0430\u0447\u0430\u0442\u044c \u0430\u0443\u0434\u0438\u0442 \u2192',
+    'hero.modal_cancel': '\u041e\u0442\u043c\u0435\u043d\u0430',
     // Logos
     'logos.title': '\u041d\u0430\u043c \u0434\u043e\u0432\u0435\u0440\u044f\u044e\u0442 \u043f\u0435\u0440\u0435\u0434\u043e\u0432\u044b\u0435 \u043a\u043e\u043c\u0430\u043d\u0434\u044b',
     // Problem
@@ -1365,6 +1439,38 @@ navLinks.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{
   navLinks.classList.remove('open');
   burger.querySelectorAll('span').forEach(s=>{s.style.transform='';s.style.opacity=''});
 }));
+
+// ===== Plan audit modal (Gumloop opens in new tab; no iframe) =====
+(function(){
+  const backdrop=document.getElementById('pmo-modal');
+  if(!backdrop)return;
+  const panel=backdrop.querySelector('.pmo-modal-panel');
+  let lastFocus=null;
+  function openModal(){
+    lastFocus=document.activeElement;
+    backdrop.classList.add('is-open');
+    backdrop.setAttribute('aria-hidden','false');
+    document.body.classList.add('modal-open');
+    const primary=panel&&panel.querySelector('.pmo-modal-actions .btn-primary');
+    if(primary) primary.focus();
+  }
+  function closeModal(){
+    backdrop.classList.remove('is-open');
+    backdrop.setAttribute('aria-hidden','true');
+    document.body.classList.remove('modal-open');
+    if(lastFocus&&typeof lastFocus.focus==='function') lastFocus.focus();
+  }
+  document.querySelectorAll('[data-pmo-open]').forEach(btn=>{
+    btn.addEventListener('click',()=>openModal());
+  });
+  backdrop.querySelectorAll('[data-pmo-close]').forEach(el=>{
+    el.addEventListener('click',()=>closeModal());
+  });
+  backdrop.addEventListener('click',e=>{if(e.target===backdrop) closeModal()});
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'&&backdrop.classList.contains('is-open')) closeModal();
+  });
+})();
 
 // ===== Intersection Observer for fade-up animations =====
 const observer=new IntersectionObserver((entries)=>{
