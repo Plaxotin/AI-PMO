@@ -42,7 +42,35 @@ Telegram (канал/супергруппа) ──► Bot Webhook ──► Ing
 
 ## 3. Работа в Cursor через агентов
 
-Ниже — **самостоятельные треки**. Каждый трек можно отдать отдельному Cloud Agent / ветке; контракты между треками зафиксировать в `docs/` или в OpenAPI-черновике до начала кодирования.
+### 3.0. Kickoff BL-1 — обязательный первый шаг (до треков A–G)
+
+**Перед** разбиением на параллельные ветки и выдачей треков агентам A–G команда проводит **один сеанс MVP Builder Mode** в Cursor Agent:
+
+1. Подключить skills: `@agents-best-practices` (harness) и `@ai-pmo-assignments` (домен BL-1). Пути: `.cursor/skills/…`, триггеры — в `AGENTS.md`.
+2. Запросить blueprint по шаблону из `agents-best-practices/SKILL.md` (секция *MVP Builder Mode*) и reference `references/mvp-agent-blueprint.md`.
+3. **Выход сеанса (артефакт в репозитории):** документ уровня `docs/BL1_HARNESS_BLUEPRINT.md` (или согласованное имя) с:
+   - core loop (ingest → slot-filling → draft → human confirm → commit);
+   - **tool registry** — узкие typed tools (не `send_message` / `write_database` без обёртки);
+   - **permission matrix** и точки approval (публикация в канал, публичный реестр, внешние записи);
+   - бюджеты цикла (шаги, таймаут черновика, стоимость STT/LLM);
+   - **launch gate** — evals и критерии пилота до включения автономных side effects.
+
+Без этого blueprint не стартуют треки B–G с внешними side effects; трек **A** (контракты/схема) может идти параллельно kickoff, но OpenAPI и Zod должны **согласоваться** с итогом сеанса.
+
+**Промпт-заготовка:**
+
+```text
+@agents-best-practices @ai-pmo-assignments
+Спроектируй MVP harness blueprint для BL-1 «Администратор поручений» по ASSIGNMENTS_ADMIN_CURSOR_PLAN.md.
+Уровень: approval-gated (L2). Включи tool registry, permissions, context/compaction для long-running агентов,
+launch gate и evals. Сохрани структуру в docs/BL1_HARNESS_BLUEPRINT.md.
+```
+
+Статус шага 3 «практичного минимума» Agent Skills — в карточке Notion «Администратор поручений».
+
+---
+
+Ниже — **самостоятельные треки** (после §3.0). Каждый трек можно отдать отдельному Cloud Agent / ветке; контракты между треками зафиксировать в `docs/` или в OpenAPI-черновике до начала кодирования.
 
 ### Агент A — Контракты и данные
 
@@ -122,8 +150,9 @@ Telegram (канал/супергруппа) ──► Bot Webhook ──► Ing
 
 ## 4. Порядок слияния (зависимости)
 
-1. **A** (схема) параллельно с черновиком OpenAPI.  
-2. **B** + **C** после A.  
+0. **§3.0 Kickoff BL-1** — MVP Builder Mode → `docs/BL1_HARNESS_BLUEPRINT.md` (блокирует B–G с side effects).  
+1. **A** (схема) параллельно с §3.0 и черновиком OpenAPI; финализация схемы — после согласования с blueprint.  
+2. **B** + **C** после A и §3.0.  
 3. **D** после B+C (нужны финальные записи).  
 4. **E** после A (можно параллельно B с мок-данными).  
 5. **F** после A и желательно после E (общий формат снапшота).  
