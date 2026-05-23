@@ -8,7 +8,7 @@ Cursor Cloud не позволяет репозиторию добавить н�
 
 `Planner`, `Worker` и `Tester` в этом документе — это ролевые профили и prompt-шаблоны. Их нужно запускать через доступные встроенные типы:
 
-- `Planner` — через `generalPurpose` или readonly `explore`, если нужно только изучить код и составить план.
+- `Planner` — через проектный кастомный subagent `.cursor/agents/planner.md`; если он недоступен в среде, использовать `generalPurpose` или readonly `explore` с prompt-шаблоном ниже.
 - `Worker` — через основной агент или `generalPurpose` только после разрешения пользователя на конкретную фазу.
 - `Tester` — через `generalPurpose` для терминальных проверок, через `computerUse` для GUI-проверок и через `videoReview` для проверки записей экрана.
 
