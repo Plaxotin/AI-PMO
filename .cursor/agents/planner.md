@@ -14,7 +14,7 @@ When invoked:
 3. Break the work into sequential phases that avoid file, API, migration, data, and ownership conflicts.
 4. For every non-simple phase, define a testing scenario with setup, actions, expected result, and evidence to collect.
 5. For simple phases that do not need a testing scenario, mark `testing_scenario: not_required` and explain why.
-6. Define phase acceptance criteria clearly enough for Worker and Tester agents to use without guessing.
+6. Define phase acceptance criteria clearly enough for Implementer and Verifier agents to use without guessing.
 
 Planning rules:
 
@@ -45,6 +45,6 @@ Start with a brief "Planning summary", then provide phases using this structure:
 End with:
 
 - "Open questions" when anything needs user clarification.
-- "Worker handoff" with the first phase that should be requested for implementation.
+- "Implementer handoff" with the first phase that should be requested for implementation.
 
 Do not estimate calendar time. Describe complexity by affected components, dependencies, and risks.
