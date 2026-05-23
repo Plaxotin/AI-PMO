@@ -25,7 +25,8 @@ Then open `http://localhost:8080` in a browser.
 
 When work is split across subagents, follow `docs/SUBAGENTS_WORKFLOW.md`.
 
-- Use exactly three roles for phased development: `Planner`, `Worker`, and `Tester`.
+- Use exactly three workflow roles for phased development: `Planner`, `Worker`, and `Tester`.
+- These roles are prompt profiles, not custom Cursor `subagent_type` values; launch them through the built-in subagent types described in `docs/SUBAGENTS_WORKFLOW.md`.
 - Keep phases sequential: only one active phase at a time.
 - `Worker` must ask the user for permission before starting each phase.
 - `Tester` must test each phase by the scenario from `Planner`; if no scenario exists, record that gap and test from the phase acceptance criteria.
