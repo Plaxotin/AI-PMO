@@ -4,15 +4,19 @@
 
 ## Важно: это роли, а не встроенные типы Cursor
 
-Cursor Cloud не позволяет репозиторию добавить новые значения `subagent_type` в инструмент Task. Встроенный список типов остается платформенным: `generalPurpose`, `explore`, `debug`, `computerUse`, `videoReview`, `cursor-guide`, `best-of-n-runner` и другие доступные типы среды.
+Проектные custom subagents (`planner`, `implementer`, `verifier`) лежат в `.cursor/agents/` и вызываются как `/planner`, `/implementer`, `/verifier` или через автоделегирование Agent. См. [Cursor Subagents](https://cursor.com/docs/subagents).
 
-`Planner`, `Implementer` и `Verifier` в этом документе — это ролевые профили и prompt-шаблоны. Их нужно запускать через доступные встроенные типы или через проектные custom subagents:
+Отдельно Cursor предоставляет встроенные субагенты **Explore**, **Bash** и **Browser** (поиск по коду, shell, браузер). Agent подключает их сам; их не нужно дублировать в репозитории.
 
-- `Planner` — через проектный кастомный subagent `.cursor/agents/planner.md`; если он недоступен в среде, использовать `generalPurpose` или readonly `explore` с prompt-шаблоном ниже.
-- `Implementer` — через проектный кастомный subagent `.cursor/agents/implementer.md`; если он недоступен в среде, использовать основной агент или `generalPurpose` только после разрешения пользователя на конкретную фазу.
-- `Verifier` — через проектный кастомный subagent `.cursor/agents/verifier.md`; для GUI-проверок может привлекаться `computerUse`, для проверки записей экрана — `videoReview`.
+Репозиторий не может добавить новые значения `subagent_type` в инструмент Task Cloud Agent. Там остаются платформенные типы (`generalPurpose`, `explore`, `debug`, `computerUse`, `videoReview`, `cursor-guide`, `best-of-n-runner` и др.) — их используют только как fallback, передавая prompt роли из этого документа.
 
-Если другой агент перечисляет только встроенные типы Cursor, это ожидаемо. Он должен брать роли `Planner`, `Implementer` и `Verifier` из этого документа или файлов `.cursor/agents/` и вставлять соответствующий prompt-шаблон при запуске выбранного встроенного типа.
+`Planner`, `Implementer` и `Verifier` — ролевые профили. Запуск в приоритете:
+
+- `Planner` — `.cursor/agents/planner.md`; fallback: `generalPurpose` или readonly `explore` + prompt-шаблон Planner ниже.
+- `Implementer` — `.cursor/agents/implementer.md`; fallback: основной агент или `generalPurpose` только после разрешения пользователя на конкретную фазу.
+- `Verifier` — `.cursor/agents/verifier.md` (`readonly: true` в frontmatter); для UI Agent может дополнительно задействовать встроенный **Browser**, для shell-проверок — **Bash**.
+
+Если среда перечисляет только встроенные типы Task, orchestrator берёт prompt из `.cursor/agents/` или разделов ниже и передаёт его выбранному встроенному типу.
 
 ## Общие правила оркестрации
 
