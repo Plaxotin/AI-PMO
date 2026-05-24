@@ -72,8 +72,10 @@
 
 ## 6. Критерий готовности BL1-0
 
-- [ ] Миграция накатывается на Supabase (или локальный Postgres с тем же SQL).  
-- [ ] Seed создаёт глобальный проект.  
-- [ ] Zod-схемы согласованы с колонками БД.  
-- [ ] Скелет маршрутов `/api/projects/[projectId]/assignments` отвечает валидируемыми заглушками (401 без сессии — если auth уже подключён, иначе явный TODO).  
-- [ ] В `README` или `docs/` перечислены env-переменные для разработчика.
+- [x] Миграция накатывается на Supabase (или локальный Postgres с тем же SQL) — `supabase/migrations/20260524000000_bl1_v1.sql`.  
+- [x] Seed создаёт глобальный проект — `supabase/seed.sql`.  
+- [x] Zod-схемы согласованы с колонками БД — `app/src/lib/assignments/types.ts`.  
+- [x] Скелет маршрутов `/api/projects/[projectId]/assignments` отвечает валидируемыми заглушками (401 без сессии — если auth уже подключён, иначе заголовок `X-Auth-Status: todo-supabase-not-configured`).  
+- [x] В `README` / `docs/` перечислены env — `docs/BL1-0_ENV.md`, `app/README.md`, `app/.env.example`.
+
+**Приложение:** каталог `app/` (Next.js 15). Статус фазы: `ready_for_test` (ветка `cursor/bl1-0-kickoff-35d7`).
