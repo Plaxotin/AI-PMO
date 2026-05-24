@@ -1,5 +1,13 @@
 # AGENTS.md
 
+## Repository identity
+
+This workspace is the **AI-PMO** product repository on GitHub: **`Plaxotin/AI-PMO`** (landing in the root; product specs and phase plans under `docs/`). When the user says «репозиторий ai-pmo», they mean this repo unless they give another path or clone.
+
+## Agent repository boundaries (mandatory)
+
+**Do not open, clone, attach, or run tools against the repository `Konstantin-portfolio` (any owner/org, any casing).** Treat it as out of scope for all Cursor agents and subagents: no reads, no searches, no PRs, no cross-repo assumptions. If work seems to require that repo, stop and ask the user to provide what is needed in this repository or in chat instead.
+
 ## Cursor Cloud specific instructions
 
 This is a zero-dependency static landing page (single `index.html` with inline CSS/JS) deployed on Vercel.
