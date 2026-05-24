@@ -2314,9 +2314,37 @@ document.querySelectorAll('.fade-up').forEach((el,i)=>{
   let auditLog=[];
   let lastGeneratedText='';
 
+  var enFallback={
+    'letters.ws.step1':'Upload corporate letterhead',
+    'letters.ws.step2':'Letter content',
+    'letters.ws.step3':'Attachments (optional)',
+    'letters.ws.step4':'Template style description (optional)',
+    'letters.ws.template_cta':'Click to choose a DOCX template',
+    'letters.ws.template_hint':'Only .docx files, max 10 MB',
+    'letters.ws.generate':'Generate letter',
+    'letters.ws.generating':'Generating...',
+    'letters.ws.result_title':'Generated letter',
+    'letters.ws.dl_docx':'Download DOCX',
+    'letters.ws.dl_zip':'Download ZIP package',
+    'letters.ws.security_notice':'Your template was not sent to AI. Only the letter text content was used for generation.',
+    'letters.ws.show_audit':'Show audit log',
+    'letters.ws.hide_audit':'Hide audit log',
+    'letters.ws.err_docx_only':'Only .docx files are accepted',
+    'letters.ws.err_too_large':'File exceeds 10 MB limit',
+    'letters.ws.err_max_files':'Maximum 5 attachments',
+    'letters.ws.err_attach_type':'Only .xlsx, .docx, .pdf files are accepted',
+    'letters.ws.attach_count':'files',
+    'letters.ws.preview_subject':'Subject',
+    'letters.ws.preview_greeting':'Dear Sir/Madam',
+    'letters.ws.preview_attachments':'Attachments',
+    'letters.ws.preview_none':'None',
+    'letters.ws.preview_signatory':'Signature'
+  };
+
   function lt(key){
     if(currentLang==='ru'&&translations.ru[key])return translations.ru[key];
-    const el=document.querySelector('[data-i18n="'+key+'"]');
+    if(enFallback[key])return enFallback[key];
+    var el=document.querySelector('[data-i18n="'+key+'"]');
     if(el&&originalsI18n.has(el))return originalsI18n.get(el);
     return el?el.textContent:key;
   }
