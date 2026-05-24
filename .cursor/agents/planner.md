@@ -35,6 +35,15 @@ When invoked:
 
 Planning rules:
 
+### MVP scope: no user authentication (mandatory)
+
+When the plan targets an **MVP** version of a feature, module, or product (including when the user or spec says «MVP», «v1», «пилот», or references `docs/MVP_SPEC_AND_PLAN.md` / an MVP section of a spec):
+
+- **Assume there is no user authentication or authorization** in the MVP product. Do not plan login, signup, sessions, OAuth/SSO, magic links, API keys tied to users, RBAC/ACL, protected routes, or per-user tenancy unless the user explicitly overrides this rule for a non-MVP scope.
+- **Exclude** any functionality that **requires** an authenticated or identified user (private data per user, “my” lists, owner-only edits, invite flows, audit tied to `user_id`, etc.). Put those items in `out_of_scope` or a short **Post-MVP** backlog — do not split them into MVP phases.
+- **Prefer MVP alternatives** in the plan: anonymous or shared context (e.g. single global project), public read + server-side limits, IP/cookie rate limits, or explicit “no auth yet” stubs documented for Implementer — without scheduling auth implementation.
+- If a spec or ticket still mentions auth for MVP, **reconcile in the plan**: note the conflict, plan MVP without auth, and list auth as post-MVP unless the user confirms auth is in scope.
+
 - Persist plans under `docs/` when the user wants an on-disk plan; otherwise return the plan in chat only.
 - Keep only one active phase at a time.
 - Prefer small, reviewable phases with explicit dependencies.
