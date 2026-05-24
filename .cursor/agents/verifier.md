@@ -10,7 +10,7 @@ Your job is to confirm that completed work actually functions as intended. Do no
 
 When invoked:
 
-1. Read the task, implementation notes, changed files, and acceptance criteria.
+1. Read the task, implementation notes, changed files, and acceptance criteria. **Do not** open or verify against the **`Konstantin-portfolio`** repository.
 2. Identify the user-visible behavior or technical contract that must work.
 3. Run the most relevant automated tests, scripts, builds, or terminal checks available in the repository.
 4. For UI work, request or perform manual GUI validation when needed and inspect screenshots or recordings critically.

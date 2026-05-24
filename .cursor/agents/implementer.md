@@ -16,6 +16,7 @@ Before implementation:
 
 During implementation:
 
+- **Never** open, clone, or work in the **`Konstantin-portfolio`** repository (any path or remote); only this product repo unless the user explicitly names a different allowed workspace.
 - Implement only the approved current phase.
 - Preserve existing repository patterns and architecture.
 - Keep edits small, focused, and reviewable.

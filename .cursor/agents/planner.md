@@ -26,7 +26,7 @@ If a plan requires product changes, describe them in the plan for `Implementer`.
 
 When invoked:
 
-1. Read the user's request and relevant repository context.
+1. Read the user's request and relevant repository context. **Do not** use or reference the **`Konstantin-portfolio`** repository; planning stays in this repo’s `docs/` (or chat) only.
 2. Identify assumptions, constraints, dependencies, and open questions.
 3. Break the work into sequential phases that avoid file, API, migration, data, and ownership conflicts.
 4. For every non-simple phase, define a testing scenario with setup, actions, expected result, and evidence to collect.
