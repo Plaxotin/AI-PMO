@@ -2,7 +2,7 @@
 
 **Дата:** 2026-05-24  
 **Источник:** ответы Product на открытые вопросы Planner + спека v1.2  
-**Применяется к:** `docs/SPEC-BL-6-assignments-admin.md`, `docs/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`
+**Применяется к:** `docs/specs/SPEC-BL-6-assignments-admin.md`, `docs/plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`
 
 ---
 
@@ -52,7 +52,7 @@
 
 ## 5. Согласование документации MVP
 
-**Решение:** да — трек BL-6 описан только в `docs/SPEC-BL-6-assignments-admin.md` (полный объём v1.2, фазы BL1-3 … BL1-5 обязательны). Аудит плана — отдельно в `docs/SPEC-PLAN-AUDIT.md` (ранее общий файл `MVP_SPEC_AND_PLAN.md`).
+**Решение:** да — трек BL-6 описан только в `docs/specs/SPEC-BL-6-assignments-admin.md` (полный объём v1.2, фазы BL1-3 … BL1-5 обязательны). Аудит плана — отдельно в `docs/specs/SPEC-PLAN-AUDIT.md` (ранее общий файл `MVP_SPEC_AND_PLAN.md`).
 
 ---
 
@@ -70,4 +70,4 @@
 
 ---
 
-*Implementer: перед BL1-1 читать этот файл вместе с `docs/BL1-0_KICKOFF.md` и фазой BL1-1 в `docs/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`.*
+*Implementer: перед BL1-1 читать этот файл вместе с `docs/plans/BL1-0_KICKOFF.md` и фазой BL1-1 в `docs/plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`.*

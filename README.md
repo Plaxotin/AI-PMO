@@ -11,7 +11,9 @@ Landing page for AI PMO service.
 
 **Лендинг:** edit `index.html` → push to `main` → auto-deploy (Vercel root).
 
-**Приложение (BL1-0+):** см. `app/README.md` и `docs/BL1-0_ENV.md`.
+**Документация:** `docs/README.md` — спеки в `docs/specs/`, планы в `docs/plans/`.
+
+**Приложение (BL1-0+):** см. `app/README.md` и `docs/plans/BL1-0_ENV.md`.
 
 ```bash
 cd app && npm install && npm run dev

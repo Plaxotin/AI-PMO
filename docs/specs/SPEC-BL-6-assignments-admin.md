@@ -5,8 +5,8 @@
 **Продукт:** AI PMO  
 **Код бэклога:** BL-6 (Notion) / BL-1 (внутренняя нумерация репозитория)  
 **WSJF:** 2 · **Волна:** 1 · **Сложность:** L · **Ценность:** Высокая  
-**Связанные файлы реализации:** `docs/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`, `docs/BL6_PRODUCT_DECISIONS.md`, `docs/BL1-0_KICKOFF.md`, `docs/BL1-0_VERIFICATION.md`  
-**Смежная фича (отдельная спека):** [Аудит проектного плана](SPEC-PLAN-AUDIT.md) — `docs/SPEC-PLAN-AUDIT.md`
+**Связанные файлы реализации:** `docs/plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`, `docs/specs/BL6_PRODUCT_DECISIONS.md`, `docs/plans/BL1-0_KICKOFF.md`, `docs/plans/BL1-0_VERIFICATION.md`  
+**Смежная фича:** [Аудит проектного плана](SPEC-PLAN-AUDIT.md) (`docs/specs/`)
 
 ---
 
@@ -47,7 +47,7 @@
 7. **Публичный реестр:** статический снапшот JSON + HTML-таблица на RU-friendly CDN; версионирование `updated_at` / ETag.
 8. **CRUD в веб-UI AI PMO:** список, карточка, форма создания/редактирования; фильтры по статусу, сроку, ответственному.
 9. **Выгрузка и ручные правки:** экспорт CSV/XLSX; импорт с валидацией и отчётом об ошибках; optimistic locking по `version`.
-10. **Журнал событий:** кто и когда создал / изменил / закрыл поручение; смена `status` и ключевых полей (`title`, `due_at`, `assignee`) — в `assignment_status_events` с `event_type` (`status_change` | `field_change` | …). См. `docs/BL6_PRODUCT_DECISIONS.md`.
+10. **Журнал событий:** кто и когда создал / изменил / закрыл поручение; смена `status` и ключевых полей (`title`, `due_at`, `assignee`) — в `assignment_status_events` с `event_type` (`status_change` | `field_change` | …). См. `docs/specs/BL6_PRODUCT_DECISIONS.md`.
 
 ### 3.2 Вне первой итерации (бэклог)
 
@@ -155,7 +155,7 @@
 
 ## 6. Архитектура и Cursor-агенты
 
-Детализированный план реализации — `docs/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`. Ниже — сводка треков и фаз для работы в Cursor Cloud через агентов.
+Детализированный план реализации — `docs/plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`. Ниже — сводка треков и фаз для работы в Cursor Cloud через агентов.
 
 ### Схема компонентов
 
@@ -201,7 +201,7 @@ Bot Webhook ──────────────────► Media Inge
 
 | Фаза | Описание | Статус |
 |------|----------|--------|
-| BL1-0 | Контракты, Zod-типы, миграции v1, скелет API | ✅ `verified` (см. `docs/BL1-0_VERIFICATION.md`) |
+| BL1-0 | Контракты, Zod-типы, миграции v1, скелет API | ✅ `verified` (см. `docs/plans/BL1-0_VERIFICATION.md`) |
 | BL1-1 | CRUD поручений, авторизация, журнал истории | `planned` |
 | BL1-2 | UI реестра (список, карточка, форма, фильтры) | `planned` |
 | BL1-3 | Telegram-инжест, STT, LLM slot-filling, уточнения | `planned` |
@@ -349,7 +349,7 @@ POST /api/projects/:projectId/assignments/import          — тело: multipar
 
 ## 12. Интеграция с фичей «Аудит плана»
 
-Модуль BL-6 разрабатывается в том же приложении (`app/`), что и аудит Excel/CSV (`docs/SPEC-PLAN-AUDIT.md`), но **домены разделены**:
+Модуль BL-6 разрабатывается в том же приложении (`app/`), что и аудит Excel/CSV (`docs/specs/SPEC-PLAN-AUDIT.md`), но **домены разделены**:
 
 | Тема | Аудит плана | BL-6 |
 |------|-------------|------|
@@ -365,7 +365,7 @@ POST /api/projects/:projectId/assignments/import          — тело: multipar
 
 - **Приложение:** Next.js (App Router), React, TypeScript — каталог `app/`.
 - **БД:** PostgreSQL (Supabase), миграции SQL в `supabase/migrations/`.
-- **Auth:** Supabase Auth (magic link / OAuth) — см. `docs/BL1-0_KICKOFF.md`.
+- **Auth:** Supabase Auth (magic link / OAuth) — см. `docs/plans/BL1-0_KICKOFF.md`.
 - **Очередь/крон:** Vercel Cron + outbox-таблица для напоминаний (BL1-4).
 - **STT:** SaluteSpeech; **публичный реестр:** Yandex Object Storage + CDN.
 - **LLM:** slot-filling и разбиение транскриптов — только нормализованный текст; подтверждение человеком перед `open`.
@@ -374,7 +374,7 @@ POST /api/projects/:projectId/assignments/import          — тело: multipar
 
 ## 14. Подготовка к разработке (чеклист)
 
-Зафиксированные решения — `docs/BL1-0_KICKOFF.md`, `docs/BL6_PRODUCT_DECISIONS.md`. Перед **BL1-0** (выполнено) и при старте **BL1-1**:
+Зафиксированные решения — `docs/plans/BL1-0_KICKOFF.md`, `docs/specs/BL6_PRODUCT_DECISIONS.md`. Перед **BL1-0** (выполнено) и при старте **BL1-1**:
 
 1. **Модель доступа:** один глобальный проект; аутентифицированные пользователи — полный доступ к реестру проекта.
 2. **Идентичность:** Supabase Auth, `owner_id` на поручении.
@@ -387,7 +387,7 @@ POST /api/projects/:projectId/assignments/import          — тело: multipar
 
 ## 15. Оценка стоимости разработки (ориентир Cursor)
 
-Методика и допущения — как в `docs/SPEC-PLAN-AUDIT.md` (Часть IV); ниже только фазы **BL1-\***.
+Методика и допущения — как в `docs/specs/SPEC-PLAN-AUDIT.md` (Часть IV); ниже только фазы **BL1-\***.
 
 | Фаза | API-эквивалент (USD) | Комментарий |
 |------|----------------------|-------------|
@@ -402,7 +402,7 @@ POST /api/projects/:projectId/assignments/import          — тело: multipar
 
 **Человеко-время (ориентир):** BL1-1 ~**0,5–1**; BL1-2 ~**0,5–1,2**; BL1-3 ~**0,5–1**; BL1-4 ~**0,2–0,5**; BL1-5 ~**0,5–1** нед. экв. разработчика с AI.
 
-Детальные **testing_scenario** по фазам — `docs/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`.
+Детальные **testing_scenario** по фазам — `docs/plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`.
 
 ---
 
@@ -426,4 +426,4 @@ POST /api/projects/:projectId/assignments/import          — тело: multipar
 
 ---
 
-*Документ является **единственной продуктовой спецификацией BL-6** (ранее часть требований дублировалась в `docs/MVP_SPEC_AND_PLAN.md`). Аудит плана — `docs/SPEC-PLAN-AUDIT.md`. План фаз — `docs/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`. Kickoff BL1-0 — `docs/BL1-0_KICKOFF.md`. Верификация BL1-0 — `docs/BL1-0_VERIFICATION.md`.*
+*Документ является **единственной продуктовой спецификацией BL-6** (ранее часть требований дублировалась в `docs/specs/SPEC-PLAN-AUDIT.md`). Аудит плана — `docs/specs/SPEC-PLAN-AUDIT.md`. План фаз — `docs/plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`. Kickoff BL1-0 — `docs/plans/BL1-0_KICKOFF.md`. Верификация BL1-0 — `docs/plans/BL1-0_VERIFICATION.md`.*

@@ -2,7 +2,7 @@
 
 **Фаза:** BL1-0 — контракты, схема БД v1, скелет API  
 **Дата фиксации:** 18 мая 2026  
-**Связанные документы:** `docs/SPEC-BL-6-assignments-admin.md` (спека BL-6), `docs/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md` (фазы BL1-*), `docs/SPEC-PLAN-AUDIT.md` (отдельная фича — аудит плана).
+**Связанные документы:** `docs/specs/SPEC-BL-6-assignments-admin.md` (спека BL-6), `docs/plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md` (фазы BL1-*), `docs/specs/SPEC-PLAN-AUDIT.md` (отдельная фича — аудит плана).
 
 ---
 
@@ -76,6 +76,6 @@
 - [x] Seed создаёт глобальный проект — `supabase/seed.sql`.  
 - [x] Zod-схемы согласованы с колонками БД — `app/src/lib/assignments/types.ts`.  
 - [x] Скелет маршрутов `/api/projects/[projectId]/assignments` отвечает валидируемыми заглушками (401 без сессии — если auth уже подключён, иначе заголовок `X-Auth-Status: todo-supabase-not-configured`).  
-- [x] В `README` / `docs/` перечислены env — `docs/BL1-0_ENV.md`, `app/README.md`, `app/.env.example`.
+- [x] В `README` / `docs/` перечислены env — `docs/plans/BL1-0_ENV.md`, `app/README.md`, `app/.env.example`.
 
 **Приложение:** каталог `app/` (Next.js 15). Статус фазы: `ready_for_test` (ветка `cursor/bl1-0-kickoff-35d7`).

@@ -18,7 +18,7 @@ export default function Home() {
         </li>
         <li>
           Документация env:{' '}
-          <code className="rounded bg-neutral-100 px-1">docs/BL1-0_ENV.md</code>
+          <code className="rounded bg-neutral-100 px-1">docs/plans/BL1-0_ENV.md</code>
         </li>
         <li>
           Глобальный <code className="rounded bg-neutral-100 px-1">projectId</code>:{' '}

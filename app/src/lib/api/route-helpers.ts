@@ -10,7 +10,7 @@ export async function withAuth() {
       ok: false as const,
       response: apiError(
         'UNAUTHORIZED',
-        'Требуется вход (Supabase Auth). См. docs/BL1-0_ENV.md',
+        'Требуется вход (Supabase Auth). См. docs/plans/BL1-0_ENV.md',
         401,
       ),
     };

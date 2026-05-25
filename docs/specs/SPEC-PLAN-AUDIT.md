@@ -6,7 +6,7 @@
 **Код бэклога:** (аудит плана — отдельная фича; не BL-6)  
 **Репозиторий:** AI PMO (`Plaxotin/AI-PMO`) — лендинг в корне; целевой код приложения — `app/` по дорожной карте.
 
-**Смежная фича (отдельная спека):** [BL-6 — Администратор поручений](SPEC-BL-6-assignments-admin.md) — `docs/SPEC-BL-6-assignments-admin.md`, план фаз — `docs/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`.
+**Смежная фича (отдельная спека):** [BL-6 — Администратор поручений](SPEC-BL-6-assignments-admin.md) — `docs/specs/SPEC-BL-6-assignments-admin.md`, план фаз — `docs/plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`.
 
 ---
 
@@ -20,7 +20,7 @@
 
 **В MVP не входит:** `.mpp`, Google Sheets, Stripe/Pro (допускается заглушка «скоро»), пакетный анализ, публичный REST API **аудита** как отдельного продукта для третьих сторон. **Аудит** остаётся без персистентности загруженных файлов.
 
-**Разделение с BL-6:** реестр поручений, Telegram, STT и публичный CDN — только в `docs/SPEC-BL-6-assignments-admin.md`. Общий деплой приложения допустим; **запрет** смешивать бинарные загрузки планов с таблицами поручений на уровне политики продуктов.
+**Разделение с BL-6:** реестр поручений, Telegram, STT и публичный CDN — только в `docs/specs/SPEC-BL-6-assignments-admin.md`. Общий деплой приложения допустим; **запрет** смешивать бинарные загрузки планов с таблицами поручений на уровне политики продуктов.
 
 ### 2. Пользовательские сценарии
 
@@ -223,7 +223,7 @@ Next.js 14 (App Router), React, Tailwind, shadcn/ui, SheetJS, PapaParse, Vercel 
 | — | Интеграция с MS Project / Primavera | После стабильного Excel/CSV MVP. |
 | — | Пакетный анализ нескольких планов | Отдельная спека. |
 
-**BL-6 «Администратор поручений»** — отдельный продуктовый модуль: `docs/SPEC-BL-6-assignments-admin.md`.
+**BL-6 «Администратор поручений»** — отдельный продуктовый модуль: `docs/specs/SPEC-BL-6-assignments-admin.md`.
 
 ---
 
@@ -233,4 +233,4 @@ Next.js 14 (App Router), React, Tailwind, shadcn/ui, SheetJS, PapaParse, Vercel 
 - Код приложения: `app/README.md`.
 - Исходная спецификация продукта v0.1 (PDF): внутренний артефакт команды.
 
-*Ранее этот документ был объединён с BL-6 в `docs/MVP_SPEC_AND_PLAN.md` (v1.2). С v1.3 аудит и BL-6 разделены.*
+*Ранее этот документ был объединён с BL-6 в `docs/specs/SPEC-PLAN-AUDIT.md` (v1.2). С v1.3 аудит и BL-6 разделены.*

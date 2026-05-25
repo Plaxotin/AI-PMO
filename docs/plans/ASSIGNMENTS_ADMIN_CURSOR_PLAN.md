@@ -1,8 +1,8 @@
 # Администратор поручений — план реализации (фазы)
 
 **Статус:** актуальный план (ревизия Planner 2026-05-24; синхронизирован со спекой v1.2)  
-**Спека:** `docs/SPEC-BL-6-assignments-admin.md` — источник истины по требованиям и решениям  
-**Связанные файлы:** `docs/BL6_PRODUCT_DECISIONS.md`, `docs/BL1-0_KICKOFF.md`, `docs/BL1-0_VERIFICATION.md`  
+**Спека:** `docs/specs/SPEC-BL-6-assignments-admin.md` — источник истины по требованиям и решениям  
+**Связанные файлы:** `docs/specs/BL6_PRODUCT_DECISIONS.md`, `docs/plans/BL1-0_KICKOFF.md`, `docs/plans/BL1-0_VERIFICATION.md`  
 **Подход:** один разработчик, последовательные фазы; каждая фаза — отдельная ветка и PR.
 
 ---
@@ -62,11 +62,11 @@ Bot Webhook ──────────────────► Media Inge
 ### Фаза BL1-0 — Контракты и данные ✅
 
 **phase_id:** BL1-0  
-**status:** `verified` (см. `docs/BL1-0_VERIFICATION.md`)
+**status:** `verified` (см. `docs/plans/BL1-0_VERIFICATION.md`)
 
 **Результат:** Zod-типы, SQL-миграция v1, скелет API, seed.
 
-**testing_scenario:** `not_required` — фаза завершена и верифицирована статически; повторная проверка по `docs/BL1-0_VERIFICATION.md`.
+**testing_scenario:** `not_required` — фаза завершена и верифицирована статически; повторная проверка по `docs/plans/BL1-0_VERIFICATION.md`.
 
 ---
 
@@ -80,7 +80,7 @@ Bot Webhook ──────────────────► Media Inge
 
 **Scope:**
 
-- Реализация эндпоинтов (контракт — `docs/SPEC-BL-6-assignments-admin.md` §9):
+- Реализация эндпоинтов (контракт — `docs/specs/SPEC-BL-6-assignments-admin.md` §9):
   ```
   GET    /api/projects/:projectId/assignments          — список с фильтрами
   POST   /api/projects/:projectId/assignments
@@ -89,14 +89,14 @@ Bot Webhook ──────────────────► Media Inge
   DELETE /api/projects/:projectId/assignments/:id      — отмена (status → cancelled)
   ```
 - Фильтры списка (привести к спеке; заменить черновик BL1-0 `due_from`/`due_to`/`limit`/`offset`/`q`):
-  `status`, `due_before`, `due_after`, `assignee` — **точное совпадение** с `assignee_label` (см. `docs/BL6_PRODUCT_DECISIONS.md` §4), `source`, `page`, `per_page`.
+  `status`, `due_before`, `due_after`, `assignee` — **точное совпадение** с `assignee_label` (см. `docs/specs/BL6_PRODUCT_DECISIONS.md` §4), `source`, `page`, `per_page`.
 - Ответ списка: `{ data: Assignment[], meta: { total, page, per_page } }`.
-- Авторизация (согласовано с `docs/BL1-0_KICKOFF.md` §4): любой аутентифицированный пользователь видит и редактирует **все** поручения глобального проекта; изоляция — по `project_id` (чужой UUID → `403`/`404`).
-- Журнал (`docs/BL6_PRODUCT_DECISIONS.md` §1): расширить `assignment_status_events` — `event_type` (`status_change` | `field_change` | `created` | `cancelled`); для `field_change` — `field_name`, `old_value`/`new_value`.
+- Авторизация (согласовано с `docs/plans/BL1-0_KICKOFF.md` §4): любой аутентифицированный пользователь видит и редактирует **все** поручения глобального проекта; изоляция — по `project_id` (чужой UUID → `403`/`404`).
+- Журнал (`docs/specs/BL6_PRODUCT_DECISIONS.md` §1): расширить `assignment_status_events` — `event_type` (`status_change` | `field_change` | `created` | `cancelled`); для `field_change` — `field_name`, `old_value`/`new_value`.
 - Оптимистическая блокировка: поле `version`, конфликт → `409` с текущей версией.
 - Миграция v2: `version` (int, default 1), расширить enum `assignment_source` значением `web_upload`, `media_ingest_job_id` (nullable uuid, FK добавить после таблицы `media_ingest_jobs` в BL1-3/BL1-5 — до FK допустим nullable без constraint).
 
-**Env (дополнить `docs/BL1-0_ENV.md`):** `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+**Env (дополнить `docs/plans/BL1-0_ENV.md`):** `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
 
 **Критерий готовности:** интеграционные тесты: создать / прочитать / изменить / отменить поручение; доступ к чужому `project_id` → `403`/`404`; `assignment_status_events` при смене статуса; `409` при конфликте `version`.
 
@@ -157,7 +157,7 @@ Bot Webhook ──────────────────► Media Inge
 - **Текст** → LLM slot-filling (одно поручение).
 - **Короткое голос/аудио** (`voice`, `audio`): tmp → **SaluteSpeech** STT → удалить → slot-filling.
 - **Короткое видео** (`video`, `video_note`): tmp → **ffmpeg** → SaluteSpeech → удалить → slot-filling.
-- **US-C (запись мероприятия в Telegram):** маршрут по эвристике `docs/BL6_PRODUCT_DECISIONS.md` §2 (`/meeting`, ключевые слова, duration ≥ 90 с, файл ≥ 3 МБ) → STT → LLM-разбиение → `MediaIngestJob` + `drafts`; в тред — «подтвердите в веб-UI».
+- **US-C (запись мероприятия в Telegram):** маршрут по эвристике `docs/specs/BL6_PRODUCT_DECISIONS.md` §2 (`/meeting`, ключевые слова, duration ≥ 90 с, файл ≥ 3 МБ) → STT → LLM-разбиение → `MediaIngestJob` + `drafts`; в тред — «подтвердите в веб-UI».
 - Файл из Telegram **> 25 МБ** (спека §10): ответ в тред с подсказкой веб-загрузки (US-C2).
 - Команды: `/help`; при необходимости `/link_project`.
 - Миграции: `clarification_sessions`, `media_ingest_jobs` (минимум для US-C).

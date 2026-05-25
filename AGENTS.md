@@ -2,7 +2,7 @@
 
 ## Repository identity
 
-This workspace is the **AI-PMO** product repository on GitHub: **`Plaxotin/AI-PMO`** (landing in the root; product specs and phase plans under `docs/`). When the user says «репозиторий ai-pmo», they mean this repo unless they give another path or clone.
+This workspace is the **AI-PMO** product repository on GitHub: **`Plaxotin/AI-PMO`** (landing in the root; product **specs** in `docs/specs/`, **plans** in `docs/plans/` — see `docs/README.md`). When the user says «репозиторий ai-pmo», they mean this repo unless they give another path or clone.
 
 ## Agent repository boundaries (mandatory)
 
