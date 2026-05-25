@@ -2,7 +2,7 @@
 
 **Статус:** актуальный план (ревизия Planner 2026-05-24; синхронизирован со спекой v1.2)  
 **Спека:** `docs/SPEC-BL-6-assignments-admin.md` — источник истины по требованиям и решениям  
-**Связанные файлы:** `docs/BL1-0_KICKOFF.md`, `docs/BL1-0_VERIFICATION.md`  
+**Связанные файлы:** `docs/BL6_PRODUCT_DECISIONS.md`, `docs/BL1-0_KICKOFF.md`, `docs/BL1-0_VERIFICATION.md`  
 **Подход:** один разработчик, последовательные фазы; каждая фаза — отдельная ветка и PR.
 
 ---
@@ -89,10 +89,10 @@ Bot Webhook ──────────────────► Media Inge
   DELETE /api/projects/:projectId/assignments/:id      — отмена (status → cancelled)
   ```
 - Фильтры списка (привести к спеке; заменить черновик BL1-0 `due_from`/`due_to`/`limit`/`offset`/`q`):
-  `status`, `due_before`, `due_after`, `assignee` (маппинг на `assignee_label`), `source`, `page`, `per_page`.
+  `status`, `due_before`, `due_after`, `assignee` — **точное совпадение** с `assignee_label` (см. `docs/BL6_PRODUCT_DECISIONS.md` §4), `source`, `page`, `per_page`.
 - Ответ списка: `{ data: Assignment[], meta: { total, page, per_page } }`.
 - Авторизация (согласовано с `docs/BL1-0_KICKOFF.md` §4): любой аутентифицированный пользователь видит и редактирует **все** поручения глобального проекта; изоляция — по `project_id` (чужой UUID → `403`/`404`).
-- Журнал: запись в `assignment_status_events` при смене `status`; при изменении ключевых полей (`title`, `due_at`, `assignee_label`) — отдельная строка аудита или расширение той же таблицы (зафиксировать в миграции v2).
+- Журнал (`docs/BL6_PRODUCT_DECISIONS.md` §1): расширить `assignment_status_events` — `event_type` (`status_change` | `field_change` | `created` | `cancelled`); для `field_change` — `field_name`, `old_value`/`new_value`.
 - Оптимистическая блокировка: поле `version`, конфликт → `409` с текущей версией.
 - Миграция v2: `version` (int, default 1), расширить enum `assignment_source` значением `web_upload`, `media_ingest_job_id` (nullable uuid, FK добавить после таблицы `media_ingest_jobs` в BL1-3/BL1-5 — до FK допустим nullable без constraint).
 
@@ -157,7 +157,7 @@ Bot Webhook ──────────────────► Media Inge
 - **Текст** → LLM slot-filling (одно поручение).
 - **Короткое голос/аудио** (`voice`, `audio`): tmp → **SaluteSpeech** STT → удалить → slot-filling.
 - **Короткое видео** (`video`, `video_note`): tmp → **ffmpeg** → SaluteSpeech → удалить → slot-filling.
-- **US-C (запись мероприятия в Telegram):** длинное аудио/видео или явный тип «совещание» → тот же pipeline, что BL1-5 (STT → LLM-разбиение) → `MediaIngestJob` + `drafts` (jsonb); ссылка/уведомление в тред «подтвердите в веб-UI».
+- **US-C (запись мероприятия в Telegram):** маршрут по эвристике `docs/BL6_PRODUCT_DECISIONS.md` §2 (`/meeting`, ключевые слова, duration ≥ 90 с, файл ≥ 3 МБ) → STT → LLM-разбиение → `MediaIngestJob` + `drafts`; в тред — «подтвердите в веб-UI».
 - Файл из Telegram **> 25 МБ** (спека §10): ответ в тред с подсказкой веб-загрузки (US-C2).
 - Команды: `/help`; при необходимости `/link_project`.
 - Миграции: `clarification_sessions`, `media_ingest_jobs` (минимум для US-C).

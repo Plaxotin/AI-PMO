@@ -5,7 +5,7 @@
 **Продукт:** AI PMO  
 **Код бэклога:** BL-6 (Notion) / BL-1 (внутренняя нумерация репозитория)  
 **WSJF:** 2 · **Волна:** 1 · **Сложность:** L · **Ценность:** Высокая  
-**Связанные файлы реализации:** `docs/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`, `docs/BL1-0_KICKOFF.md`, `docs/BL1-0_VERIFICATION.md`
+**Связанные файлы реализации:** `docs/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`, `docs/BL6_PRODUCT_DECISIONS.md`, `docs/BL1-0_KICKOFF.md`, `docs/BL1-0_VERIFICATION.md`
 
 ---
 
@@ -37,7 +37,7 @@
 
 ### 3.1 Обязательно в MVP
 
-1. **Модель поручения:** `id`, `project_id`, `title`, `description` (опц.), `status` (enum: `draft` | `open` | `done` | `cancelled`), `due_at` (опц.), `assignee` (Telegram @username / user_id / отображаемое имя), `source` (`manual` | `import` | `webhook`), `created_at`, `updated_at`, `history`.
+1. **Модель поручения:** `id`, `project_id`, `title`, `description` (опц.), `status` (enum: `draft` | `open` | `done` | `cancelled`), `due_at` (опц.), `assignee` (Telegram @username / user_id / отображаемое имя), `source` (`manual` | `import` | `webhook` | `web_upload`), `created_at`, `updated_at`, `history`, `version` (с BL1-1).
 2. **Приём из Telegram:** текст, голосовые и видеосообщения, медиафайлы из привязанного канала / супергруппы; webhook с верификацией токена.
 3. **STT для аудио и видео:** скачать файл (voice / audio / video) → извлечь аудиодорожку (для видео) → **SaluteSpeech** → нормализация текста → тот же pipeline, что и текст. Медиафайл **не сохраняется** — обрабатывается только в памяти/temp и удаляется сразу после транскрипции.
 4. **Ключевой сценарий «запись с мероприятия»:** файл летучки/созвона (**аудио или видео**, переданный боту в Telegram **или загруженный через веб-интерфейс AI PMO**) → STT + LLM-разбиение → структурированный список поручений в веб-UI AI PMO с подтверждением.
@@ -46,7 +46,7 @@
 7. **Публичный реестр:** статический снапшот JSON + HTML-таблица на RU-friendly CDN; версионирование `updated_at` / ETag.
 8. **CRUD в веб-UI AI PMO:** список, карточка, форма создания/редактирования; фильтры по статусу, сроку, ответственному.
 9. **Выгрузка и ручные правки:** экспорт CSV/XLSX; импорт с валидацией и отчётом об ошибках; optimistic locking по `version`.
-10. **Журнал событий:** кто и когда создал / изменил / закрыл поручение.
+10. **Журнал событий:** кто и когда создал / изменил / закрыл поручение; смена `status` и ключевых полей (`title`, `due_at`, `assignee`) — в `assignment_status_events` с `event_type` (`status_change` | `field_change` | …). См. `docs/BL6_PRODUCT_DECISIONS.md`.
 
 ### 3.2 Вне первой итерации (бэклог)
 
@@ -183,7 +183,7 @@ Bot Webhook ──────────────────► Media Inge
 | BL1-2 | UI реестра (список, карточка, форма, фильтры) | `planned` |
 | BL1-3 | Telegram-инжест, STT, LLM slot-filling, уточнения | `planned` |
 | BL1-4 | Напоминания (cron/outbox), публичный реестр (CDN), импорт/экспорт | `planned` |
-| BL1-5 | Сценарий US-C «голос с мероприятия», наблюдаемость, пилот | `planned` |
+| BL1-5 | Веб-загрузка US-C2, экран подтверждения US-C/US-C2, наблюдаемость, пилот | `planned` |
 
 ### Рекомендуемые LLM по фазам
 
@@ -194,7 +194,7 @@ Bot Webhook ──────────────────► Media Inge
 | BL1-2 UI реестра | Agent / Composer | Sonnet, GPT-4o |
 | BL1-3 Telegram + STT + LLM | Agent + Chat | GPT-4.1 / Sonnet; промпты slot-filling — Opus точечно |
 | BL1-4 Напоминания + CDN + импорт | Agent | Sonnet, GPT-4o |
-| BL1-5 US-C + наблюдаемость | Agent + Chat | Sonnet; диагностика STT-качества — Opus |
+| BL1-5 US-C2 + confirm UI + наблюдаемость | Agent + Chat | Sonnet; диагностика STT-качества — Opus |
 
 ---
 
@@ -242,7 +242,7 @@ PATCH  /api/projects/:projectId/assignments/:id      — обновить
 DELETE /api/projects/:projectId/assignments/:id      — отменить (soft delete)
 ```
 
-Фильтры списка: `status`, `due_before`, `due_after`, `assignee`, `source`, `page`, `per_page`.
+Фильтры списка: `status`, `due_before`, `due_after`, `assignee` (**точное совпадение** с `assignee_label`), `source`, `page`, `per_page`.
 
 Ответ: `{ data: Assignment[], meta: { total, page, per_page } }`.  
 Версионирование схемы: заголовок `X-Api-Version` или query-параметр.
