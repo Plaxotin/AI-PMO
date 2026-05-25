@@ -282,13 +282,6 @@ export async function updateAssignment(
       new_value: updated.title,
     });
   }
-  if ((previous.description ?? null) !== (updated.description ?? null)) {
-    fieldChanges.push({
-      field_name: 'description',
-      old_value: previous.description ?? null,
-      new_value: updated.description ?? null,
-    });
-  }
   if (dueBefore !== dueAfter) {
     fieldChanges.push({
       field_name: 'due_at',
