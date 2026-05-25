@@ -2554,6 +2554,22 @@ document.querySelectorAll('.fade-up').forEach((el,i)=>{
     previewEl.innerHTML=html;
   }
 
+  var crc32Table=(function(){
+    var table=new Uint32Array(256);
+    for(var i=0;i<256;i++){
+      var c=i;
+      for(var j=0;j<8;j++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);
+      table[i]=c;
+    }
+    return table;
+  })();
+
+  function crc32(data){
+    var crc=0xFFFFFFFF;
+    for(var i=0;i<data.length;i++) crc=crc32Table[(crc^data[i])&0xFF]^(crc>>>8);
+    return (crc^0xFFFFFFFF)>>>0;
+  }
+
   function buildMinimalZip(files){
     var localHeaders=[];
     var centralHeaders=[];
@@ -2563,11 +2579,13 @@ document.querySelectorAll('.fade-up').forEach((el,i)=>{
       var data=(files[i].content instanceof Uint8Array)
         ? files[i].content
         : new TextEncoder().encode(files[i].content);
+      var checksum=crc32(data);
       var localHeader=new Uint8Array(30+name.length);
       var dv=new DataView(localHeader.buffer);
       dv.setUint32(0,0x04034b50,true);
       dv.setUint16(4,20,true);
       dv.setUint16(8,0,true);
+      dv.setUint32(14,checksum,true);
       dv.setUint32(18,data.length,true);
       dv.setUint32(22,data.length,true);
       dv.setUint16(26,name.length,true);
@@ -2579,6 +2597,7 @@ document.querySelectorAll('.fade-up').forEach((el,i)=>{
       cv.setUint16(4,20,true);
       cv.setUint16(6,20,true);
       cv.setUint16(10,0,true);
+      cv.setUint32(16,checksum,true);
       cv.setUint32(20,data.length,true);
       cv.setUint32(24,data.length,true);
       cv.setUint16(28,name.length,true);
