@@ -2,7 +2,7 @@
 
 **Фаза:** BL1-0 — контракты, схема БД v1, скелет API  
 **Дата фиксации:** 18 мая 2026  
-**Связанные документы:** `docs/MVP_SPEC_AND_PLAN.md` (общий MVP и BL-1), при необходимости — `docs/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md` (расширенный Telegram-план; часть требований шире текущего BL1-0).
+**Связанные документы:** `docs/SPEC-BL-6-assignments-admin.md` (спека BL-6), `docs/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md` (фазы BL1-*), `docs/SPEC-PLAN-AUDIT.md` (отдельная фича — аудит плана).
 
 ---
 

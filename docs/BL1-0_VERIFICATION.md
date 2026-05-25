@@ -23,4 +23,4 @@
 
 ## Следующая фаза
 
-BL1-1 — CRUD и авторизация (см. `docs/MVP_SPEC_AND_PLAN.md`).
+BL1-1 — CRUD и авторизация (см. `docs/SPEC-BL-6-assignments-admin.md`, `docs/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`).
