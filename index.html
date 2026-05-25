@@ -2560,7 +2560,9 @@ document.querySelectorAll('.fade-up').forEach((el,i)=>{
     var offset=0;
     for(var i=0;i<files.length;i++){
       var name=new TextEncoder().encode(files[i].name);
-      var data=new TextEncoder().encode(files[i].content);
+      var data=(files[i].content instanceof Uint8Array)
+        ? files[i].content
+        : new TextEncoder().encode(files[i].content);
       var localHeader=new Uint8Array(30+name.length);
       var dv=new DataView(localHeader.buffer);
       dv.setUint32(0,0x04034b50,true);
@@ -2605,6 +2607,68 @@ document.querySelectorAll('.fade-up').forEach((el,i)=>{
     parts.push(endRecord);
 
     return new Blob(parts,{type:'application/zip'});
+  }
+
+  function escapeXml(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+  }
+
+  function buildDocxBlob(text){
+    var contentTypes='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'+
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'+
+      '<Default Extension="xml" ContentType="application/xml"/>'+
+      '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'+
+      '</Types>';
+
+    var rels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'+
+      '</Relationships>';
+
+    var lines=text.split('\n');
+    var paragraphs='';
+    for(var i=0;i<lines.length;i++){
+      var escaped=escapeXml(lines[i]);
+      paragraphs+='<w:p><w:r><w:t xml:space="preserve">'+escaped+'</w:t></w:r></w:p>';
+    }
+
+    var doc='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+
+      '<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" '+
+      'xmlns:mo="http://schemas.microsoft.com/office/mac/office/2008/main" '+
+      'xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" '+
+      'xmlns:mv="urn:schemas-microsoft-com:mac:vml" '+
+      'xmlns:o="urn:schemas-microsoft-com:office:office" '+
+      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" '+
+      'xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" '+
+      'xmlns:v="urn:schemas-microsoft-com:vml" '+
+      'xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" '+
+      'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" '+
+      'xmlns:w10="urn:schemas-microsoft-com:office:word" '+
+      'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '+
+      'xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" '+
+      'xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" '+
+      'xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk" '+
+      'xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml" '+
+      'xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" '+
+      'mc:Ignorable="w14 wp14">'+
+      '<w:body>'+paragraphs+'</w:body></w:document>';
+
+    var docxFiles=[
+      {name:'[Content_Types].xml', content:contentTypes},
+      {name:'_rels/.rels', content:rels},
+      {name:'word/document.xml', content:doc}
+    ];
+
+    return buildMinimalZip(docxFiles);
+  }
+
+  function blobToUint8Array(blob){
+    return new Promise(function(resolve){
+      var reader=new FileReader();
+      reader.onload=function(){resolve(new Uint8Array(reader.result));};
+      reader.readAsArrayBuffer(blob);
+    });
   }
 
   function triggerDownload(blob,filename){
@@ -2665,28 +2729,31 @@ document.querySelectorAll('.fade-up').forEach((el,i)=>{
   }
 
   dlDocxBtn.addEventListener('click',function(){
-    var blob=new Blob([lastGeneratedText],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+    var blob=buildDocxBlob(lastGeneratedText);
     triggerDownload(blob,'letter.docx');
   });
 
   dlZipBtn.addEventListener('click',function(){
-    var zipFiles=[{name:'letter.docx',content:lastGeneratedText}];
-    var usedNames={};
-    usedNames['letter.docx']=true;
-    attachments.forEach(function(f){
-      var name=f.name;
-      if(usedNames[name]){
-        var ext=getExt(name);
-        var base=name.substring(0,name.length-ext.length);
-        var counter=2;
-        while(usedNames[base+'_'+counter+ext])counter++;
-        name=base+'_'+counter+ext;
-      }
-      usedNames[name]=true;
-      zipFiles.push({name:name,content:'[Attachment: '+f.name+' ('+formatSize(f.size)+')]'});
+    var docxBlob=buildDocxBlob(lastGeneratedText);
+    blobToUint8Array(docxBlob).then(function(docxBytes){
+      var zipFiles=[{name:'letter.docx',content:docxBytes}];
+      var usedNames={};
+      usedNames['letter.docx']=true;
+      attachments.forEach(function(f){
+        var name=f.name;
+        if(usedNames[name]){
+          var ext=getExt(name);
+          var base=name.substring(0,name.length-ext.length);
+          var counter=2;
+          while(usedNames[base+'_'+counter+ext])counter++;
+          name=base+'_'+counter+ext;
+        }
+        usedNames[name]=true;
+        zipFiles.push({name:name,content:'[Attachment: '+f.name+' ('+formatSize(f.size)+')]'});
+      });
+      var blob=buildMinimalZip(zipFiles);
+      triggerDownload(blob,'letter-package.zip');
     });
-    var blob=buildMinimalZip(zipFiles);
-    triggerDownload(blob,'letter-package.zip');
   });
 
   auditToggle.addEventListener('click',function(){
