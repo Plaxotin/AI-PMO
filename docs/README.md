@@ -19,6 +19,7 @@
 |------|------|
 | [ASSIGNMENTS_ADMIN_CURSOR_PLAN.md](plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md) | BL-6 — фазы BL1-0 … BL1-5, testing scenarios |
 | [BL1-0_KICKOFF.md](plans/BL1-0_KICKOFF.md) | BL-6 — стартовые решения BL1-0 |
+| [BL1-1_KICKOFF.md](plans/BL1-1_KICKOFF.md) | BL-6 — kickoff BL1-1 (MVP без auth) |
 | [BL1-0_VERIFICATION.md](plans/BL1-0_VERIFICATION.md) | BL-6 — отчёт верификации BL1-0 |
 | [BL1-0_ENV.md](plans/BL1-0_ENV.md) | BL-6 — переменные окружения приложения |
 | [BL18_PLAN.md](plans/BL18_PLAN.md) | BL-18 — план реализации |

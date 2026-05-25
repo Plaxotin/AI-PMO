@@ -15,17 +15,15 @@ psql "$DATABASE_URL" -f supabase/migrations/20260524000000_bl1_v1.sql
 psql "$DATABASE_URL" -f supabase/seed.sql
 ```
 
-## Supabase Auth (опционально в BL1-0, рекомендуется)
+## Supabase Auth (опционально, post-MVP)
 
 | Переменная | Описание |
 |------------|----------|
-| `NEXT_PUBLIC_SUPABASE_URL` | URL проекта Supabase |
+| `NEXT_PUBLIC_SUPABASE_URL` | URL проекта Supabase (если подключаете auth в post-MVP) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Anon key (браузер + cookie session в route handlers) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role (только сервер, не публиковать) |
 
-Если заданы `NEXT_PUBLIC_SUPABASE_URL` и `NEXT_PUBLIC_SUPABASE_ANON_KEY`, API возвращает **401** без сессии.
-
-Если Supabase **не** настроен, API работает без проверки сессии и отдаёт заголовок `X-Auth-Status: todo-supabase-not-configured` (явный TODO для BL1-1).
+В текущем MVP BL-6 API работает **без обязательной пользовательской сессии**. Перевод на обязательный `401` без сессии — post-MVP.
 
 ## Глобальный проект
 
@@ -42,7 +40,7 @@ npm install
 npm run dev
 ```
 
-Проверка списка (без auth, если Supabase не настроен):
+Проверка списка (MVP без обязательной auth):
 
 ```bash
 curl -s "http://localhost:3000/api/projects/00000000-0000-4000-8000-000000000001/assignments" | jq
