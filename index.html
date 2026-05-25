@@ -668,6 +668,194 @@ footer{padding:60px clamp(20px,5vw,80px) 30px;border-top:1px solid var(--border)
 .tools-footer p{font-size:0.85rem;color:var(--text-muted)}
 @media(max-width:1024px){.tools-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:600px){.tools-grid{grid-template-columns:1fr}}
+
+/* ===== BL-18 Letter Generator Workspace ===== */
+.letter-workspace{
+  position:fixed;inset:0;z-index:4000;
+  background:var(--bg-void);
+  overflow:auto;display:none;
+}
+body.letter-workspace-active .letter-workspace{display:block}
+body.letter-workspace-active{overflow:hidden}
+.letter-workspace-inner{max-width:760px;margin:0 auto;padding:100px clamp(20px,5vw,40px) 48px}
+.letter-workspace-head{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:48px;gap:16px;
+}
+.letter-workspace-head h1{
+  font-family:var(--font-display);font-size:clamp(1.35rem,3vw,1.75rem);
+  font-weight:700;color:var(--text-bright);
+}
+.letter-workspace-close{
+  flex-shrink:0;width:44px;height:44px;border-radius:12px;
+  border:1px solid var(--border);background:rgba(255,255,255,0.04);
+  color:var(--text-secondary);display:grid;place-items:center;
+  transition:border-color 0.2s,color 0.2s,background 0.2s;cursor:pointer;
+}
+.letter-workspace-close:hover{border-color:var(--border-hover);color:var(--text-bright);background:rgba(255,255,255,0.07)}
+
+.lw-step{margin-bottom:32px}
+.lw-step-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.lw-step-num{
+  width:32px;height:32px;border-radius:50%;flex-shrink:0;
+  display:grid;place-items:center;font-size:0.85rem;font-weight:600;
+  font-family:var(--font-display);
+  background:rgba(6,182,212,0.15);color:var(--cyan);
+}
+.lw-step-num--done{background:rgba(34,197,94,0.15);color:#22C55E}
+.lw-step-head h2{font-family:var(--font-display);font-size:1.05rem;font-weight:600;color:var(--text-bright)}
+
+.lw-upload{
+  display:flex;flex-direction:column;align-items:center;position:relative;
+  border:2px dashed var(--border-hover);border-radius:var(--radius);
+  padding:36px 24px;text-align:center;cursor:pointer;
+  background:rgba(15,23,42,0.4);transition:border-color 0.3s,background 0.3s;
+}
+.lw-upload:hover{border-color:rgba(6,182,212,0.35);background:rgba(6,182,212,0.04)}
+.lw-upload.has-file{border-color:rgba(6,182,212,0.45);background:rgba(6,182,212,0.08)}
+.lw-upload.has-error{border-color:rgba(239,68,68,0.5);background:rgba(239,68,68,0.04)}
+.lw-upload svg{width:40px;height:40px;margin:0 auto 12px;color:var(--text-muted)}
+.lw-upload.has-file svg{color:var(--cyan)}
+.lw-upload p{color:var(--text-secondary);margin-bottom:4px;font-size:0.9rem}
+.lw-upload .lw-upload-hint{font-size:0.78rem;color:var(--text-muted)}
+.lw-upload input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+
+.lw-error{
+  color:#EF4444;font-size:0.82rem;margin-top:8px;
+  display:flex;align-items:center;gap:6px;
+}
+.lw-error svg{width:14px;height:14px;flex-shrink:0}
+
+.lw-textarea{
+  width:100%;min-height:140px;padding:16px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);background:rgba(15,23,42,0.5);
+  color:var(--text-primary);font-family:var(--font-body);font-size:0.92rem;
+  line-height:1.6;resize:vertical;transition:border-color 0.2s;
+}
+.lw-textarea:focus{outline:none;border-color:rgba(6,182,212,0.4)}
+.lw-textarea::placeholder{color:var(--text-muted)}
+.lw-textarea-hint{font-size:0.78rem;color:var(--text-muted);margin-top:6px}
+
+.lw-passport{
+  width:100%;min-height:60px;padding:12px 16px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);background:rgba(15,23,42,0.5);
+  color:var(--text-primary);font-family:var(--font-body);font-size:0.88rem;
+  line-height:1.5;resize:vertical;transition:border-color 0.2s;
+}
+.lw-passport:focus{outline:none;border-color:rgba(6,182,212,0.4)}
+.lw-passport::placeholder{color:var(--text-muted)}
+
+.lw-attach-zone{
+  border:2px dashed var(--border-hover);border-radius:var(--radius);
+  padding:28px 24px;text-align:center;cursor:pointer;position:relative;
+  background:rgba(15,23,42,0.4);transition:border-color 0.3s,background 0.3s;
+}
+.lw-attach-zone:hover{border-color:rgba(6,182,212,0.35);background:rgba(6,182,212,0.04)}
+.lw-attach-zone svg{width:32px;height:32px;margin:0 auto 8px;color:var(--text-muted)}
+.lw-attach-zone p{color:var(--text-secondary);font-size:0.88rem;margin-bottom:4px}
+.lw-attach-zone .lw-upload-hint{font-size:0.78rem;color:var(--text-muted)}
+.lw-attach-zone input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+
+.lw-file-list{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.lw-file-item{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;border-radius:var(--radius-sm);
+  background:var(--bg-card);border:1px solid var(--border);
+  font-size:0.85rem;color:var(--text-primary);
+}
+.lw-file-item .lw-file-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lw-file-item .lw-file-size{color:var(--text-muted);font-size:0.78rem;flex-shrink:0}
+.lw-file-item .lw-file-remove{
+  width:28px;height:28px;border-radius:6px;border:1px solid var(--border);
+  background:transparent;color:var(--text-muted);display:grid;place-items:center;
+  cursor:pointer;flex-shrink:0;transition:border-color 0.2s,color 0.2s;
+}
+.lw-file-item .lw-file-remove:hover{border-color:rgba(239,68,68,0.4);color:#EF4444}
+.lw-file-item .lw-file-remove svg{width:14px;height:14px}
+.lw-file-count{font-size:0.78rem;color:var(--text-muted);margin-top:8px;text-align:right}
+
+.lw-generate{
+  display:inline-flex;align-items:center;gap:10px;
+  padding:16px 36px;border-radius:14px;border:none;
+  font-weight:600;font-size:0.95rem;font-family:var(--font-body);
+  transition:transform 0.25s,box-shadow 0.25s,opacity 0.25s;
+  margin-top:12px;
+}
+.lw-generate:not(:disabled){background:var(--accent-gradient);color:#fff;box-shadow:0 0 30px rgba(6,182,212,0.2);cursor:pointer}
+.lw-generate:not(:disabled):hover{transform:translateY(-2px);box-shadow:0 0 44px rgba(6,182,212,0.32)}
+.lw-generate:disabled{background:rgba(255,255,255,0.06);color:var(--text-muted);cursor:not-allowed}
+
+.lw-result{
+  margin-top:36px;padding:28px;border-radius:var(--radius);
+  background:var(--bg-card);border:1px solid var(--border);
+}
+.lw-result-title{
+  font-family:var(--font-display);font-size:1rem;font-weight:600;
+  color:var(--text-bright);margin-bottom:16px;
+}
+.lw-preview{
+  padding:20px;border-radius:var(--radius-sm);
+  background:rgba(255,255,255,0.03);border:1px solid var(--border);
+  color:var(--text-secondary);font-size:0.88rem;line-height:1.7;
+  margin-bottom:20px;white-space:pre-wrap;max-height:320px;overflow-y:auto;
+}
+.lw-preview .lw-preview-placeholder{
+  color:var(--cyan);font-weight:600;
+}
+.lw-downloads{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.lw-dl-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:12px 24px;border-radius:14px;
+  border:1px solid var(--border-hover);background:transparent;
+  color:var(--text-primary);font-weight:500;font-size:0.88rem;
+  transition:border-color 0.25s,background 0.25s;cursor:pointer;
+  font-family:var(--font-body);
+}
+.lw-dl-btn:hover{border-color:var(--cyan);background:rgba(6,182,212,0.05)}
+.lw-dl-btn svg{width:16px;height:16px}
+.lw-notice{
+  font-size:0.8rem;color:var(--text-muted);margin-bottom:16px;
+  display:flex;align-items:flex-start;gap:8px;
+  padding:10px 14px;border-radius:var(--radius-sm);
+  background:rgba(6,182,212,0.04);border:1px solid rgba(6,182,212,0.1);
+}
+.lw-notice svg{width:16px;height:16px;flex-shrink:0;color:var(--cyan);margin-top:1px}
+
+.lw-audit-toggle{
+  display:inline-flex;align-items:center;gap:6px;
+  background:none;border:none;color:var(--text-secondary);
+  font-size:0.82rem;cursor:pointer;padding:4px 0;
+  font-family:var(--font-body);transition:color 0.2s;
+}
+.lw-audit-toggle:hover{color:var(--text-bright)}
+.lw-audit-toggle svg{width:14px;height:14px;transition:transform 0.2s}
+.lw-audit-toggle.open svg{transform:rotate(180deg)}
+.lw-audit-panel{
+  margin-top:12px;display:none;
+  border-radius:var(--radius-sm);
+  background:rgba(15,23,42,0.5);border:1px solid var(--border);
+  overflow-x:auto;
+}
+.lw-audit-panel.open{display:block}
+.lw-audit-table{width:100%;border-collapse:collapse;font-size:0.76rem}
+.lw-audit-table th{
+  padding:8px 10px;text-align:left;color:var(--text-muted);
+  font-weight:600;border-bottom:1px solid var(--border);
+  font-family:var(--font-display);white-space:nowrap;
+}
+.lw-audit-table td{
+  padding:7px 10px;color:var(--text-secondary);
+  border-bottom:1px solid rgba(56,189,248,0.04);white-space:nowrap;
+}
+.lw-audit-table tr:last-child td{border-bottom:none}
+.lw-spin{
+  width:20px;height:20px;border:2px solid rgba(255,255,255,0.2);
+  border-top-color:#fff;border-radius:50%;animation:toolSpin 0.7s linear infinite;
+}
+@media(max-width:600px){
+  .lw-downloads{flex-direction:column}
+  .lw-dl-btn{width:100%;justify-content:center}
+}
 </style>
 <style>
 
@@ -1397,6 +1585,126 @@ footer{padding:60px clamp(20px,5vw,80px) 30px;border-top:1px solid var(--border)
   </div>
 </div>
 
+<!-- BL-18 Letter Generator Workspace -->
+<div id="letter-workspace" class="letter-workspace" aria-hidden="true">
+  <div class="letter-workspace-inner">
+    <div class="letter-workspace-head">
+      <h1 id="letter-workspace-title" data-i18n="platform.tool.letters.title">Official letters</h1>
+      <button type="button" class="letter-workspace-close" id="letterWorkspaceClose" aria-label="Close">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+      </button>
+    </div>
+
+    <!-- Step 1: Template upload -->
+    <div class="lw-step" id="lwStepTemplate">
+      <div class="lw-step-head">
+        <div class="lw-step-num">1</div>
+        <h2 data-i18n="letters.ws.step1">Upload corporate letterhead</h2>
+      </div>
+      <label class="lw-upload" id="lwTemplateZone">
+        <input type="file" id="lwTemplateInput" accept=".docx">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+        <p id="lwTemplateLabel" data-i18n="letters.ws.template_cta">Click to choose a DOCX template</p>
+        <p class="lw-upload-hint" data-i18n="letters.ws.template_hint">Only .docx files, max 10 MB</p>
+      </label>
+      <div class="lw-error" id="lwTemplateError" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        <span id="lwTemplateErrorText"></span>
+      </div>
+    </div>
+
+    <!-- Step 2: Letter content -->
+    <div class="lw-step" id="lwStepContent">
+      <div class="lw-step-head">
+        <div class="lw-step-num">2</div>
+        <h2 data-i18n="letters.ws.step2">Letter content</h2>
+      </div>
+      <textarea class="lw-textarea" id="lwContentArea" data-i18n-placeholder="letters.ws.content_placeholder" placeholder="Describe the letter content in Russian..."></textarea>
+      <div class="lw-textarea-hint" data-i18n="letters.ws.content_hint">Official business style, Russian language. AI will format and structure the text.</div>
+    </div>
+
+    <!-- Step 3: Attachments -->
+    <div class="lw-step" id="lwStepAttach">
+      <div class="lw-step-head">
+        <div class="lw-step-num">3</div>
+        <h2 data-i18n="letters.ws.step3">Attachments (optional)</h2>
+      </div>
+      <div class="lw-attach-zone" id="lwAttachZone">
+        <input type="file" id="lwAttachInput" accept=".xlsx,.docx,.pdf" multiple>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"></path></svg>
+        <p data-i18n="letters.ws.attach_cta">Click to add attachments</p>
+        <p class="lw-upload-hint" data-i18n="letters.ws.attach_hint">.xlsx, .docx, .pdf — up to 5 files, max 10 MB each</p>
+      </div>
+      <div class="lw-error" id="lwAttachError" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        <span id="lwAttachErrorText"></span>
+      </div>
+      <div class="lw-file-list" id="lwAttachList"></div>
+      <div class="lw-file-count" id="lwAttachCount" hidden></div>
+    </div>
+
+    <!-- Step 4: Template passport (optional) -->
+    <div class="lw-step" id="lwStepPassport">
+      <div class="lw-step-head">
+        <div class="lw-step-num">4</div>
+        <h2 data-i18n="letters.ws.step4">Template style description (optional)</h2>
+      </div>
+      <textarea class="lw-passport" id="lwPassportArea" data-i18n-placeholder="letters.ws.passport_placeholder" placeholder="E.g.: Formal corporate style, government agency, greeting 'Dear...'"></textarea>
+    </div>
+
+    <!-- Generate button -->
+    <div style="text-align:center;margin-top:8px;margin-bottom:8px">
+      <button type="button" class="lw-generate" id="lwGenerateBtn" disabled>
+        <span id="lwGenerateLabel" data-i18n="letters.ws.generate">Generate letter</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" id="lwGenerateArrow"><path d="M5 12h14"></path><path d="M12 5l7 7-7 7"></path></svg>
+      </button>
+    </div>
+
+    <!-- Result section (hidden until generation) -->
+    <div class="lw-result" id="lwResult" hidden>
+      <div class="lw-result-title" data-i18n="letters.ws.result_title">Generated letter</div>
+      <div class="lw-preview" id="lwPreview"></div>
+
+      <div class="lw-downloads">
+        <button type="button" class="lw-dl-btn" id="lwDownloadDocx">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span data-i18n="letters.ws.dl_docx">Download DOCX</span>
+        </button>
+        <button type="button" class="lw-dl-btn" id="lwDownloadZip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span data-i18n="letters.ws.dl_zip">Download ZIP package</span>
+        </button>
+      </div>
+
+      <div class="lw-notice">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+        <span data-i18n="letters.ws.security_notice">Your template was not sent to AI. Only the letter text content was used for generation.</span>
+      </div>
+
+      <button type="button" class="lw-audit-toggle" id="lwAuditToggle">
+        <span data-i18n="letters.ws.show_audit">Show audit log</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="lw-audit-panel" id="lwAuditPanel">
+        <table class="lw-audit-table">
+          <thead>
+            <tr>
+              <th data-i18n="letters.ws.audit_time">Timestamp</th>
+              <th data-i18n="letters.ws.audit_user">User</th>
+              <th data-i18n="letters.ws.audit_template">Template ID</th>
+              <th data-i18n="letters.ws.audit_request">Request ID</th>
+              <th data-i18n="letters.ws.audit_model">Model</th>
+              <th data-i18n="letters.ws.audit_attach">Attachments</th>
+              <th data-i18n="letters.ws.audit_zip">ZIP</th>
+            </tr>
+          </thead>
+          <tbody id="lwAuditBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 // ===== i18n Translation System =====
 let currentLang = 'en';
@@ -1608,6 +1916,43 @@ const translations = {
     'platform.ws.result': '\u0420\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442',
     'platform.ws.result_body': '\u0420\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442 \u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438 \u0433\u043e\u0442\u043e\u0432! \u0417\u0434\u0435\u0441\u044c \u0431\u0443\u0434\u0435\u0442 \u043e\u0442\u043e\u0431\u0440\u0430\u0436\u0430\u0442\u044c\u0441\u044f \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442 \u0440\u0430\u0431\u043e\u0442\u044b AI \u0438\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442\u0430.',
     'platform.ws.download': '\u0421\u043a\u0430\u0447\u0430\u0442\u044c \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442',
+    // BL-18 Letter Generator
+    'letters.ws.step1': '\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u0435 \u043a\u043e\u0440\u043f\u043e\u0440\u0430\u0442\u0438\u0432\u043d\u044b\u0439 \u0431\u043b\u0430\u043d\u043a',
+    'letters.ws.step2': '\u0421\u043e\u0434\u0435\u0440\u0436\u0430\u043d\u0438\u0435 \u043f\u0438\u0441\u044c\u043c\u0430',
+    'letters.ws.step3': '\u041f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u044f (\u043d\u0435\u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u043e)',
+    'letters.ws.step4': '\u041e\u043f\u0438\u0441\u0430\u043d\u0438\u0435 \u0441\u0442\u0438\u043b\u044f \u0448\u0430\u0431\u043b\u043e\u043d\u0430 (\u043d\u0435\u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u043e)',
+    'letters.ws.template_cta': '\u041d\u0430\u0436\u043c\u0438\u0442\u0435 \u0434\u043b\u044f \u0432\u044b\u0431\u043e\u0440\u0430 DOCX-\u0448\u0430\u0431\u043b\u043e\u043d\u0430',
+    'letters.ws.template_hint': '\u0422\u043e\u043b\u044c\u043a\u043e .docx, \u043c\u0430\u043a\u0441\u0438\u043c\u0443\u043c 10 \u041c\u0411',
+    'letters.ws.content_placeholder': '\u041e\u043f\u0438\u0448\u0438\u0442\u0435 \u0441\u0443\u0442\u044c \u043f\u0438\u0441\u044c\u043c\u0430 \u043d\u0430 \u0440\u0443\u0441\u0441\u043a\u043e\u043c \u044f\u0437\u044b\u043a\u0435...',
+    'letters.ws.content_hint': '\u041e\u0444\u0438\u0446\u0438\u0430\u043b\u044c\u043d\u043e-\u0434\u0435\u043b\u043e\u0432\u043e\u0439 \u0441\u0442\u0438\u043b\u044c, \u0440\u0443\u0441\u0441\u043a\u0438\u0439 \u044f\u0437\u044b\u043a. \u0418\u0418 \u043e\u0444\u043e\u0440\u043c\u0438\u0442 \u0438 \u0441\u0442\u0440\u0443\u043a\u0442\u0443\u0440\u0438\u0440\u0443\u0435\u0442 \u0442\u0435\u043a\u0441\u0442.',
+    'letters.ws.attach_cta': '\u041d\u0430\u0436\u043c\u0438\u0442\u0435 \u0434\u043b\u044f \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0438\u044f \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0439',
+    'letters.ws.attach_hint': '.xlsx, .docx, .pdf \u2014 \u0434\u043e 5 \u0444\u0430\u0439\u043b\u043e\u0432, \u043c\u0430\u043a\u0441\u0438\u043c\u0443\u043c 10 \u041c\u0411 \u043a\u0430\u0436\u0434\u044b\u0439',
+    'letters.ws.passport_placeholder': '\u041d\u0430\u043f\u0440.: \u0444\u043e\u0440\u043c\u0430\u043b\u044c\u043d\u044b\u0439 \u043a\u043e\u0440\u043f\u043e\u0440\u0430\u0442\u0438\u0432\u043d\u044b\u0439 \u0441\u0442\u0438\u043b\u044c, \u0433\u043e\u0441\u0443\u0434\u0430\u0440\u0441\u0442\u0432\u0435\u043d\u043d\u043e\u0435 \u0443\u0447\u0440\u0435\u0436\u0434\u0435\u043d\u0438\u0435, \u043e\u0431\u0440\u0430\u0449\u0435\u043d\u0438\u0435 \u00ab\u0423\u0432\u0430\u0436\u0430\u0435\u043c\u044b\u0439...\u00bb',
+    'letters.ws.generate': '\u0421\u0433\u0435\u043d\u0435\u0440\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u043f\u0438\u0441\u044c\u043c\u043e',
+    'letters.ws.generating': '\u0413\u0435\u043d\u0435\u0440\u0430\u0446\u0438\u044f...',
+    'letters.ws.result_title': '\u0421\u0433\u0435\u043d\u0435\u0440\u0438\u0440\u043e\u0432\u0430\u043d\u043d\u043e\u0435 \u043f\u0438\u0441\u044c\u043c\u043e',
+    'letters.ws.dl_docx': '\u0421\u043a\u0430\u0447\u0430\u0442\u044c DOCX',
+    'letters.ws.dl_zip': '\u0421\u043a\u0430\u0447\u0430\u0442\u044c ZIP-\u043f\u0430\u043a\u0435\u0442',
+    'letters.ws.security_notice': '\u0412\u0430\u0448 \u0448\u0430\u0431\u043b\u043e\u043d \u043d\u0435 \u043f\u0435\u0440\u0435\u0434\u0430\u0432\u0430\u043b\u0441\u044f \u0432 \u0418\u0418. \u0414\u043b\u044f \u0433\u0435\u043d\u0435\u0440\u0430\u0446\u0438\u0438 \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d \u0442\u043e\u043b\u044c\u043a\u043e \u0442\u0435\u043a\u0441\u0442 \u043f\u0438\u0441\u044c\u043c\u0430.',
+    'letters.ws.show_audit': '\u041f\u043e\u043a\u0430\u0437\u0430\u0442\u044c \u0436\u0443\u0440\u043d\u0430\u043b \u0430\u0443\u0434\u0438\u0442\u0430',
+    'letters.ws.hide_audit': '\u0421\u043a\u0440\u044b\u0442\u044c \u0436\u0443\u0440\u043d\u0430\u043b \u0430\u0443\u0434\u0438\u0442\u0430',
+    'letters.ws.audit_time': '\u0412\u0440\u0435\u043c\u044f',
+    'letters.ws.audit_user': '\u041f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044c',
+    'letters.ws.audit_template': 'ID \u0448\u0430\u0431\u043b\u043e\u043d\u0430',
+    'letters.ws.audit_request': 'ID \u0437\u0430\u043f\u0440\u043e\u0441\u0430',
+    'letters.ws.audit_model': '\u041c\u043e\u0434\u0435\u043b\u044c',
+    'letters.ws.audit_attach': '\u041f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u044f',
+    'letters.ws.audit_zip': 'ZIP',
+    'letters.ws.err_docx_only': '\u0422\u043e\u043b\u044c\u043a\u043e \u0444\u0430\u0439\u043b\u044b .docx',
+    'letters.ws.err_too_large': '\u0424\u0430\u0439\u043b \u043f\u0440\u0435\u0432\u044b\u0448\u0430\u0435\u0442 10 \u041c\u0411',
+    'letters.ws.err_max_files': '\u041c\u0430\u043a\u0441\u0438\u043c\u0443\u043c 5 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0439',
+    'letters.ws.err_attach_type': '\u0414\u043e\u043f\u0443\u0441\u0442\u0438\u043c\u044b \u0442\u043e\u043b\u044c\u043a\u043e .xlsx, .docx, .pdf',
+    'letters.ws.attach_count': '\u0444\u0430\u0439\u043b\u043e\u0432 \u0438\u0437 5',
+    'letters.ws.preview_subject': '\u0422\u0435\u043c\u0430',
+    'letters.ws.preview_greeting': '\u0423\u0432\u0430\u0436\u0430\u0435\u043c\u044b\u0439(-\u0430\u044f)',
+    'letters.ws.preview_attachments': '\u041f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u044f',
+    'letters.ws.preview_none': '\u041d\u0435\u0442',
+    'letters.ws.preview_signatory': '\u041f\u043e\u0434\u043f\u0438\u0441\u044c',
   }
 };
 
@@ -1840,14 +2185,21 @@ document.querySelectorAll('.fade-up').forEach((el,i)=>{
   }
 
   document.querySelectorAll('.tool-card[data-tool-active]').forEach(card=>{
-    card.addEventListener('click',()=>openWorkspace(card.getAttribute('data-tool-id')));
+    card.addEventListener('click',()=>{
+      const id=card.getAttribute('data-tool-id');
+      if(id==='letters'){openLetterWorkspace();return;}
+      openWorkspace(id);
+    });
   });
   document.querySelectorAll('.tool-card[data-tool-tier="professional"]').forEach(card=>{
     card.addEventListener('click',scrollToPricing);
   });
   document.getElementById('toolWorkspaceClose')?.addEventListener('click',closeWorkspace);
   document.addEventListener('keydown',e=>{
-    if(e.key==='Escape'&&document.body.classList.contains('workspace-active')) closeWorkspace();
+    if(e.key==='Escape'){
+      if(document.body.classList.contains('letter-workspace-active')) closeLetterWorkspace();
+      else if(document.body.classList.contains('workspace-active')) closeWorkspace();
+    }
   });
 
   uploadZone.addEventListener('keydown',e=>{
@@ -1922,6 +2274,447 @@ document.querySelectorAll('.fade-up').forEach((el,i)=>{
   }
   window.addEventListener('hashchange',redirectLegacyHash);
   redirectLegacyHash();
+})();
+
+// ===== BL-18 Letter Generator Workspace =====
+(function(){
+  const lws=document.getElementById('letter-workspace');
+  if(!lws)return;
+
+  const MAX_FILE_SIZE=10*1024*1024;
+  const MAX_ATTACHMENTS=5;
+  const ALLOWED_ATTACH_EXT=['.xlsx','.docx','.pdf'];
+
+  const lwTitle=document.getElementById('letter-workspace-title');
+  const templateInput=document.getElementById('lwTemplateInput');
+  const templateZone=document.getElementById('lwTemplateZone');
+  const templateLabel=document.getElementById('lwTemplateLabel');
+  const templateError=document.getElementById('lwTemplateError');
+  const templateErrorText=document.getElementById('lwTemplateErrorText');
+  const contentArea=document.getElementById('lwContentArea');
+  const attachInput=document.getElementById('lwAttachInput');
+  const attachError=document.getElementById('lwAttachError');
+  const attachErrorText=document.getElementById('lwAttachErrorText');
+  const attachList=document.getElementById('lwAttachList');
+  const attachCount=document.getElementById('lwAttachCount');
+  const passportArea=document.getElementById('lwPassportArea');
+  const generateBtn=document.getElementById('lwGenerateBtn');
+  const generateLabel=document.getElementById('lwGenerateLabel');
+  const generateArrow=document.getElementById('lwGenerateArrow');
+  const resultSection=document.getElementById('lwResult');
+  const previewEl=document.getElementById('lwPreview');
+  const dlDocxBtn=document.getElementById('lwDownloadDocx');
+  const dlZipBtn=document.getElementById('lwDownloadZip');
+  const auditToggle=document.getElementById('lwAuditToggle');
+  const auditPanel=document.getElementById('lwAuditPanel');
+  const auditBody=document.getElementById('lwAuditBody');
+
+  let templateFile=null;
+  let attachments=[];
+  let auditLog=[];
+  let lastGeneratedText='';
+
+  var enFallback={
+    'letters.ws.step1':'Upload corporate letterhead',
+    'letters.ws.step2':'Letter content',
+    'letters.ws.step3':'Attachments (optional)',
+    'letters.ws.step4':'Template style description (optional)',
+    'letters.ws.template_cta':'Click to choose a DOCX template',
+    'letters.ws.template_hint':'Only .docx files, max 10 MB',
+    'letters.ws.generate':'Generate letter',
+    'letters.ws.generating':'Generating...',
+    'letters.ws.result_title':'Generated letter',
+    'letters.ws.dl_docx':'Download DOCX',
+    'letters.ws.dl_zip':'Download ZIP package',
+    'letters.ws.security_notice':'Your template was not sent to AI. Only the letter text content was used for generation.',
+    'letters.ws.show_audit':'Show audit log',
+    'letters.ws.hide_audit':'Hide audit log',
+    'letters.ws.err_docx_only':'Only .docx files are accepted',
+    'letters.ws.err_too_large':'File exceeds 10 MB limit',
+    'letters.ws.err_max_files':'Maximum 5 attachments',
+    'letters.ws.err_attach_type':'Only .xlsx, .docx, .pdf files are accepted',
+    'letters.ws.attach_count':'files',
+    'letters.ws.preview_subject':'Subject',
+    'letters.ws.preview_greeting':'Dear Sir/Madam',
+    'letters.ws.preview_attachments':'Attachments',
+    'letters.ws.preview_none':'None',
+    'letters.ws.preview_signatory':'Signature'
+  };
+
+  function lt(key){
+    if(currentLang==='ru'&&translations.ru[key])return translations.ru[key];
+    if(enFallback[key])return enFallback[key];
+    var el=document.querySelector('[data-i18n="'+key+'"]');
+    if(el&&originalsI18n.has(el))return originalsI18n.get(el);
+    return el?el.textContent:key;
+  }
+
+  function uuid(){
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){
+      var r=Math.random()*16|0;return(c==='x'?r:r&0x3|0x8).toString(16);
+    });
+  }
+
+  function formatSize(bytes){
+    if(bytes<1024)return bytes+' B';
+    if(bytes<1048576)return(bytes/1024).toFixed(1)+' KB';
+    return(bytes/1048576).toFixed(1)+' MB';
+  }
+
+  function getExt(name){
+    const i=name.lastIndexOf('.');
+    return i>=0?name.slice(i).toLowerCase():'';
+  }
+
+  function updateGenerateBtn(){
+    generateBtn.disabled=!(templateFile&&contentArea.value.trim().length>0);
+  }
+
+  function showTemplateError(msg){
+    templateErrorText.textContent=msg;
+    templateError.hidden=false;
+    templateZone.classList.add('has-error');
+    templateZone.classList.remove('has-file');
+  }
+  function hideTemplateError(){
+    templateError.hidden=true;
+    templateZone.classList.remove('has-error');
+  }
+  function showAttachError(msg){
+    attachErrorText.textContent=msg;
+    attachError.hidden=false;
+  }
+  function hideAttachError(){attachError.hidden=true;}
+
+  function renderAttachList(){
+    attachList.innerHTML='';
+    attachments.forEach(function(f,i){
+      var item=document.createElement('div');
+      item.className='lw-file-item';
+      item.innerHTML='<span class="lw-file-name">'+f.name+'</span>'+
+        '<span class="lw-file-size">'+formatSize(f.size)+'</span>'+
+        '<button type="button" class="lw-file-remove" aria-label="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>';
+      item.querySelector('.lw-file-remove').addEventListener('click',function(){
+        attachments.splice(i,1);
+        renderAttachList();
+        hideAttachError();
+      });
+      attachList.appendChild(item);
+    });
+    if(attachments.length>0){
+      attachCount.hidden=false;
+      attachCount.textContent=attachments.length+' / 5 '+(currentLang==='ru'?lt('letters.ws.attach_count'):'files');
+    }else{
+      attachCount.hidden=true;
+    }
+  }
+
+  function resetLetterWorkspace(){
+    templateFile=null;
+    templateInput.value='';
+    templateZone.classList.remove('has-file');
+    templateLabel.textContent=lt('letters.ws.template_cta');
+    hideTemplateError();
+    contentArea.value='';
+    attachments=[];
+    attachInput.value='';
+    renderAttachList();
+    hideAttachError();
+    passportArea.value='';
+    generateBtn.disabled=true;
+    generateLabel.textContent=lt('letters.ws.generate');
+    generateArrow.style.display='';
+    generateBtn.querySelector('.lw-spin')?.remove();
+    resultSection.hidden=true;
+    previewEl.innerHTML='';
+    auditLog=[];
+    auditBody.innerHTML='';
+    auditPanel.classList.remove('open');
+    auditToggle.classList.remove('open');
+    var toggleLabel=auditToggle.querySelector('[data-i18n]');
+    if(toggleLabel) toggleLabel.textContent=lt('letters.ws.show_audit');
+  }
+
+  window.openLetterWorkspace=function(){
+    resetLetterWorkspace();
+    var card=document.querySelector('.tool-card[data-tool-id="letters"] h3');
+    lwTitle.textContent=card?card.textContent:lt('platform.tool.letters.title');
+    document.body.classList.add('letter-workspace-active');
+    lws.setAttribute('aria-hidden','false');
+    lws.scrollTop=0;
+  };
+
+  window.closeLetterWorkspace=function(){
+    document.body.classList.remove('letter-workspace-active');
+    lws.setAttribute('aria-hidden','true');
+    resetLetterWorkspace();
+  };
+
+  document.getElementById('letterWorkspaceClose')?.addEventListener('click',closeLetterWorkspace);
+
+  templateInput.addEventListener('change',function(){
+    var f=templateInput.files&&templateInput.files[0];
+    if(!f)return;
+    hideTemplateError();
+    if(getExt(f.name)!=='.docx'){
+      showTemplateError(lt('letters.ws.err_docx_only'));
+      templateFile=null;
+      templateInput.value='';
+      updateGenerateBtn();
+      return;
+    }
+    if(f.size>MAX_FILE_SIZE){
+      showTemplateError(lt('letters.ws.err_too_large'));
+      templateFile=null;
+      templateInput.value='';
+      updateGenerateBtn();
+      return;
+    }
+    templateFile=f;
+    templateZone.classList.add('has-file');
+    templateLabel.textContent=f.name+' ('+formatSize(f.size)+')';
+    updateGenerateBtn();
+  });
+
+  contentArea.addEventListener('input',updateGenerateBtn);
+
+  attachInput.addEventListener('change',function(){
+    var files=Array.from(attachInput.files||[]);
+    hideAttachError();
+    var remaining=MAX_ATTACHMENTS-attachments.length;
+    if(remaining<=0){
+      showAttachError(lt('letters.ws.err_max_files'));
+      attachInput.value='';
+      return;
+    }
+    var added=0;
+    for(var i=0;i<files.length;i++){
+      var f=files[i];
+      if(added>=remaining){
+        showAttachError(lt('letters.ws.err_max_files'));
+        break;
+      }
+      var ext=getExt(f.name);
+      if(ALLOWED_ATTACH_EXT.indexOf(ext)===-1){
+        showAttachError(lt('letters.ws.err_attach_type'));
+        continue;
+      }
+      if(f.size>MAX_FILE_SIZE){
+        showAttachError(lt('letters.ws.err_too_large')+': '+f.name);
+        continue;
+      }
+      attachments.push(f);
+      added++;
+    }
+    attachInput.value='';
+    renderAttachList();
+  });
+
+  function buildMockLetter(){
+    var content=contentArea.value.trim();
+    var isRu=currentLang==='ru';
+    var subjectLabel=isRu?lt('letters.ws.preview_subject'):'Subject';
+    var greetingLabel=isRu?lt('letters.ws.preview_greeting'):'Dear Sir/Madam';
+    var attachLabel=isRu?lt('letters.ws.preview_attachments'):'Attachments';
+    var noneLabel=isRu?lt('letters.ws.preview_none'):'None';
+    var sigLabel=isRu?lt('letters.ws.preview_signatory'):'Signature';
+
+    var firstLine=content.split('\n')[0].substring(0,80);
+    var subject=firstLine||(isRu?'\u041e \u043f\u0440\u0435\u0434\u043e\u0441\u0442\u0430\u0432\u043b\u0435\u043d\u0438\u0438 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u043e\u0432':'Re: Document request');
+
+    var lines=[];
+    lines.push(subjectLabel+': '+subject);
+    lines.push('');
+    lines.push(greetingLabel+'!');
+    lines.push('');
+    lines.push(content);
+    lines.push('');
+
+    if(attachments.length>0){
+      lines.push(attachLabel+':');
+      attachments.forEach(function(f,i){
+        lines.push('  '+(i+1)+'. '+f.name);
+      });
+    }else{
+      lines.push(attachLabel+': '+noneLabel);
+    }
+    lines.push('');
+    lines.push(isRu?'\u0421 \u0443\u0432\u0430\u0436\u0435\u043d\u0438\u0435\u043c,':'Respectfully,');
+    lines.push('');
+    lines.push('{{SIGNATORY_TITLE}}');
+    lines.push('{{SIGNATORY_NAME}}');
+
+    return lines.join('\n');
+  }
+
+  function renderPreview(text){
+    var html=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    html=html.replace(/(\{\{SIGNATORY_NAME\}\}|\{\{SIGNATORY_TITLE\}\})/g,
+      '<span class="lw-preview-placeholder">$1</span>');
+    previewEl.innerHTML=html;
+  }
+
+  function buildMinimalZip(files){
+    var localHeaders=[];
+    var centralHeaders=[];
+    var offset=0;
+    for(var i=0;i<files.length;i++){
+      var name=new TextEncoder().encode(files[i].name);
+      var data=new TextEncoder().encode(files[i].content);
+      var localHeader=new Uint8Array(30+name.length);
+      var dv=new DataView(localHeader.buffer);
+      dv.setUint32(0,0x04034b50,true);
+      dv.setUint16(4,20,true);
+      dv.setUint16(8,0,true);
+      dv.setUint32(18,data.length,true);
+      dv.setUint32(22,data.length,true);
+      dv.setUint16(26,name.length,true);
+      localHeader.set(name,30);
+
+      var centralHeader=new Uint8Array(46+name.length);
+      var cv=new DataView(centralHeader.buffer);
+      cv.setUint32(0,0x02014b50,true);
+      cv.setUint16(4,20,true);
+      cv.setUint16(6,20,true);
+      cv.setUint16(10,0,true);
+      cv.setUint32(20,data.length,true);
+      cv.setUint32(24,data.length,true);
+      cv.setUint16(28,name.length,true);
+      cv.setUint32(42,offset,true);
+      centralHeader.set(name,46);
+
+      localHeaders.push({header:localHeader,data:data});
+      centralHeaders.push(centralHeader);
+      offset+=localHeader.length+data.length;
+    }
+    var centralOffset=offset;
+    var centralSize=0;
+    centralHeaders.forEach(function(ch){centralSize+=ch.length;});
+
+    var endRecord=new Uint8Array(22);
+    var ev=new DataView(endRecord.buffer);
+    ev.setUint32(0,0x06054b50,true);
+    ev.setUint16(8,files.length,true);
+    ev.setUint16(10,files.length,true);
+    ev.setUint32(12,centralSize,true);
+    ev.setUint32(16,centralOffset,true);
+
+    var parts=[];
+    localHeaders.forEach(function(lh){parts.push(lh.header);parts.push(lh.data);});
+    centralHeaders.forEach(function(ch){parts.push(ch);});
+    parts.push(endRecord);
+
+    return new Blob(parts,{type:'application/zip'});
+  }
+
+  function triggerDownload(blob,filename){
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;a.download=filename;a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  generateBtn.addEventListener('click',function(){
+    if(generateBtn.disabled)return;
+    generateBtn.disabled=true;
+    generateLabel.textContent=lt('letters.ws.generating');
+    generateArrow.style.display='none';
+    var spin=document.createElement('span');
+    spin.className='lw-spin';
+    generateBtn.insertBefore(spin,generateLabel);
+
+    setTimeout(function(){
+      spin.remove();
+      generateArrow.style.display='';
+      generateLabel.textContent=lt('letters.ws.generate');
+      generateBtn.disabled=false;
+
+      lastGeneratedText=buildMockLetter();
+      renderPreview(lastGeneratedText);
+      resultSection.hidden=false;
+      resultSection.scrollIntoView({behavior:'smooth',block:'start'});
+
+      var entry={
+        timestamp:new Date().toLocaleString('ru-RU',{timeZone:'Europe/Moscow'})+' MSK',
+        user_id:'demo-user',
+        template_id:uuid().substring(0,8),
+        request_id:uuid().substring(0,8),
+        model_id:'mock-llm-v1',
+        attachment_count:attachments.length,
+        attachment_names:attachments.map(function(f){return f.name;}).join(', ')||'\u2014',
+        zip_issued:true
+      };
+      auditLog.push(entry);
+      renderAuditLog();
+    },2500);
+  });
+
+  function renderAuditLog(){
+    auditBody.innerHTML='';
+    auditLog.forEach(function(e){
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td>'+e.timestamp+'</td>'+
+        '<td>'+e.user_id+'</td>'+
+        '<td>'+e.template_id+'</td>'+
+        '<td>'+e.request_id+'</td>'+
+        '<td>'+e.model_id+'</td>'+
+        '<td>'+e.attachment_count+' ('+e.attachment_names+')</td>'+
+        '<td>'+(e.zip_issued?'\u2705':'\u274c')+'</td>';
+      auditBody.appendChild(tr);
+    });
+  }
+
+  dlDocxBtn.addEventListener('click',function(){
+    var blob=new Blob([lastGeneratedText],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+    triggerDownload(blob,'letter.docx');
+  });
+
+  dlZipBtn.addEventListener('click',function(){
+    var zipFiles=[{name:'letter.docx',content:lastGeneratedText}];
+    var usedNames={};
+    usedNames['letter.docx']=true;
+    attachments.forEach(function(f){
+      var name=f.name;
+      if(usedNames[name]){
+        var ext=getExt(name);
+        var base=name.substring(0,name.length-ext.length);
+        var counter=2;
+        while(usedNames[base+'_'+counter+ext])counter++;
+        name=base+'_'+counter+ext;
+      }
+      usedNames[name]=true;
+      zipFiles.push({name:name,content:'[Attachment: '+f.name+' ('+formatSize(f.size)+')]'});
+    });
+    var blob=buildMinimalZip(zipFiles);
+    triggerDownload(blob,'letter-package.zip');
+  });
+
+  auditToggle.addEventListener('click',function(){
+    var isOpen=auditPanel.classList.toggle('open');
+    auditToggle.classList.toggle('open',isOpen);
+    var label=auditToggle.querySelector('[data-i18n]');
+    if(label){
+      label.setAttribute('data-i18n',isOpen?'letters.ws.hide_audit':'letters.ws.show_audit');
+      label.textContent=lt(isOpen?'letters.ws.hide_audit':'letters.ws.show_audit');
+    }
+  });
+
+  function refreshLetterI18n(){
+    var card=document.querySelector('.tool-card[data-tool-id="letters"] h3');
+    if(document.body.classList.contains('letter-workspace-active')&&card){
+      lwTitle.textContent=card.textContent;
+    }
+    if(!templateFile){
+      templateLabel.textContent=lt('letters.ws.template_cta');
+    }
+    if(resultSection.hidden){
+      generateLabel.textContent=lt('letters.ws.generate');
+    }
+    if(attachments.length>0){
+      attachCount.textContent=attachments.length+' / 5 '+(currentLang==='ru'?lt('letters.ws.attach_count'):'files');
+    }
+  }
+  document.addEventListener('app:lang',refreshLetterI18n);
 })();
 </script>
 </body>
