@@ -1,6 +1,6 @@
 # BL-18 — чеклист продуктивного развёртывания
 
-Краткий runbook; решения — `docs/ADR-BL-18-02-production-decisions.md`, тенант — `docs/ADR-BL-18-01-tenant-model.md`.
+Краткий runbook; решения — `docs/specs/ADR-BL-18-02-production-decisions.md`, тенант — `docs/specs/ADR-BL-18-01-tenant-model.md`.
 
 ## 1. Перед деплоем
 

@@ -3,7 +3,7 @@
 **Статус:** принято  
 **Дата:** 2026-05-24  
 **Контекст:** спека BL-18 требует `tenant_id` и квоту **1 ГБ на тенант**; kickoff BL1-0 зафиксировал **один глобальный проект без мультитенанта**.  
-**Связанные документы:** `docs/SPEC-BL-18-official-letter-generator.md` (§2, §8, §11), `docs/BL1-0_KICKOFF.md`, `docs/ADR-BL-18-02-production-decisions.md`.
+**Связанные документы:** `docs/SPEC-BL-18-official-letter-generator.md` (§2, §8, §11), `docs/BL1-0_KICKOFF.md`, `docs/specs/ADR-BL-18-02-production-decisions.md`.
 
 ---
 
@@ -181,7 +181,7 @@ letter_audit_events (tenant_id = SINGLE_TENANT_ID всегда)
 | «Без мультитенанта» в kickoff | Уточнение: **нет мультитенанта в UI BL1-0**; платформа BL-18 вводит тенант **раньше**, BL-1 догоняет. |
 | Auth skeleton | Обязателен **в prod** для BL-18: без сессии генерация запрещена (401). |
 
-Файл `docs/BL1-0_BL18-ALIGNMENT.md` фиксирует поля и порядок миграций.
+Файл `docs/plans/BL1-0_BL18-ALIGNMENT.md` фиксирует поля и порядок миграций.
 
 ---
 

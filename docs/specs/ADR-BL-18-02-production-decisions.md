@@ -3,7 +3,7 @@
 **Статус:** принято  
 **Дата:** 2026-05-24  
 **Назначение:** закрыть открытые вопросы SPEC-BL-18 §12 и пробелы, необходимые для prod без отдельного implementation plan.  
-**Связанные документы:** `docs/SPEC-BL-18-official-letter-generator.md` (v1.2), `docs/ADR-BL-18-01-tenant-model.md`.
+**Связанные документы:** `docs/SPEC-BL-18-official-letter-generator.md` (v1.2), `docs/specs/ADR-BL-18-01-tenant-model.md`.
 
 ---
 
@@ -17,7 +17,7 @@
 | LLM | HTTP API из бэкенда в РФ; трансграница **разрешена** при чекбоксе (§6 спеки). |
 | CI/CD | Сборка образа/деплой из репо; секреты только в env платформы. |
 
-**Runbook:** в `docs/BL18-PROD-RUNBOOK.md` (чеклист env, миграции, health).
+**Runbook:** в `docs/plans/BL18-PROD-RUNBOOK.md` (чеклист env, миграции, health).
 
 ---
 

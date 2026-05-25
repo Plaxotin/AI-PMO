@@ -1,7 +1,7 @@
 # Согласование BL1-0 и BL-18
 
 **Дата:** 2026-05-24  
-**ADR:** `docs/ADR-BL-18-01-tenant-model.md` (рекомендация **A₀**).
+**ADR:** `docs/specs/ADR-BL-18-01-tenant-model.md` (рекомендация **A₀**).
 
 ---
 
