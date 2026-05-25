@@ -9,7 +9,12 @@ export const assignmentStatusSchema = z.enum([
 
 export type AssignmentStatus = z.infer<typeof assignmentStatusSchema>;
 
-export const assignmentSourceSchema = z.enum(['manual', 'import', 'webhook']);
+export const assignmentSourceSchema = z.enum([
+  'manual',
+  'import',
+  'webhook',
+  'web_upload',
+]);
 
 export type AssignmentSource = z.infer<typeof assignmentSourceSchema>;
 
@@ -34,6 +39,7 @@ export const assignmentSchema = z.object({
   owner_id: uuidSchema.nullable(),
   assignee_label: z.string().max(500).nullable(),
   source: assignmentSourceSchema,
+  version: z.number().int().min(1),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
 });
@@ -43,27 +49,27 @@ export type Assignment = z.infer<typeof assignmentSchema>;
 export const assignmentStatusEventSchema = z.object({
   id: uuidSchema,
   assignment_id: uuidSchema,
+  event_type: z.enum(['created', 'status_change', 'field_change', 'cancelled']),
+  field_name: z.string().nullable(),
   from_status: assignmentStatusSchema.nullable(),
-  to_status: assignmentStatusSchema,
+  to_status: assignmentStatusSchema.nullable(),
+  old_value: z.unknown().nullable(),
+  new_value: z.unknown().nullable(),
   actor_id: uuidSchema.nullable(),
   created_at: z.string().datetime(),
 });
 
 export type AssignmentStatusEvent = z.infer<typeof assignmentStatusEventSchema>;
 
-/** Query params for GET /assignments (US-6 filters, BL1-0). */
+/** Query params for GET /assignments (BL1-1 contract). */
 export const assignmentListQuerySchema = z.object({
   status: assignmentStatusSchema.optional(),
-  due_from: z.string().datetime().optional(),
-  due_to: z.string().datetime().optional(),
-  q: z
-    .string()
-    .trim()
-    .min(1)
-    .max(200)
-    .optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(50),
-  offset: z.coerce.number().int().min(0).default(0),
+  due_before: z.string().datetime().optional(),
+  due_after: z.string().datetime().optional(),
+  assignee: z.string().trim().min(1).max(500).optional(),
+  source: assignmentSourceSchema.optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  per_page: z.coerce.number().int().min(1).max(100).default(50),
 });
 
 export type AssignmentListQuery = z.infer<typeof assignmentListQuerySchema>;
@@ -81,15 +87,24 @@ export type CreateAssignmentBody = z.infer<typeof createAssignmentBodySchema>;
 
 export const patchAssignmentBodySchema = z
   .object({
+    version: z.number().int().min(1),
     title: z.string().trim().min(1).max(500).optional(),
     description: z.string().max(10000).optional().nullable(),
     status: assignmentStatusSchema.optional(),
     due_at: z.string().datetime().optional().nullable(),
     assignee_label: z.string().trim().max(500).optional().nullable(),
   })
-  .refine((body) => Object.keys(body).length > 0, {
-    message: 'Укажите хотя бы одно поле для обновления',
-  });
+  .refine(
+    (body) =>
+      body.title !== undefined ||
+      body.description !== undefined ||
+      body.status !== undefined ||
+      body.due_at !== undefined ||
+      body.assignee_label !== undefined,
+    {
+      message: 'Укажите хотя бы одно поле для обновления',
+    },
+  );
 
 export type PatchAssignmentBody = z.infer<typeof patchAssignmentBodySchema>;
 
@@ -97,7 +112,11 @@ export const assignmentListResponseSchema = z.object({
   data: z.array(assignmentSchema),
   meta: z.object({
     total: z.number().int().nonnegative(),
-    limit: z.number().int(),
-    offset: z.number().int(),
+    page: z.number().int().min(1),
+    per_page: z.number().int().min(1),
   }),
+});
+
+export const assignmentWithHistorySchema = assignmentSchema.extend({
+  history: z.array(assignmentStatusEventSchema),
 });

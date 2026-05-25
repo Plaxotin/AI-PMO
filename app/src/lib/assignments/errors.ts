@@ -8,6 +8,7 @@ export type ApiErrorCode =
   | 'NOT_FOUND'
   | 'NOT_IMPLEMENTED'
   | 'PROJECT_MISMATCH'
+  | 'VERSION_CONFLICT'
   | 'INTERNAL_ERROR'
   | 'DATABASE_UNAVAILABLE';
 

@@ -3,9 +3,9 @@ import { getAuthResult, authHeaders } from '@/lib/auth/session';
 import { apiError } from '@/lib/assignments/errors';
 import { isDatabaseConfigured } from '@/lib/config';
 
-export async function withAuth() {
+export async function withAuth(options?: { requireSession?: boolean }) {
   const auth = await getAuthResult();
-  if (auth.mode === 'unauthenticated') {
+  if (options?.requireSession && auth.mode === 'unauthenticated') {
     return {
       ok: false as const,
       response: apiError(

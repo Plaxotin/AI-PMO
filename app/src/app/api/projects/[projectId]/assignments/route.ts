@@ -6,11 +6,14 @@ import {
 import {
   apiError,
   validationError,
-  notImplemented,
 } from '@/lib/assignments/errors';
 import { parseProjectId } from '@/lib/api/project';
-import { jsonWithAuth, withAuth } from '@/lib/api/route-helpers';
-import { listAssignments } from '@/lib/db/assignments';
+import {
+  databaseUnavailableResponse,
+  jsonWithAuth,
+  withAuth,
+} from '@/lib/api/route-helpers';
+import { createAssignment, listAssignments } from '@/lib/db/assignments';
 
 type RouteContext = { params: Promise<{ projectId: string }> };
 
@@ -34,17 +37,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
   const result = await listAssignments(project.projectId, parsedQuery.data);
   if (!result) {
-    return jsonWithAuth(
-      {
-        data: [],
-        meta: {
-          total: 0,
-          limit: parsedQuery.data.limit,
-          offset: parsedQuery.data.offset,
-        },
-      },
-      { auth: authResult.auth },
-    );
+    return databaseUnavailableResponse();
   }
 
   return jsonWithAuth(result, { auth: authResult.auth });
@@ -78,5 +71,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return validationError(parsedBody.error);
   }
 
-  return notImplemented('POST /assignments (создание поручения)');
+  const created = await createAssignment(
+    project.projectId,
+    parsedBody.data,
+    authResult.auth.mode === 'authenticated' ? authResult.auth.userId : null,
+  );
+
+  if (!created) {
+    return databaseUnavailableResponse();
+  }
+
+  return jsonWithAuth({ data: created }, { status: 201, auth: authResult.auth });
 }
