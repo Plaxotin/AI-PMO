@@ -7,7 +7,7 @@
 - `GET/POST` `/api/projects/:projectId/assignments`
 - `GET/PATCH` `/api/projects/:projectId/assignments/:assignmentId`
 - Таблицы: `projects`, `assignments`, `assignment_status_events`
-- Без Telegram, инжеста, STT (см. `docs/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md` — этапы после реестра)
+- Без Telegram, инжеста, STT (см. `docs/plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md` — этапы после реестра)
 
 ## Команды
 
@@ -18,7 +18,7 @@ npm run build
 npm test             # Vitest — Zod-контракты
 ```
 
-Переменные окружения: **`docs/BL1-0_ENV.md`**.
+Переменные окружения: **`docs/plans/BL1-0_ENV.md`**.
 
 ## Структура
 

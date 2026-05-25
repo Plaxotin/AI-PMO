@@ -136,7 +136,7 @@
 - `result_zip` (binary) — архив: **`letter.docx`** + **оригиналы** приложений (0–5 файлов); при отсутствии приложений — архив только с `letter.docx`
 - `audit_id`
 
-**Детализация REST (принято для prod):** см. `docs/ADR-BL-18-02-production-decisions.md` §10 — префикс `/api/tenants/:tenantId/...`, отдельные endpoints для шаблонов и генерации, ответ с URL скачивания или `202` при больших файлах.
+**Детализация REST (принято для prod):** см. `docs/specs/ADR-BL-18-02-production-decisions.md` §10 — префикс `/api/tenants/:tenantId/...`, отдельные endpoints для шаблонов и генерации, ответ с URL скачивания или `202` при больших файлах.
 
 ---
 
@@ -166,10 +166,10 @@
 
 | Тема | Документ |
 |------|----------|
-| Модель тенанта (варианты A / B / рекомендация A₀) | `docs/ADR-BL-18-01-tenant-model.md` |
-| LLM, DOCX, API, TTL, ZIP, плейсхолдеры, AV, роли, инфра РФ | `docs/ADR-BL-18-02-production-decisions.md` |
-| Согласование с BL1-0 | `docs/BL1-0_BL18-ALIGNMENT.md` |
-| Чеклист деплоя | `docs/BL18-PROD-RUNBOOK.md` |
+| Модель тенанта (варианты A / B / рекомендация A₀) | `docs/specs/ADR-BL-18-01-tenant-model.md` |
+| LLM, DOCX, API, TTL, ZIP, плейсхолдеры, AV, роли, инфра РФ | `docs/specs/ADR-BL-18-02-production-decisions.md` |
+| Согласование с BL1-0 | `docs/plans/BL1-0_BL18-ALIGNMENT.md` |
+| Чеклист деплоя | `docs/plans/BL18-PROD-RUNBOOK.md` |
 
 **Кратко:**
 
@@ -186,7 +186,7 @@
 
 ## 13. Модель тенанта (выжимка для разработчиков)
 
-Полное сравнение **варианта A** (мультитенант) и **варианта B** (single-tenant) — в `docs/ADR-BL-18-01-tenant-model.md`.
+Полное сравнение **варианта A** (мультитенант) и **варианта B** (single-tenant) — в `docs/specs/ADR-BL-18-01-tenant-model.md`.
 
 | | A — мультитенант | B — single-tenant |
 |---|------------------|-------------------|

@@ -2,7 +2,7 @@
 
 **Фаза:** BL1-0 — контракты, схема БД v1, скелет API  
 **Дата фиксации:** 18 мая 2026  
-**Связанные документы:** `docs/MVP_SPEC_AND_PLAN.md` (общий MVP и BL-1), при необходимости — `docs/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md` (расширенный Telegram-план; часть требований шире текущего BL1-0).
+**Связанные документы:** `docs/specs/SPEC-BL-6-assignments-admin.md` (спека BL-6), `docs/plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md` (фазы BL1-*), `docs/specs/SPEC-PLAN-AUDIT.md` (отдельная фича — аудит плана).
 
 ---
 
@@ -11,7 +11,7 @@
 | # | Тема | Решение |
 |---|------|---------|
 | 1 | Репозиторий | **Один репозиторий** с лендингом (`index.html` в корне). Код приложения (Next.js) появляется в этом же репо (подкаталог, например `app/` или `packages/web/`) — уточнить структуру при первом коммите приложения. |
-| 2 | Организации / тенанты | **Один глобальный проект** без организаций и без мультитенанта в UI BL-1 на старте. Достаточно одной строки в `projects` или константы `DEFAULT_PROJECT_ID`. **BL-18** вводит `tenants` отдельно (см. `docs/BL1-0_BL18-ALIGNMENT.md`, ADR-BL-18-01). |
+| 2 | Организации / тенанты | **Один глобальный проект** без организаций и без мультитенанта в UI BL-1 на старте. Достаточно одной строки в `projects` или константы `DEFAULT_PROJECT_ID`. **BL-18** вводит `tenants` отдельно (см. `docs/plans/BL1-0_BL18-ALIGNMENT.md`, ADR-BL-18-01). |
 | 3 | Аутентификация | **Рекомендация:** **Supabase Auth** в связке с **Supabase Postgres** — один проект Supabase, меньше склейки, бесплатный tier, RLS при необходимости позже. Для MVP: вход по **magic link (email)** и/или **OAuth** (провайдер выбрать по доступности из РФ для вашей аудитории). Альтернатива «только Next» — Auth.js + тот же Postgres по `DATABASE_URL`; сложнее старт, зато без vendor lock-in на auth. |
 | 4 | База данных | **Supabase (PostgreSQL)**. Регион проекта Supabase выбрать ближе к пользователям и проверить доступность дашборда/API из РФ на практике (политики у провайдеров меняются). |
 | 5 | Исполнители | Допускаются **строковые метки** (например ФИО, `@username`, произвольная строка). Не требовать `user_id` исполнителя в BL1-0; поле вида `assignee_label` (text) или массив текстов — зафиксировать в Zod и миграции. |
@@ -76,6 +76,6 @@
 - [x] Seed создаёт глобальный проект — `supabase/seed.sql`.  
 - [x] Zod-схемы согласованы с колонками БД — `app/src/lib/assignments/types.ts`.  
 - [x] Скелет маршрутов `/api/projects/[projectId]/assignments` отвечает валидируемыми заглушками (401 без сессии — если auth уже подключён, иначе заголовок `X-Auth-Status: todo-supabase-not-configured`).  
-- [x] В `README` / `docs/` перечислены env — `docs/BL1-0_ENV.md`, `app/README.md`, `app/.env.example`.
+- [x] В `README` / `docs/` перечислены env — `docs/plans/BL1-0_ENV.md`, `app/README.md`, `app/.env.example`.
 
 **Приложение:** каталог `app/` (Next.js 15). Статус фазы: `ready_for_test` (ветка `cursor/bl1-0-kickoff-35d7`).

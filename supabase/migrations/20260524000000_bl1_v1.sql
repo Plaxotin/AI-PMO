@@ -1,5 +1,5 @@
 -- BL1-0: assignments registry v1 (AI PMO)
--- Aligns with docs/BL1-0_KICKOFF.md — no ingest / Telegram tables in v1.
+-- Aligns with docs/plans/BL1-0_KICKOFF.md — no ingest / Telegram tables in v1.
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
