@@ -1,8 +1,8 @@
 # Администратор поручений — план реализации (фазы)
 
-**Статус:** актуальный план (ревизия Planner 2026-05-24; синхронизирован со спекой v1.2)  
+**Статус:** актуальный план (ревизия Planner 2026-05-25; синхронизирован со спекой v1.4)
 **Спека:** `docs/specs/SPEC-BL-6-assignments-admin.md` — источник истины по требованиям и решениям  
-**Связанные файлы:** `docs/specs/BL6_PRODUCT_DECISIONS.md`, `docs/plans/BL1-0_KICKOFF.md`, `docs/plans/BL1-0_VERIFICATION.md`  
+**Связанные файлы:** `docs/specs/BL6_PRODUCT_DECISIONS.md`, `docs/plans/BL1-0_KICKOFF.md`, `docs/plans/BL1-1_KICKOFF.md`, `docs/plans/BL1-0_VERIFICATION.md`
 **Подход:** один разработчик, последовательные фазы; каждая фаза — отдельная ветка и PR.
 
 ---
@@ -70,13 +70,13 @@ Bot Webhook ──────────────────► Media Inge
 
 ---
 
-### Фаза BL1-1 — CRUD поручений и авторизация
+### Фаза BL1-1 — CRUD поручений и журнал (MVP без auth)
 
 **phase_id:** BL1-1  
 **status:** `planned`  
 **Зависит от:** BL1-0
 
-**Результат:** рабочие API-эндпоинты реестра с проверкой прав и журналом истории.
+**Результат:** рабочие API-эндпоинты реестра с журналом истории и optimistic locking.
 
 **Scope:**
 
@@ -91,22 +91,22 @@ Bot Webhook ──────────────────► Media Inge
 - Фильтры списка (привести к спеке; заменить черновик BL1-0 `due_from`/`due_to`/`limit`/`offset`/`q`):
   `status`, `due_before`, `due_after`, `assignee` — **точное совпадение** с `assignee_label` (см. `docs/specs/BL6_PRODUCT_DECISIONS.md` §4), `source`, `page`, `per_page`.
 - Ответ списка: `{ data: Assignment[], meta: { total, page, per_page } }`.
-- Авторизация (согласовано с `docs/plans/BL1-0_KICKOFF.md` §4): любой аутентифицированный пользователь видит и редактирует **все** поручения глобального проекта; изоляция — по `project_id` (чужой UUID → `403`/`404`).
+- MVP-модель доступа (согласовано с `docs/specs/BL6_PRODUCT_DECISIONS.md`): API работает без обязательной пользовательской сессии; изоляция — по `project_id` (чужой UUID → `404`).
 - Журнал (`docs/specs/BL6_PRODUCT_DECISIONS.md` §1): расширить `assignment_status_events` — `event_type` (`status_change` | `field_change` | `created` | `cancelled`); для `field_change` — `field_name`, `old_value`/`new_value`.
 - Оптимистическая блокировка: поле `version`, конфликт → `409` с текущей версией.
 - Миграция v2: `version` (int, default 1), расширить enum `assignment_source` значением `web_upload`, `media_ingest_job_id` (nullable uuid, FK добавить после таблицы `media_ingest_jobs` в BL1-3/BL1-5 — до FK допустим nullable без constraint).
 
-**Env (дополнить `docs/plans/BL1-0_ENV.md`):** `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+**Env (дополнить `docs/plans/BL1-0_ENV.md`):** `DATABASE_URL` (обязательно); переменные Supabase оставить опциональными для post-MVP.
 
-**Критерий готовности:** интеграционные тесты: создать / прочитать / изменить / отменить поручение; доступ к чужому `project_id` → `403`/`404`; `assignment_status_events` при смене статуса; `409` при конфликте `version`.
+**Критерий готовности:** интеграционные тесты: создать / прочитать / изменить / отменить поручение; доступ к чужому `project_id` → `404`; `assignment_status_events` при смене статуса/ключевых полей; `409` при конфликте `version`.
 
 **testing_scenario:**
 
 | Поле | Значение |
 |------|----------|
-| **setup** | `DATABASE_URL` + миграции v1 и v2; seed; Supabase Auth или тестовая сессия; `DEFAULT_PROJECT_ID`. |
+| **setup** | `DATABASE_URL` + миграции v1 и v2; seed; `DEFAULT_PROJECT_ID`. |
 | **actions** | 1) `POST` поручение с `title`. 2) `GET` список с `status=open`. 3) `PATCH` с `version`. 4) `DELETE`. 5) Запрос с другим `projectId`. 6) `PATCH` со stale `version`. |
-| **expected** | `201`/`200` на CRUD; событие в `assignment_status_events`; `DELETE` → `cancelled`; чужой проект → `403`/`404`; stale version → `409`. |
+| **expected** | `201`/`200` на CRUD; события в `assignment_status_events`; `DELETE` → `cancelled`; чужой проект → `404`; stale version → `409`. |
 | **evidence** | Вывод Vitest/integration; `curl` transcript; строки в `assignment_status_events`. |
 
 ---
@@ -133,7 +133,7 @@ Bot Webhook ──────────────────► Media Inge
 
 | Поле | Значение |
 |------|----------|
-| **setup** | `npm run dev` в `app/`; BL1-1 API на живой БД; тестовый пользователь с сессией. |
+| **setup** | `npm run dev` в `app/`; BL1-1 API на живой БД; браузерная сессия приложения (без обязательной auth в MVP). |
 | **actions** | Создать поручение в форме; отфильтровать по статусу; открыть карточку; изменить срок; отменить; остановить API и повторить действие. |
 | **expected** | Запись в списке; фильтр сужает выборку; история на карточке; `409` при параллельном редактировании; offline — сообщение об ошибке. |
 | **evidence** | Скриншот/запись UI; Network tab (статусы API). |
@@ -331,7 +331,7 @@ POST /api/projects/:projectId/media/ingest/:jobId/confirm
 
 ```
 BL1-0 ✅
-  └─► BL1-1 (CRUD + authz)
+  └─► BL1-1 (CRUD + audit log, no-auth MVP)
         └─► BL1-2 (UI реестра)
         └─► BL1-3 (Telegram + SaluteSpeech + уточнения)
               └─► BL1-4 (напоминания + YOS + импорт/экспорт)
@@ -348,7 +348,7 @@ BL1-0 ✅
 | Фаза | Режим Cursor | Модели |
 |------|-------------|--------|
 | BL1-0 (выполнено) | Agent / Composer | Claude Sonnet, GPT-4.1 |
-| BL1-1 CRUD + authz | Agent | Sonnet, GPT-4o |
+| BL1-1 CRUD + audit log | Agent | Sonnet, GPT-4o |
 | BL1-2 UI реестра | Agent / Composer | Sonnet, GPT-4o |
 | BL1-3 Telegram + STT + LLM + тред | Agent + Chat | GPT-4.1 / Sonnet; промпты — Opus точечно |
 | BL1-4 Напоминания + YOS + signed links | Agent | Sonnet, GPT-4o |

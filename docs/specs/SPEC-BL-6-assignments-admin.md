@@ -1,11 +1,11 @@
 # BL-6 — Администратор поручений
 
-**Версия:** 1.3 (выделена из общего `MVP_SPEC_AND_PLAN.md`; полная спека BL-6)  
-**Дата:** 2026-05-24  
+**Версия:** 1.4 (выделена из общего `MVP_SPEC_AND_PLAN.md`; полная спека BL-6)
+**Дата:** 2026-05-25
 **Продукт:** AI PMO  
 **Код бэклога:** BL-6 (Notion) / BL-1 (внутренняя нумерация репозитория)  
 **WSJF:** 2 · **Волна:** 1 · **Сложность:** L · **Ценность:** Высокая  
-**Связанные файлы реализации:** `docs/plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`, `docs/specs/BL6_PRODUCT_DECISIONS.md`, `docs/plans/BL1-0_KICKOFF.md`, `docs/plans/BL1-0_VERIFICATION.md`  
+**Связанные файлы реализации:** `docs/plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`, `docs/specs/BL6_PRODUCT_DECISIONS.md`, `docs/plans/BL1-0_KICKOFF.md`, `docs/plans/BL1-1_KICKOFF.md`, `docs/plans/BL1-0_VERIFICATION.md`
 **Смежная фича:** [Аудит проектного плана](SPEC-PLAN-AUDIT.md) (`docs/specs/`)
 
 ---
@@ -202,7 +202,7 @@ Bot Webhook ──────────────────► Media Inge
 | Фаза | Описание | Статус |
 |------|----------|--------|
 | BL1-0 | Контракты, Zod-типы, миграции v1, скелет API | ✅ `verified` (см. `docs/plans/BL1-0_VERIFICATION.md`) |
-| BL1-1 | CRUD поручений, авторизация, журнал истории | `planned` |
+| BL1-1 | CRUD поручений (MVP без авторизации), журнал истории | `planned` |
 | BL1-2 | UI реестра (список, карточка, форма, фильтры) | `planned` |
 | BL1-3 | Telegram-инжест, STT, LLM slot-filling, уточнения | `planned` |
 | BL1-4 | Напоминания (cron/outbox), публичный реестр (CDN), импорт/экспорт | `planned` |
@@ -213,7 +213,7 @@ Bot Webhook ──────────────────► Media Inge
 | Фаза | Режим Cursor | Модели |
 |------|-------------|--------|
 | BL1-0 (выполнено) | Agent / Composer | Claude Sonnet, GPT-4.1 |
-| BL1-1 CRUD + authz | Agent | Sonnet, GPT-4o |
+| BL1-1 CRUD + audit log | Agent | Sonnet, GPT-4o |
 | BL1-2 UI реестра | Agent / Composer | Sonnet, GPT-4o |
 | BL1-3 Telegram + STT + LLM | Agent + Chat | GPT-4.1 / Sonnet; промпты slot-filling — Opus точечно |
 | BL1-4 Напоминания + CDN + импорт | Agent | Sonnet, GPT-4o |
@@ -357,7 +357,7 @@ POST /api/projects/:projectId/assignments/import          — тело: multipar
 | API | `POST /api/analyze` | `/api/projects/:projectId/assignments`, webhook, ingest |
 | Rate limit | По IP/cookie (Free) | Отдельные лимиты на webhook и `/media/ingest` |
 
-**Обязательно:** не смешивать бинарные загрузки планов с таблицами поручений; общие auth и деплой — допустимы. Трек BL-6 можно вести **параллельно** с аудитом после BL1-0 или независимо, если модули изолированы.
+**Обязательно:** не смешивать бинарные загрузки планов с таблицами поручений; общий деплой и инфраструктурные компоненты — допустимы. Трек BL-6 можно вести **параллельно** с аудитом после BL1-0 или независимо, если модули изолированы.
 
 ---
 
@@ -365,7 +365,7 @@ POST /api/projects/:projectId/assignments/import          — тело: multipar
 
 - **Приложение:** Next.js (App Router), React, TypeScript — каталог `app/`.
 - **БД:** PostgreSQL (Supabase), миграции SQL в `supabase/migrations/`.
-- **Auth:** Supabase Auth (magic link / OAuth) — см. `docs/plans/BL1-0_KICKOFF.md`.
+- **Auth:** в **MVP авторизация не обязательна**; опциональная интеграция Supabase Auth — только в post-MVP (см. `docs/specs/BL6_PRODUCT_DECISIONS.md`).
 - **Очередь/крон:** Vercel Cron + outbox-таблица для напоминаний (BL1-4).
 - **STT:** SaluteSpeech; **публичный реестр:** Yandex Object Storage + CDN.
 - **LLM:** slot-filling и разбиение транскриптов — только нормализованный текст; подтверждение человеком перед `open`.
@@ -376,8 +376,8 @@ POST /api/projects/:projectId/assignments/import          — тело: multipar
 
 Зафиксированные решения — `docs/plans/BL1-0_KICKOFF.md`, `docs/specs/BL6_PRODUCT_DECISIONS.md`. Перед **BL1-0** (выполнено) и при старте **BL1-1**:
 
-1. **Модель доступа:** один глобальный проект; аутентифицированные пользователи — полный доступ к реестру проекта.
-2. **Идентичность:** Supabase Auth, `owner_id` на поручении.
+1. **Модель доступа (MVP):** один глобальный проект; API реестра без обязательной пользовательской авторизации.
+2. **Идентичность:** `owner_id` в MVP допускается `null`; заполнение из user session — post-MVP при внедрении auth.
 3. **Данные:** регион Postgres; миграции v1/v2; каскад при удалении проекта.
 4. **Интеграция с аудитом:** общий деплой допустим; разделение доменов данных (§12).
 5. **Каналы:** полный Telegram + веб в BL1-3…BL1-5; секреты в env / Cursor Secrets.
@@ -392,7 +392,7 @@ POST /api/projects/:projectId/assignments/import          — тело: multipar
 | Фаза | API-эквивалент (USD) | Комментарий |
 |------|----------------------|-------------|
 | BL1-0 | **5–18** | Выполнено (`verified`) |
-| BL1-1 | **15–40** | CRUD, authz, журнал |
+| BL1-1 | **15–40** | CRUD, журнал |
 | BL1-2 | **18–45** | UI реестра |
 | BL1-3 | **20–50** | Telegram, STT, US-C |
 | BL1-4 | **8–22** | Напоминания, YOS, import/export |
@@ -426,4 +426,4 @@ POST /api/projects/:projectId/assignments/import          — тело: multipar
 
 ---
 
-*Документ является **единственной продуктовой спецификацией BL-6** (ранее часть требований дублировалась в `docs/specs/SPEC-PLAN-AUDIT.md`). Аудит плана — `docs/specs/SPEC-PLAN-AUDIT.md`. План фаз — `docs/plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`. Kickoff BL1-0 — `docs/plans/BL1-0_KICKOFF.md`. Верификация BL1-0 — `docs/plans/BL1-0_VERIFICATION.md`.*
+*Документ является **единственной продуктовой спецификацией BL-6** (ранее часть требований дублировалась в `docs/specs/SPEC-PLAN-AUDIT.md`). Аудит плана — `docs/specs/SPEC-PLAN-AUDIT.md`. План фаз — `docs/plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`. Kickoff BL1-0/BL1-1 — `docs/plans/BL1-0_KICKOFF.md`, `docs/plans/BL1-1_KICKOFF.md`. Верификация BL1-0 — `docs/plans/BL1-0_VERIFICATION.md`.*

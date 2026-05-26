@@ -10,24 +10,36 @@ This workspace is the **AI-PMO** product repository on GitHub: **`Plaxotin/AI-PM
 
 ## Cursor Cloud specific instructions
 
-This is a zero-dependency static landing page (single `index.html` with inline CSS/JS) deployed on Vercel.
+The repository has two parts:
+
+1. **Landing** in repo root (`index.html`, inline CSS/JS, static Vercel deploy).
+2. **Product app** in `app/` (Next.js + TypeScript for BL-6 implementation and API routes).
 
 ### Running locally
 
-Serve files with any static HTTP server from the repo root:
+Landing (root):
 
 ```
 python3 -m http.server 8080
 ```
 
-Then open `http://localhost:8080` in a browser.
+Then open `http://localhost:8080`.
+
+Product app (`app/`):
+
+```
+cd app
+npm install
+npm run dev
+```
+
+Then open `http://localhost:3000`.
 
 ### Key notes
 
-- There is **no build step**, no package manager, no linting tooling, and no automated tests.
-- The `vercel.json` sets `"buildCommand": null` — Vercel deploys the directory as-is.
-- The page includes a client-side EN/RU language toggle and a mock email signup form (purely front-end, no backend calls).
-- All styles and scripts are inline in `index.html`.
+- Root landing remains zero-dependency static (`vercel.json` has `"buildCommand": null`).
+- Product development for BL-6 happens in `app/` with npm scripts (`dev`, `build`, `test`).
+- Keep landing and product app changes isolated; do not mix landing-only assumptions with BL-6 app work.
 
 ## Subagent workflow
 
