@@ -64,7 +64,10 @@ This plan breaks the BL-18 letter generator landing-page workspace into **3 sequ
     6. Open a non-letters tool, then close, then open letters → verify no ghost state from the generic workspace leaks.
   - **Expected result:** All 6 checks pass; no console errors.
   - **Evidence:** Screenshots of: (a) letters workspace open in EN, (b) letters workspace open in RU, (c) generic workspace open for another tool (proving no regression).
-- **status:** `planned`
+- **status:** `verified`
+- **verified_date:** 2026-05-24
+- **verified_by:** Verifier (computerUse subagent, 9 test scenarios)
+- **PR:** [#22](https://github.com/Plaxotin/AI-PMO/pull/22) — merged 2026-05-25
 
 ---
 
@@ -114,7 +117,10 @@ This plan breaks the BL-18 letter generator landing-page workspace into **3 sequ
     11. Resize browser to mobile width → verify layout is usable.
   - **Expected result:** All 11 checks pass; no console errors; button state is always correct.
   - **Evidence:** Screenshots of: (a) validation error on wrong file type, (b) valid template selected + content entered + attachments listed, (c) RU language state, (d) mobile layout.
-- **status:** `planned`
+- **status:** `verified`
+- **verified_date:** 2026-05-24
+- **verified_by:** Verifier (computerUse subagent, 9 test scenarios)
+- **PR:** [#22](https://github.com/Plaxotin/AI-PMO/pull/22) — merged 2026-05-25
 
 ---
 
@@ -176,18 +182,29 @@ This plan breaks the BL-18 letter generator landing-page workspace into **3 sequ
     14. Verify no console errors throughout.
   - **Expected result:** All 14 checks pass; downloads trigger; audit log accurately reflects each generation.
   - **Evidence:** Screenshots of: (a) result panel with letter preview and signatory placeholders, (b) downloads folder showing downloaded files, (c) expanded audit log with entries, (d) RU language state of the result section. Optionally a screen recording of the full end-to-end flow.
-- **status:** `planned`
+- **status:** `verified`
+- **verified_date:** 2026-05-24
+- **verified_by:** Verifier (computerUse subagent, 9 test scenarios + video recording)
+- **PR:** [#22](https://github.com/Plaxotin/AI-PMO/pull/22) — merged 2026-05-25
 
 ---
 
-## Open questions
+## Open questions — resolved
 
-1. **Mock DOCX content format:** Should the downloaded `letter.docx` contain just plain text (simplest), or attempt a minimal valid Office Open XML structure? Plain text with `.docx` extension won't open perfectly in Word but is zero-dependency. Recommendation: plain text for landing demo; note in UI that this is a demonstration.
-2. **Mock ZIP content:** Same question — a text file renamed `.zip` won't unzip. If the user expects a real zip, we could inline a tiny ZIP library (~50 lines of JS for uncompressed ZIP). Recommendation: implement a minimal uncompressed ZIP builder in JS (no external dependencies) for a better demo experience. Decision needed from product owner.
-3. **Collision handling in attachment names:** The spec mentions suffix `_2` for duplicate filenames in ZIP. For the landing demo with max 5 client-side files, is it worth implementing? Recommendation: implement the suffix approach — it's a few lines of JS and demonstrates spec awareness.
+1. **Mock DOCX content format:** Resolved — plain text with `.docx` MIME type. Sufficient for landing-page demo.
+2. **Mock ZIP content:** Resolved — implemented a minimal uncompressed ZIP builder in ~50 lines of JS (no external dependencies). ZIP files are valid and can be extracted by standard archivers.
+3. **Collision handling in attachment names:** Resolved — implemented suffix `_2`, `_3`, etc. approach per spec recommendation.
 
 ---
 
-## Implementer handoff
+## Defects found and fixed
 
-Start with **Phase BL18-P1** (workspace skeleton and routing). This phase has no dependencies and establishes the structural foundation for Phases 2 and 3. Request: `Разрешите начать фазу BL18-P1: Letter workspace HTML/CSS skeleton and card routing?`
+1. **EN error messages showed raw i18n keys** — dynamic error strings (e.g. "Only .docx files are accepted") had no DOM counterparts for the EN fallback path. Fixed by adding `enFallback` dictionary in the letter workspace JS. Commit `3f6869f`.
+
+---
+
+## Deployment
+
+- **Production URL:** https://ai-pmo-tawny.vercel.app
+- **Vercel status:** SUCCESS
+- **To test:** open the URL → scroll to "Tools" section → click "Official letters" card
