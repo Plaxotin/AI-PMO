@@ -7,7 +7,7 @@
 | Файл | Фича |
 |------|------|
 | [SPEC-PLAN-AUDIT.md](specs/SPEC-PLAN-AUDIT.md) | Аудит проектного плана (Excel/CSV, CPM, LLM-отчёт) |
-| [SPEC-BL-6-assignments-admin.md](specs/SPEC-BL-6-assignments-admin.md) | BL-6 — Администратор поручений |
+| [SPEC-BL-6-assignments-admin.md](specs/SPEC-BL-6-assignments-admin.md) | BL-6 — Администратор поручений (**v2.0**: пивот на Google Sheets) |
 | [BL6_PRODUCT_DECISIONS.md](specs/BL6_PRODUCT_DECISIONS.md) | Зафиксированные продуктовые решения BL-6 |
 | [SPEC-BL-18-official-letter-generator.md](specs/SPEC-BL-18-official-letter-generator.md) | BL-18 — Генератор официальных писем |
 | [ADR-BL-18-01-tenant-model.md](specs/ADR-BL-18-01-tenant-model.md) | BL-18 — ADR: модель тенанта |
@@ -17,7 +17,7 @@
 
 | Файл | Фича |
 |------|------|
-| [ASSIGNMENTS_ADMIN_CURSOR_PLAN.md](plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md) | BL-6 — фазы BL1-0 … BL1-5, testing scenarios |
+| [ASSIGNMENTS_ADMIN_CURSOR_PLAN.md](plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md) | BL-6 — фазы BL1-0 … BL1-5 (v1.3, отменены BL1-1+); v2.0 фазы BL2-* — в спеке |
 | [BL1-0_KICKOFF.md](plans/BL1-0_KICKOFF.md) | BL-6 — стартовые решения BL1-0 |
 | [BL1-0_VERIFICATION.md](plans/BL1-0_VERIFICATION.md) | BL-6 — отчёт верификации BL1-0 |
 | [BL1-0_ENV.md](plans/BL1-0_ENV.md) | BL-6 — переменные окружения приложения |
