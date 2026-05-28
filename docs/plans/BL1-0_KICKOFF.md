@@ -2,7 +2,7 @@
 
 **Фаза:** BL1-0 — контракты, схема БД v1, скелет API  
 **Дата фиксации:** 18 мая 2026  
-**Связанные документы:** `docs/specs/SPEC-BL-6-assignments-admin.md` (спека BL-6), `docs/plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md` (фазы BL1-*), `docs/specs/SPEC-PLAN-AUDIT.md` (отдельная фича — аудит плана).
+**Связанные документы:** `docs/specs/SPEC-BL-6-assignments-admin-v2.2.md` (спека BL-6), `docs/plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md` (фазы BL1-*), `docs/specs/SPEC-PLAN-AUDIT.md` (отдельная фича — аудит плана).
 
 ---
 
