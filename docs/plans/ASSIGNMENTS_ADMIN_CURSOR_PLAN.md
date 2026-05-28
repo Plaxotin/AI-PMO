@@ -1,7 +1,7 @@
 # Администратор поручений — план реализации (фазы)
 
 **Статус:** актуальный план (ревизия Planner 2026-05-24; синхронизирован со спекой v1.2)  
-**Спека:** `docs/specs/SPEC-BL-6-assignments-admin.md` — источник истины по требованиям и решениям  
+**Спека:** `docs/specs/SPEC-BL-6-assignments-admin-v2.2.md` — источник истины по требованиям и решениям  
 **Связанные файлы:** `docs/specs/BL6_PRODUCT_DECISIONS.md`, `docs/plans/BL1-0_KICKOFF.md`, `docs/plans/BL1-0_VERIFICATION.md`  
 **Подход:** один разработчик, последовательные фазы; каждая фаза — отдельная ветка и PR.
 
@@ -80,7 +80,7 @@ Bot Webhook ──────────────────► Media Inge
 
 **Scope:**
 
-- Реализация эндпоинтов (контракт — `docs/specs/SPEC-BL-6-assignments-admin.md` §9):
+- Реализация эндпоинтов (контракт — `docs/specs/SPEC-BL-6-assignments-admin-v2.2.md` §9):
   ```
   GET    /api/projects/:projectId/assignments          — список с фильтрами
   POST   /api/projects/:projectId/assignments

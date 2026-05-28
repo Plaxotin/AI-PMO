@@ -2,7 +2,7 @@
 
 **Дата:** 2026-05-24  
 **Источник:** ответы Product на открытые вопросы Planner + спека v1.2  
-**Применяется к:** `docs/specs/SPEC-BL-6-assignments-admin.md`, `docs/plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`
+**Применяется к:** `docs/specs/SPEC-BL-6-assignments-admin-v2.2.md`, `docs/plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md`
 
 ---
 
@@ -52,7 +52,7 @@
 
 ## 5. Согласование документации MVP
 
-**Решение:** да — трек BL-6 описан только в `docs/specs/SPEC-BL-6-assignments-admin.md` (полный объём v1.2, фазы BL1-3 … BL1-5 обязательны). Аудит плана — отдельно в `docs/specs/SPEC-PLAN-AUDIT.md` (ранее общий файл `MVP_SPEC_AND_PLAN.md`).
+**Решение:** да — трек BL-6 описан только в `docs/specs/SPEC-BL-6-assignments-admin-v2.2.md` (полный объём v1.2, фазы BL1-3 … BL1-5 обязательны). Аудит плана — отдельно в `docs/specs/SPEC-PLAN-AUDIT.md` (ранее общий файл `MVP_SPEC_AND_PLAN.md`).
 
 ---
 

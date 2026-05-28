@@ -7,7 +7,7 @@
 | Файл | Фича |
 |------|------|
 | [SPEC-PLAN-AUDIT.md](specs/SPEC-PLAN-AUDIT.md) | Аудит проектного плана (Excel/CSV, CPM, LLM-отчёт) |
-| [SPEC-BL-6-assignments-admin.md](specs/SPEC-BL-6-assignments-admin.md) | BL-6 — Администратор поручений (**v2.0**: пивот на Google Sheets) |
+| [SPEC-BL-6-assignments-admin-v2.2.md](specs/SPEC-BL-6-assignments-admin-v2.2.md) | BL-6 — Администратор поручений (v2.2: один экран, Google Sheets, direct-to-table) |
 | [BL6_PRODUCT_DECISIONS.md](specs/BL6_PRODUCT_DECISIONS.md) | Зафиксированные продуктовые решения BL-6 |
 | [SPEC-BL-18-official-letter-generator.md](specs/SPEC-BL-18-official-letter-generator.md) | BL-18 — Генератор официальных писем |
 | [ADR-BL-18-01-tenant-model.md](specs/ADR-BL-18-01-tenant-model.md) | BL-18 — ADR: модель тенанта |
