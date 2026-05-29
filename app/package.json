@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "verify:bl2-secrets": "node scripts/verify-bl2-secrets.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
@@ -29,6 +30,8 @@
     "eslint-config-next": "15.5.18",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.7",
+    "google-auth-library": "^10.5.0",
+    "googleapis": "^171.4.0"
   }
 }

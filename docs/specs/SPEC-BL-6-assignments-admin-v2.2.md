@@ -412,7 +412,7 @@ BL1-0 — `verified` (Zod-типы, миграции). Код остаётся �
 - STT pipeline: SaluteSpeech + ffmpeg для видео.
 - Диктовка: Web Speech API (клиентская).
 
-**Env:** `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY`, LLM API key, `SALUTESPEECH_CLIENT_ID`, `SALUTESPEECH_SECRET`.
+**Env:** `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY`, `LLM_API_KEY`, `SALUTESPEECH_CLIENT_ID`, `SALUTESPEECH_SECRET` (см. `docs/plans/BL2-0_SECRETS_SETUP.md`).
 
 **Критерий готовности:**
 

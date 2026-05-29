@@ -48,6 +48,20 @@ npm run dev
 curl -s "http://localhost:3000/api/projects/00000000-0000-4000-8000-000000000001/assignments" | jq
 ```
 
+## BL-6 / BL2-0 (Google Sheets + SaluteSpeech)
+
+Пошаговая настройка Service Account, доступа к Sheet и SaluteSpeech: **`docs/plans/BL2-0_SECRETS_SETUP.md`**.
+
+Проверка после заполнения `app/.env.local`:
+
+```bash
+cd app && npm run verify:bl2-secrets
+```
+
+## LLM
+
+См. `LLM_API_KEY` в `app/.env.example` и `docs/specs/ADR-BL-18-02-production-decisions.md` §3.
+
 ## Деплой
 
 Корень Vercel для приложения — каталог **`app/`** (отдельный проект или monorepo root directory). Статический лендинг остаётся в корне репозитория с `vercel.json` (`buildCommand: null`).
