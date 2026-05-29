@@ -48,6 +48,18 @@ npm run dev
 curl -s "http://localhost:3000/api/projects/00000000-0000-4000-8000-000000000001/assignments" | jq
 ```
 
+## LLM (BL-6 smart-input, BL-18 письма)
+
+Контракт env — `docs/specs/ADR-BL-18-02-production-decisions.md` §3. Ключ API **всегда** называется `LLM_API_KEY`; для Kimi дополнительно `LLM_PROVIDER=kimi`, `LLM_API_BASE_URL`, `LLM_MODEL_ID` (см. `app/.env.example`).
+
+| Куда | Имя переменной |
+|------|----------------|
+| **Cursor Cloud** → Cloud Agents → Secrets | `LLM_API_KEY` (без `NEXT_PUBLIC_`) |
+| **Локально** → `app/.env.local` | `LLM_API_KEY=...` (скопировать из `app/.env.example`) |
+| **Vercel** → Environment Variables проекта `app/` | `LLM_API_KEY` |
+
+`KIMI_API_KEY` приложение **не читает** — переименуйте секрет или продублируйте то же значение под именем `LLM_API_KEY` (п.1 и п.3 из чеклиста).
+
 ## Деплой
 
 Корень Vercel для приложения — каталог **`app/`** (отдельный проект или monorepo root directory). Статический лендинг остаётся в корне репозитория с `vercel.json` (`buildCommand: null`).
