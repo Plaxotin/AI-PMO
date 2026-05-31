@@ -74,7 +74,24 @@
 
 ---
 
-## 8. Остаётся открытым (не блокирует BL1-1)
+## 8. LLM для BL2-0 (slot-filling, v2.2)
+
+**Решение (2026-05-31):** **Moonshot Kimi** через OpenAI-compatible API ([platform.moonshot.ai](https://platform.moonshot.ai/)).
+
+| Параметр | Значение |
+|----------|----------|
+| `LLM_PROVIDER` | `kimi` |
+| `LLM_API_BASE_URL` | `https://api.moonshot.ai/v1` |
+| `LLM_MODEL_ID` (MVP BL2-0) | **`moonshot-v1-8k`** — smart-input, одно поручение |
+| `LLM_API_KEY` | из [API Keys](https://platform.moonshot.ai/console/api-keys) |
+
+**Длинные транскрипты** (инжест файла совещания): при нехватке контекста 8k — переключить в env или коде на `moonshot-v1-32k` / `moonshot-v1-128k` (доступны тому же ключу; список — `GET /v1/models`).
+
+**Трансграница:** провайдер вне РФ; для prod в РФ — отдельное решение (YandexGPT и др., см. `ADR-BL-18-02-production-decisions.md` §3).
+
+---
+
+## 9. Остаётся открытым (не блокирует BL2-0)
 
 | Вопрос | Когда |
 |--------|--------|
@@ -82,4 +99,4 @@
 
 ---
 
-*Implementer: перед BL1-1 — пункты 1–6; перед **BL2-0** — также §7 (OAuth) вместе со спекой v2.2 §4, §13–§14.*
+*Implementer: перед **BL2-0** — §7 (OAuth), §8 (LLM) вместе со спекой v2.2 §4, §13–§14.*

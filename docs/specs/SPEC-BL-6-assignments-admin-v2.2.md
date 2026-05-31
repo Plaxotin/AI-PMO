@@ -143,7 +143,7 @@
 |---------|------------|
 | Авторизация | **Google OAuth 2.0** — доступ к Sheets/Drive **от имени пользователя** (вход перед первым использованием; refresh-токен в сессии приложения). Service Account **не используется**. |
 | STT-провайдер | **SaluteSpeech (Сбер)** — данные в контуре РФ. |
-| LLM | Минимизация данных: только текст ввода / транскрипт + контекст мероприятия. |
+| LLM | **Moonshot Kimi** (`moonshot-v1-8k` для MVP); OpenAI-compatible API; только текст ввода / транскрипт + контекст мероприятия. См. `docs/specs/BL6_PRODUCT_DECISIONS.md` §8. |
 | Медиафайлы | Не хранятся. tmp → STT → удалить. |
 | Rate limits | Google Sheets API: 300 запросов/мин; batch-записи для массовых вставок. |
 
@@ -412,7 +412,7 @@ BL1-0 — `verified` (Zod-типы, миграции). Код остаётся �
 - STT pipeline: SaluteSpeech + ffmpeg для видео.
 - Диктовка: Web Speech API (клиентская).
 
-**Env:** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` (OAuth 2.0); `LLM_API_KEY`; `SALUTESPEECH_CLIENT_ID`, `SALUTESPEECH_SECRET` (см. `docs/plans/BL2-0_SECRETS_SETUP.md`). Access/refresh-токены пользователя — только в сессии приложения, не в env.
+**Env:** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` (OAuth 2.0); `LLM_PROVIDER=kimi`, `LLM_API_BASE_URL=https://api.moonshot.ai/v1`, `LLM_MODEL_ID=moonshot-v1-8k`, `LLM_API_KEY`; `SALUTESPEECH_CLIENT_ID`, `SALUTESPEECH_SECRET` (см. `docs/plans/BL2-0_SECRETS_SETUP.md`, `BL6_PRODUCT_DECISIONS.md` §8). Access/refresh-токены Google — только в сессии приложения, не в env.
 
 **Критерий готовности:**
 
@@ -522,7 +522,7 @@ BL2-0 (единый экран + Sheets + smart-input + AI-инжест файл
 - **Реестр:** Google Sheets API v4 (`googleapis` npm).
 - **Auth к Sheet:** Google OAuth 2.0 (scopes: spreadsheets, drive.file — уточнить при BL2-0).
 - **STT:** SaluteSpeech; ffmpeg для видео.
-- **LLM:** slot-filling текста и транскриптов.
+- **LLM:** Moonshot Kimi, модель **`moonshot-v1-8k`** (MVP); slot-filling текста и транскриптов; `https://api.moonshot.ai/v1`.
 - **Диктовка:** Web Speech API (клиент).
 - **Telegram:** Bot API webhook (BL2-1).
 - **Хостинг:** Vercel.
@@ -534,7 +534,7 @@ BL2-0 (единый экран + Sheets + smart-input + AI-инжест файл
 | # | Шаг | Когда |
 |---|-----|-------|
 | 1 | Создать OAuth 2.0 Client в Google Cloud Console (Web application; redirect URI для dev/prod) | До BL2-0 |
-| 2 | Секреты в Cursor Dashboard (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, LLM API key) | До BL2-0 |
+| 2 | Секреты в Cursor / Vercel: Google OAuth (`GOOGLE_CLIENT_*`, `GOOGLE_REDIRECT_URI`); LLM: `LLM_PROVIDER=kimi`, `LLM_API_BASE_URL=https://api.moonshot.ai/v1`, `LLM_MODEL_ID=moonshot-v1-8k`, `LLM_API_KEY` | До BL2-0 |
 | 3 | SaluteSpeech sandbox credentials | До BL2-0 |
 | 4 | Telegram Bot Token + webhook URL | До BL2-1 |
 
