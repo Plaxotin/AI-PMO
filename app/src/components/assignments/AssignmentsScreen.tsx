@@ -6,14 +6,9 @@ import type { ParsedAssignment, SheetRow } from '@/lib/pmi/types';
 
 const PROJECT_ID = DEFAULT_PROJECT_ID;
 
-/** Vercel builds from `app/package.json` may mount the app under `/app`. */
-function appBasePath(): string {
-  if (typeof window === 'undefined') return '';
-  return window.location.pathname.startsWith('/app') ? '/app' : '';
-}
-
 function apiRoot(): string {
-  return `${appBasePath()}/api/projects/${PROJECT_ID}`;
+  const prefix = process.env.NEXT_PUBLIC_API_PREFIX ?? '';
+  return `${prefix}/api/projects/${PROJECT_ID}`;
 }
 
 type DraftRow = ParsedAssignment & { draftId: string };
