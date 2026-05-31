@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * BL2-0: проверка GOOGLE_* (Service Account) и SALUTESPEECH_* из env.
+ * BL2-0: проверка GOOGLE_* (OAuth client) и SALUTESPEECH_* из env.
  * Запуск: npm run verify:bl2-secrets  (читает app/.env.local если есть)
  */
 import { readFileSync, existsSync } from "node:fs";
@@ -33,7 +33,6 @@ function loadEnvLocal() {
 
 loadEnvLocal();
 
-
 const SALUTE_OAUTH_URL =
   "https://ngw.devices.sberbank.ru:9443/api/v2/oauth";
 
@@ -50,10 +49,6 @@ function requireEnv(name) {
   const v = process.env[name]?.trim();
   if (!v) fail(`Missing env: ${name}`);
   return v;
-}
-
-function normalizePrivateKey(raw) {
-  return raw.replace(/\\n/g, "\n");
 }
 
 async function verifySaluteSpeech() {
@@ -98,54 +93,56 @@ async function verifySaluteSpeech() {
   ok(`SaluteSpeech: access token OK (scope=${scope})`);
 }
 
-async function verifyGoogleServiceAccount() {
-  const email = requireEnv("GOOGLE_SERVICE_ACCOUNT_EMAIL");
-  const privateKey = normalizePrivateKey(requireEnv("GOOGLE_PRIVATE_KEY"));
+function verifyGoogleOAuthConfig() {
+  const clientId = requireEnv("GOOGLE_CLIENT_ID");
+  requireEnv("GOOGLE_CLIENT_SECRET");
+  const redirectUri = requireEnv("GOOGLE_REDIRECT_URI");
 
-  const { JWT } = await import("google-auth-library");
-  const client = new JWT({
-    email,
-    key: privateKey,
-    scopes: [
-      "https://www.googleapis.com/auth/spreadsheets",
-      "https://www.googleapis.com/auth/drive.file",
-    ],
-  });
-
-  const token = await client.getAccessToken();
-  if (!token.token) {
-    fail("Google SA: empty access token");
-    return;
-  }
-  ok(`Google SA: access token OK (${email})`);
-
-  const sheetId = process.env.GOOGLE_SHEET_ID?.trim();
-  if (!sheetId) {
+  if (!clientId.includes(".apps.googleusercontent.com")) {
     console.log(
-      "  (optional) Set GOOGLE_SHEET_ID to test read access to a shared sheet",
+      "  (warn) GOOGLE_CLIENT_ID does not look like a Google OAuth client id",
     );
+  }
+
+  try {
+    const url = new URL(redirectUri);
+    if (!["http:", "https:"].includes(url.protocol)) {
+      fail("GOOGLE_REDIRECT_URI must be http or https");
+      return;
+    }
+  } catch {
+    fail("GOOGLE_REDIRECT_URI is not a valid URL");
     return;
   }
 
-  const { google } = await import("googleapis");
-  const sheets = google.sheets({ version: "v4", auth: client });
-  const meta = await sheets.spreadsheets.get({
-    spreadsheetId: sheetId,
-    fields: "properties.title",
-  });
-  ok(`Google Sheet read OK: "${meta.data.properties?.title ?? sheetId}"`);
+  ok(
+    `Google OAuth: env OK (client=${clientId.slice(0, 20)}…, redirect=${redirectUri})`,
+  );
+  console.log(
+    "  (note) Full OAuth consent is verified after BL2-0 implements /api/auth/google",
+  );
 }
 
 async function main() {
   console.log("BL2-0 secrets verification\n");
 
-  const hasGoogle =
+  const hasGoogleOAuth =
+    process.env.GOOGLE_CLIENT_ID &&
+    process.env.GOOGLE_CLIENT_SECRET &&
+    process.env.GOOGLE_REDIRECT_URI;
+  const hasLegacySa =
     process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
     process.env.GOOGLE_PRIVATE_KEY;
   const hasSalute =
     process.env.SALUTESPEECH_CLIENT_ID && process.env.SALUTESPEECH_SECRET;
 
-  if (!hasSalute && !hasGoogle) {
+  if (hasLegacySa) {
+    fail(
+      "GOOGLE_SERVICE_ACCOUNT_* is deprecated. Use GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI (see docs/plans/BL2-0_SECRETS_SETUP.md).",
+    );
+  }
+
+  if (!hasSalute && !hasGoogleOAuth) {
     fail(
       "No BL2 secrets found. Copy app/.env.example → app/.env.local and fill values.",
     );
@@ -162,14 +159,14 @@ async function main() {
     console.log("⊘ SaluteSpeech: skipped (SALUTESPEECH_* not set)");
   }
 
-  if (hasGoogle) {
+  if (hasGoogleOAuth) {
     try {
-      await verifyGoogleServiceAccount();
+      verifyGoogleOAuthConfig();
     } catch (e) {
-      fail(`Google SA: ${e instanceof Error ? e.message : String(e)}`);
+      fail(`Google OAuth: ${e instanceof Error ? e.message : String(e)}`);
     }
   } else {
-    console.log("⊘ Google SA: skipped (GOOGLE_SERVICE_ACCOUNT_* not set)");
+    console.log("⊘ Google OAuth: skipped (GOOGLE_CLIENT_* not set)");
   }
 
   if (process.exitCode) {

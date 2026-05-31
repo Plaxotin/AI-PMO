@@ -48,19 +48,27 @@ npm run dev
 curl -s "http://localhost:3000/api/projects/00000000-0000-4000-8000-000000000001/assignments" | jq
 ```
 
-## BL-6 / BL2-0 (Google Sheets + SaluteSpeech)
+## BL-6 / BL2-0 (Google OAuth + SaluteSpeech)
 
-Пошаговая настройка Service Account, доступа к Sheet и SaluteSpeech: **`docs/plans/BL2-0_SECRETS_SETUP.md`**.
-
-Проверка после заполнения `app/.env.local`:
+Пошаговая настройка OAuth Client, SaluteSpeech и проверка env: **`docs/plans/BL2-0_SECRETS_SETUP.md`**.
 
 ```bash
 cd app && npm run verify:bl2-secrets
 ```
 
-## LLM
+Ожидается: SaluteSpeech token OK; Google OAuth env заданы (полный consent — при первом входе в BL2-0 UI).
 
-См. `LLM_API_KEY` в `app/.env.example` и `docs/specs/ADR-BL-18-02-production-decisions.md` §3.
+## LLM (BL-6 smart-input, BL-18 письма)
+
+Контракт env — `docs/specs/ADR-BL-18-02-production-decisions.md` §3. Ключ API **всегда** называется `LLM_API_KEY`; для Kimi дополнительно `LLM_PROVIDER=kimi`, `LLM_API_BASE_URL`, `LLM_MODEL_ID` (см. `app/.env.example`).
+
+| Куда | Имя переменной |
+|------|----------------|
+| **Cursor Cloud** → Cloud Agents → Secrets | `LLM_API_KEY` (без `NEXT_PUBLIC_`) |
+| **Локально** → `app/.env.local` | `LLM_API_KEY=...` |
+| **Vercel** → Environment Variables проекта `app/` | `LLM_API_KEY` |
+
+`KIMI_API_KEY` приложение **не читает** — используйте `LLM_API_KEY`.
 
 ## Деплой
 

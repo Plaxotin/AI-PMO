@@ -141,7 +141,7 @@
 
 | Область | Требование |
 |---------|------------|
-| Авторизация | **Google OAuth 2.0** или **Service Account** с доступом к Sheet. |
+| Авторизация | **Google OAuth 2.0** — доступ к Sheets/Drive **от имени пользователя** (вход перед первым использованием; refresh-токен в сессии приложения). Service Account **не используется**. |
 | STT-провайдер | **SaluteSpeech (Сбер)** — данные в контуре РФ. |
 | LLM | Минимизация данных: только текст ввода / транскрипт + контекст мероприятия. |
 | Медиафайлы | Не хранятся. tmp → STT → удалить. |
@@ -412,7 +412,7 @@ BL1-0 — `verified` (Zod-типы, миграции). Код остаётся �
 - STT pipeline: SaluteSpeech + ffmpeg для видео.
 - Диктовка: Web Speech API (клиентская).
 
-**Env:** `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY`, `LLM_API_KEY`, `SALUTESPEECH_CLIENT_ID`, `SALUTESPEECH_SECRET` (см. `docs/plans/BL2-0_SECRETS_SETUP.md`).
+**Env:** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` (OAuth 2.0); `LLM_API_KEY`; `SALUTESPEECH_CLIENT_ID`, `SALUTESPEECH_SECRET` (см. `docs/plans/BL2-0_SECRETS_SETUP.md`). Access/refresh-токены пользователя — только в сессии приложения, не в env.
 
 **Критерий готовности:**
 
@@ -431,7 +431,7 @@ BL1-0 — `verified` (Zod-типы, миграции). Код остаётся �
 
 | Поле | Значение |
 |------|----------|
-| **setup** | Service Account; SaluteSpeech credentials; LLM API key; тестовые mp3/mp4; `npm run dev`. |
+| **setup** | OAuth 2.0 Client (Google Cloud); тестовый Google-аккаунт с пройденным consent; SaluteSpeech credentials; LLM API key; тестовые mp3/mp4; `npm run dev`. |
 | **actions** | 1) Открыть BL-6 → проверить авто-создание Sheet. 2) Smart-input «Петров — ТЗ к 3 июня, важно, с летучки» → проверить edit-mode строку → ✓. 3) Smart-input «обновить документацию» → ✓. 4) 📎 mp3 совещания → дождаться строк → ✓ на 2, ✗ на 1. 5) 📎 mp4 → тот же flow. 6) Файл > 500 МБ. 7) Открыть Google Sheet — проверить строки. 8) Изменить строку в Google Sheets → refresh → проверить. 9) Фильтр ▾ по статусу. 10) «Подключить свой реестр» → проверить замену. |
 | **expected** | Авто-таблица создана; текст → корректный LLM-разбор; файл → STT → N строк; ✓ → в Sheet, ✗ → нет; > 500 МБ → отказ; фильтры работают; замена реестра работает. |
 | **evidence** | Скриншот/видео UI; Google Sheet до и после; tmp пуст через 60 с. |
@@ -520,7 +520,7 @@ BL2-0 (единый экран + Sheets + smart-input + AI-инжест файл
 
 - **Приложение:** Next.js (App Router), React, TypeScript — каталог `app/`.
 - **Реестр:** Google Sheets API v4 (`googleapis` npm).
-- **Auth к Sheet:** Google Service Account (MVP); OAuth 2.0 (бэклог).
+- **Auth к Sheet:** Google OAuth 2.0 (scopes: spreadsheets, drive.file — уточнить при BL2-0).
 - **STT:** SaluteSpeech; ffmpeg для видео.
 - **LLM:** slot-filling текста и транскриптов.
 - **Диктовка:** Web Speech API (клиент).
@@ -533,8 +533,8 @@ BL2-0 (единый экран + Sheets + smart-input + AI-инжест файл
 
 | # | Шаг | Когда |
 |---|-----|-------|
-| 1 | Создать Google Service Account | До BL2-0 |
-| 2 | Секреты в Cursor Dashboard (GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY, LLM API key) | До BL2-0 |
+| 1 | Создать OAuth 2.0 Client в Google Cloud Console (Web application; redirect URI для dev/prod) | До BL2-0 |
+| 2 | Секреты в Cursor Dashboard (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, LLM API key) | До BL2-0 |
 | 3 | SaluteSpeech sandbox credentials | До BL2-0 |
 | 4 | Telegram Bot Token + webhook URL | До BL2-1 |
 
@@ -553,9 +553,10 @@ BL2-0 (единый экран + Sheets + smart-input + AI-инжест файл
 
 ## 16. Открытые вопросы
 
+**Закрыто:** выбор auth-модели для Google Sheets — **OAuth 2.0** (см. `docs/specs/BL6_PRODUCT_DECISIONS.md` §7).
+
 | Вопрос | Кто решает | Когда |
 |--------|-----------|-------|
-| Service Account vs OAuth для Google Sheets | Product/Tech | До BL2-0 |
 | Формат Telegram-напоминаний | Product | До BL2-1 |
 | Нужна ли поддержка нескольких таблиц | Product | После MVP |
 

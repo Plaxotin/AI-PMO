@@ -1,84 +1,72 @@
-# BL2-0 — настройка секретов (Google Sheets + SaluteSpeech)
+# BL2-0 — настройка секретов (Google OAuth + SaluteSpeech)
 
 **Репозиторий:** `Plaxotin/AI-PMO`  
 **Спека:** `docs/specs/SPEC-BL-6-assignments-admin-v2.2.md` §14, фаза BL2-0  
-**Приложение:** каталог `app/` (Vercel root directory = `app`)
+**Решение:** Google Sheets — **OAuth 2.0** (см. `docs/specs/BL6_PRODUCT_DECISIONS.md` §7). Service Account **не используется**.
 
-Пошаговая настройка для п.1 (Google) и п.2 (SaluteSpeech) из чеклиста подготовки. Секреты **не коммитить** — только Cursor Cloud Secrets, Vercel и локальный `app/.env.local`.
+Пошаговая настройка п.1–3 чеклиста подготовки. Секреты **не коммитить** — только Cursor Cloud Secrets, Vercel и `app/.env.local`.
 
 ---
 
-## Куда класть переменные (все три места)
+## Куда класть переменные
 
-| Переменная | Cursor Cloud → Secrets | `app/.env.local` | Vercel (проект `app/`) |
-|------------|------------------------|------------------|-------------------------|
-| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | да | да | да |
-| `GOOGLE_PRIVATE_KEY` | да | да | да |
+| Переменная | Cursor Cloud → Secrets | `app/.env.local` | Vercel (`app/`) |
+|------------|------------------------|------------------|-----------------|
+| `GOOGLE_CLIENT_ID` | да | да | да |
+| `GOOGLE_CLIENT_SECRET` | да | да | да |
+| `GOOGLE_REDIRECT_URI` | да | да | да |
 | `SALUTESPEECH_CLIENT_ID` | да | да | да |
 | `SALUTESPEECH_SECRET` | да | да | да |
-| `LLM_API_KEY` | да (уже есть) | да | да |
+| `LLM_API_KEY` | да | да | да |
 
-Опционально для проверки доступа к **уже созданной** таблице:
-
-| `GOOGLE_SHEET_ID` | ID из URL `https://docs.google.com/spreadsheets/d/<ID>/edit` |
+Access/refresh-токены Google после входа пользователя хранятся **в сессии приложения** (cookie/БД), не в Cursor/Vercel env.
 
 ---
 
-## 1. Google Service Account + Sheets API
+## 1. Google OAuth 2.0 Client
 
-### 1.1 Проект и API в Google Cloud Console
+### 1.1 Проект и API
 
-1. Откройте [Google Cloud Console](https://console.cloud.google.com/).
-2. Создайте проект (или выберите существующий) — запомните **Project ID**.
-3. **APIs & Services → Library** → найдите и включите:
+1. [Google Cloud Console](https://console.cloud.google.com/) → проект.
+2. **APIs & Services → Library** → включить:
    - **Google Sheets API**
-   - **Google Drive API** (нужен для создания файлов таблицы по шаблону в BL2-0)
+   - **Google Drive API** (создание таблицы по шаблону в `sheets/init`)
 
-### 1.2 Service Account
+### 1.2 OAuth consent screen
 
-1. **IAM & Admin → Service Accounts → Create service account**.
-2. Имя, например: `ai-pmo-bl6-sheets`.
-3. Роль на уровне проекта для старта достаточно минимальной (доступ к Sheet идёт через **шаринг**, не через Owner). Можно оставить без роли или `Editor` только если создаёте таблицы через API в Drive SA.
-4. **Keys → Add key → Create new key → JSON** — скачайте файл **один раз** (повторно ключ не покажут).
+1. **APIs & Services → OAuth consent screen**.
+2. Тип: **External** (тест) или **Internal** (Google Workspace).
+3. Добавьте scopes (ориентир BL2-0):
+   - `https://www.googleapis.com/auth/spreadsheets`
+   - `https://www.googleapis.com/auth/drive.file`
+4. В **Test users** добавьте Google-аккаунты пилота (пока приложение в Testing).
 
-Из JSON-файла понадобятся:
+### 1.3 OAuth Client ID
 
-| Поле в JSON | Env |
-|-------------|-----|
-| `client_email` | `GOOGLE_SERVICE_ACCOUNT_EMAIL` |
-| `private_key` | `GOOGLE_PRIVATE_KEY` |
+1. **Credentials → Create credentials → OAuth client ID**.
+2. Тип: **Web application**.
+3. **Authorized redirect URIs** (примеры):
 
-### 1.3 Права на Google Sheet
+| Среда | URI |
+|-------|-----|
+| Локально | `http://localhost:3000/api/auth/google/callback` |
+| Vercel preview/prod | `https://<your-app>.vercel.app/api/auth/google/callback` |
 
-Service Account **не видит** таблицы, пока вы не выдали доступ его email (вид `xxx@xxx.iam.gserviceaccount.com`).
+Имя пути callback уточняется при реализации BL2-0; **до кода** зафиксируйте один URI в `GOOGLE_REDIRECT_URI` и добавьте его в GCP.
 
-**Вариант A — тестовая таблица вручную**
+4. Скопируйте **Client ID** и **Client secret** → env.
 
-1. Создайте Google Sheet (или откройте [шаблон PMI](https://docs.google.com/spreadsheets/d/1BVD8pfu6avCFkpf1gR71cZkbHOH0V_bsNHkEa5hm998/edit)).
-2. **Share** → добавьте `GOOGLE_SERVICE_ACCOUNT_EMAIL` с ролью **Editor**.
-3. Скопируйте ID таблицы из URL в `GOOGLE_SHEET_ID` (для проверки скриптом).
-
-**Вариант B — таблицы создаёт приложение (BL2-0)**
-
-После реализации `sheets/init` таблицы будут создаваться от имени SA; владелец файла — service account. Для пилота с «личным» Drive пользователя позже потребуется **OAuth 2.0** (см. черновик в ветке `cursor/oauth-bl6-spec-fd7f` / PR #28).
-
-### 1.4 Формат `GOOGLE_PRIVATE_KEY` в env
-
-В JSON ключ многострочный. В Vercel / Cursor вставляйте **в одну строку**, заменив переносы на `\n`:
+### 1.4 Env
 
 ```env
-GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----\n"
+GOOGLE_CLIENT_ID=....apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-...
+GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
 ```
 
-В `app/.env.local` допустимы и реальные переносы в кавычках — главное, чтобы в рантайме ключ парсился с `\n` → перевод строки.
+### 1.5 Миграция с Service Account
 
-### 1.5 Пример `app/.env.local` (фрагмент)
-
-```env
-GOOGLE_SERVICE_ACCOUNT_EMAIL=ai-pmo-bl6@your-project.iam.gserviceaccount.com
-GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-GOOGLE_SHEET_ID=1BVD8pfu6avCFkpf1gR71cZkbHOH0V_bsNHkEa5hm998
-```
+Если ранее настраивали `GOOGLE_SERVICE_ACCOUNT_EMAIL` / `GOOGLE_PRIVATE_KEY` — **удалите** их из Cursor/Vercel и замените на три переменные OAuth выше.
 
 ---
 
@@ -86,20 +74,8 @@ GOOGLE_SHEET_ID=1BVD8pfu6avCFkpf1gR71cZkbHOH0V_bsNHkEa5hm998
 
 Документация: [Аутентификация SaluteSpeech](https://developers.sber.ru/docs/ru/salutespeech/api/authentication).
 
-### 2.1 Кабинет
-
-1. [developers.sber.ru](https://developers.sber.ru/) → вход (Сбер ID).
-2. **Studio** → создайте проект **SaluteSpeech API**.
-3. В настройках проекта / API возьмите **Client ID** и **Client Secret** (иногда показывают готовый Authorization key — нам нужны именно id и secret для env).
-
-### 2.2 Scope
-
-| Тип аккаунта | `SALUTESPEECH_SCOPE` |
-|--------------|----------------------|
-| Физлицо (личный проект) | `SALUTE_SPEECH_PERS` (по умолчанию) |
-| Юрлицо | `SALUTE_SPEECH_CORP` |
-
-### 2.3 Env
+1. [developers.sber.ru](https://developers.sber.ru/) → проект **SaluteSpeech API**.
+2. **Client ID** и **Client Secret** → env.
 
 ```env
 SALUTESPEECH_CLIENT_ID=...
@@ -107,39 +83,50 @@ SALUTESPEECH_SECRET=...
 # SALUTESPEECH_SCOPE=SALUTE_SPEECH_PERS
 ```
 
-Те же значения — в **Cursor Cloud Secrets** и **Vercel** (без `NEXT_PUBLIC_`).
+| Тип аккаунта | `SALUTESPEECH_SCOPE` |
+|--------------|----------------------|
+| Физлицо | `SALUTE_SPEECH_PERS` (по умолчанию) |
+| Юрлицо | `SALUTE_SPEECH_CORP` |
 
-### 2.4 Проверка токена
+---
 
-После заполнения `.env.local`:
+## 3. LLM
+
+См. `LLM_API_KEY` в `app/.env.example` и `docs/plans/BL1-0_ENV.md`.
+
+---
+
+## 4. Проверка
 
 ```bash
 cd app
+cp .env.example .env.local   # заполните значения
+npm install
 npm run verify:bl2-secrets
 ```
 
-Ожидается: `SaluteSpeech: access token OK` и `Google SA: access token OK` (если заданы Google-переменные).
+Ожидается:
+
+- `SaluteSpeech: access token OK`
+- `Google OAuth: env OK` (полный OAuth flow проверяется вручную после реализации `/api/auth/google`)
 
 ---
 
-## 3. Чеклист перед BL2-0
+## 5. Чеклист перед BL2-0
 
 - [ ] Sheets API + Drive API включены в GCP
-- [ ] Service Account создан, JSON-ключ сохранён в менеджере паролей (не в git)
-- [ ] `GOOGLE_SERVICE_ACCOUNT_EMAIL` и `GOOGLE_PRIVATE_KEY` в Cursor + Vercel + `.env.local`
-- [ ] Тестовый Sheet расшарен на email SA (или готовы к созданию таблицы через API)
-- [ ] `SALUTESPEECH_CLIENT_ID` и `SALUTESPEECH_SECRET` в Cursor + Vercel + `.env.local`
+- [ ] OAuth consent screen + test users
+- [ ] OAuth Web Client создан; redirect URI совпадает с `GOOGLE_REDIRECT_URI`
+- [ ] `GOOGLE_CLIENT_*` и `GOOGLE_REDIRECT_URI` в Cursor + Vercel + `.env.local`
+- [ ] `SALUTESPEECH_*` в Cursor + Vercel + `.env.local`
+- [ ] `LLM_API_KEY` (+ при Kimi: `LLM_PROVIDER`, `LLM_API_BASE_URL`, `LLM_MODEL_ID`)
 - [ ] `npm run verify:bl2-secrets` проходит
-- [ ] `LLM_API_KEY` уже настроен (см. `docs/plans/BL1-0_ENV.md`)
+- [ ] Старые `GOOGLE_SERVICE_ACCOUNT_*` удалены из секретов
 
 ---
 
-## 4. Ограничения Service Account (важно)
+## 6. Что проверить после реализации OAuth в коде
 
-| Сценарий v2.2 | Service Account | OAuth 2.0 пользователя |
-|---------------|-----------------|-------------------------|
-| Общая тестовая таблица, расшаренная на SA | да | да |
-| «Подключить свой реестр» (таблица пользователя) | только если пользователь шарит на SA | да, штатно |
-| Авто-создание таблицы в **личном** Drive пользователя | нет (файл будет у SA) | да |
-
-Для прод-пилота с личными таблицами планируется переход на OAuth (см. PR #28); текущий runbook закрывает **п.1–2 спеки §14** в варианте SA для старта разработки BL2-0.
+1. Вход через Google → consent → refresh-токен в сессии.
+2. `POST /api/projects/:id/sheets/init` создаёт таблицу в Drive **пользователя**.
+3. «Подключить свой реестр» работает без шаринга на service account.
