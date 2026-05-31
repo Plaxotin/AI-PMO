@@ -1,4 +1,7 @@
 import { NextRequest } from 'next/server';
+
+export const maxDuration = 300;
+export const runtime = 'nodejs';
 import { parseProjectId } from '@/lib/api/project';
 import { jsonWithAuth, withAuth } from '@/lib/api/route-helpers';
 import { apiError } from '@/lib/assignments/errors';

@@ -1,9 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "nextjs",
-  "rootDirectory": "app",
-  "buildCommand": "npm run build",
-  "installCommand": "npm install",
+  "version": 2,
+  "builds": [
+    {
+      "src": "app/package.json",
+      "use": "@vercel/next"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

@@ -1,0 +1,9 @@
+{
+  "name": "ai-pmo",
+  "private": true,
+  "description": "AI PMO monorepo: static landing + Next.js app in app/",
+  "scripts": {
+    "build": "npm run build --prefix app",
+    "vercel-build": "npm run build --prefix app"
+  }
+}
