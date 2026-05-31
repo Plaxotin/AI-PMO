@@ -17,6 +17,9 @@
 | `GOOGLE_REDIRECT_URI` | да | да | да |
 | `SALUTESPEECH_CLIENT_ID` | да | да | да |
 | `SALUTESPEECH_SECRET` | да | да | да |
+| `LLM_PROVIDER` | да | да | да |
+| `LLM_API_BASE_URL` | да | да | да |
+| `LLM_MODEL_ID` | да | да | да |
 | `LLM_API_KEY` | да | да | да |
 
 Access/refresh-токены Google после входа пользователя хранятся **в сессии приложения** (cookie/БД), не в Cursor/Vercel env.
@@ -90,9 +93,20 @@ SALUTESPEECH_SECRET=...
 
 ---
 
-## 3. LLM
+## 3. LLM (Moonshot Kimi — зафиксировано для BL2-0)
 
-См. `LLM_API_KEY` в `app/.env.example` и `docs/plans/BL1-0_ENV.md`.
+Решение Product: **`moonshot-v1-8k`** на [api.moonshot.ai](https://api.moonshot.ai/v1). Подробности — `docs/specs/BL6_PRODUCT_DECISIONS.md` §8.
+
+| Переменная | Значение |
+|------------|----------|
+| `LLM_PROVIDER` | `kimi` |
+| `LLM_API_BASE_URL` | `https://api.moonshot.ai/v1` |
+| `LLM_MODEL_ID` | `moonshot-v1-8k` |
+| `LLM_API_KEY` | [platform.moonshot.ai → API Keys](https://platform.moonshot.ai/console/api-keys) |
+
+Те же четыре имени — в **Cursor Secrets** и **Vercel** (`app/`).
+
+Для длинных транскриптов совещаний (📎) при необходимости: `moonshot-v1-32k` или `moonshot-v1-128k` (проверка: `curl.exe "https://api.moonshot.ai/v1/models" -H "Authorization: Bearer …"`).
 
 ---
 
@@ -119,7 +133,7 @@ npm run verify:bl2-secrets
 - [ ] OAuth Web Client создан; redirect URI совпадает с `GOOGLE_REDIRECT_URI`
 - [ ] `GOOGLE_CLIENT_*` и `GOOGLE_REDIRECT_URI` в Cursor + Vercel + `.env.local`
 - [ ] `SALUTESPEECH_*` в Cursor + Vercel + `.env.local`
-- [ ] `LLM_API_KEY` (+ при Kimi: `LLM_PROVIDER`, `LLM_API_BASE_URL`, `LLM_MODEL_ID`)
+- [ ] LLM: `LLM_PROVIDER=kimi`, `LLM_API_BASE_URL`, `LLM_MODEL_ID=moonshot-v1-8k`, `LLM_API_KEY`
 - [ ] `npm run verify:bl2-secrets` проходит
 - [ ] Старые `GOOGLE_SERVICE_ACCOUNT_*` удалены из секретов
 
