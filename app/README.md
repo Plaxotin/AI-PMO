@@ -1,13 +1,12 @@
 # AI PMO — приложение (Next.js)
 
-Реестр поручений (BL-1). Фаза **BL1-0**: контракты Zod, миграция v1, скелет REST API.
+Реестр поручений **BL-6 v2.2** (фаза **BL2-0**): Google OAuth, Google Sheets PMI, smart-input, LLM, SaluteSpeech инжест.
 
-## BL1-0 scope
+## Маршруты
 
-- `GET/POST` `/api/projects/:projectId/assignments`
-- `GET/PATCH` `/api/projects/:projectId/assignments/:assignmentId`
-- Таблицы: `projects`, `assignments`, `assignment_status_events`
-- Без Telegram, инжеста, STT (см. `docs/plans/ASSIGNMENTS_ADMIN_CURSOR_PLAN.md` — этапы после реестра)
+- UI: `/assignments` — единый экран (smart-input + таблица + edit-mode)
+- OAuth: `/api/auth/google`, `/api/auth/google/callback`
+- API: `/api/projects/:projectId/sheets/*`, `/assignments`, `/assignments/parse`, `/ingest`
 
 ## Команды
 
@@ -15,16 +14,14 @@
 npm install
 npm run dev          # http://localhost:3000
 npm run build
-npm test             # Vitest — Zod-контракты
+npm test
+npm run verify:bl2-secrets
 ```
 
-Переменные окружения: **`docs/plans/BL1-0_ENV.md`**.
+Секреты: `docs/plans/BL2-0_SECRETS_SETUP.md`, `docs/plans/BL1-0_ENV.md`.
 
-## Структура
+**Приёмка (prod):** https://ai-pmo-tawny.vercel.app/assignments
 
-- `src/lib/assignments/` — Zod-схемы и коды ошибок API
-- `src/lib/db/` — доступ к Postgres (`DATABASE_URL`)
-- `src/lib/auth/` — скелет Supabase session
-- `src/app/api/projects/[projectId]/assignments/` — route handlers
+## Деплой
 
-Миграции SQL: `../supabase/migrations/`.
+Корневой `vercel.json` указывает `rootDirectory: "app"`. Лендинг в корне репозитория (`index.html`) — отдельный статический артефакт; прод-приложение BL-6 — Next.js из `app/`.
