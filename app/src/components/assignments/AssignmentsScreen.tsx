@@ -5,7 +5,16 @@ import { DEFAULT_PROJECT_ID } from '@/lib/config';
 import type { ParsedAssignment, SheetRow } from '@/lib/pmi/types';
 
 const PROJECT_ID = DEFAULT_PROJECT_ID;
-const API = `/api/projects/${PROJECT_ID}`;
+
+/** Vercel builds from `app/package.json` may mount the app under `/app`. */
+function appBasePath(): string {
+  if (typeof window === 'undefined') return '';
+  return window.location.pathname.startsWith('/app') ? '/app' : '';
+}
+
+function apiRoot(): string {
+  return `${appBasePath()}/api/projects/${PROJECT_ID}`;
+}
 
 type DraftRow = ParsedAssignment & { draftId: string };
 
@@ -79,7 +88,7 @@ export default function AssignmentsScreen() {
 
   const refresh = useCallback(async () => {
     setError(null);
-    const statusRes = await fetch(`${API}/sheets/status`);
+    const statusRes = await fetch(`${apiRoot()}/sheets/status`);
     const status = await statusRes.json();
     setGoogleSignedIn(Boolean(status.google_signed_in));
     setConnected(Boolean(status.connected));
@@ -91,7 +100,7 @@ export default function AssignmentsScreen() {
     }
 
     if (!status.connected) {
-      const initRes = await fetch(`${API}/sheets/init`, { method: 'POST' });
+      const initRes = await fetch(`${apiRoot()}/sheets/init`, { method: 'POST' });
       if (!initRes.ok) {
         const err = await initRes.json();
         setError(err?.error?.message ?? 'Не удалось создать таблицу');
@@ -103,7 +112,7 @@ export default function AssignmentsScreen() {
       setConnected(true);
     }
 
-    const listRes = await fetch(`${API}/assignments`);
+    const listRes = await fetch(`${apiRoot()}/assignments`);
     const list = await listRes.json();
     if (listRes.ok) {
       setRows(list.data ?? []);
@@ -151,7 +160,7 @@ export default function AssignmentsScreen() {
     setProgress('Разбор текста…');
     setError(null);
     try {
-      const res = await fetch(`${API}/assignments/parse`, {
+      const res = await fetch(`${apiRoot()}/assignments/parse`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
@@ -173,7 +182,7 @@ export default function AssignmentsScreen() {
 
   async function saveDraft(draft: DraftRow) {
     setError(null);
-    const res = await fetch(`${API}/assignments`, {
+    const res = await fetch(`${apiRoot()}/assignments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(draft),
@@ -203,7 +212,7 @@ export default function AssignmentsScreen() {
     const form = new FormData();
     form.append('file', file);
     try {
-      const res = await fetch(`${API}/ingest`, { method: 'POST', body: form });
+      const res = await fetch(`${apiRoot()}/ingest`, { method: 'POST', body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error?.message ?? 'Ошибка инжеста');
 
@@ -222,7 +231,7 @@ export default function AssignmentsScreen() {
   async function pollJob(jobId: string) {
     for (let i = 0; i < 120; i++) {
       setProgress('Обработка файла…');
-      const res = await fetch(`${API}/ingest/${jobId}`);
+      const res = await fetch(`${apiRoot()}/ingest/${jobId}`);
       const data = await res.json();
       if (data.stage) setProgress(data.stage);
       if (data.status === 'done' && data.drafts) {
@@ -269,7 +278,7 @@ export default function AssignmentsScreen() {
 
   async function connectOwnSheet() {
     setError(null);
-    const res = await fetch(`${API}/sheets/connect`, {
+    const res = await fetch(`${apiRoot()}/sheets/connect`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ spreadsheet_url: connectUrl }),
