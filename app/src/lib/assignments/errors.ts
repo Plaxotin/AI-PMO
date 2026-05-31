@@ -9,7 +9,13 @@ export type ApiErrorCode =
   | 'NOT_IMPLEMENTED'
   | 'PROJECT_MISMATCH'
   | 'INTERNAL_ERROR'
-  | 'DATABASE_UNAVAILABLE';
+  | 'DATABASE_UNAVAILABLE'
+  | 'GOOGLE_NOT_CONNECTED'
+  | 'SHEETS_NOT_CONNECTED'
+  | 'SHEETS_API_ERROR'
+  | 'LLM_ERROR'
+  | 'STT_ERROR'
+  | 'INGEST_ERROR';
 
 export type ApiErrorBody = {
   error: {
@@ -47,9 +53,5 @@ export function validationError(zodError: ZodError): NextResponse<ApiErrorBody> 
 }
 
 export function notImplemented(feature: string): NextResponse<ApiErrorBody> {
-  return apiError(
-    'NOT_IMPLEMENTED',
-    `Функция «${feature}» будет реализована в фазе BL1-1`,
-    501,
-  );
+  return apiError('NOT_IMPLEMENTED', `Функция «${feature}» не реализована`, 501);
 }

@@ -1,82 +1,106 @@
 import { NextRequest } from 'next/server';
 import {
-  assignmentListQuerySchema,
-  createAssignmentBodySchema,
-} from '@/lib/assignments/types';
-import {
-  apiError,
-  validationError,
-  notImplemented,
-} from '@/lib/assignments/errors';
+  requireGoogleSession,
+  requireSheetConnection,
+} from '@/lib/api/google-route-helpers';
+import { apiError, validationError } from '@/lib/assignments/errors';
 import { parseProjectId } from '@/lib/api/project';
 import { jsonWithAuth, withAuth } from '@/lib/api/route-helpers';
-import { listAssignments } from '@/lib/db/assignments';
+import { createPmiRowBodySchema } from '@/lib/pmi/types';
+import { appendRow, listAssignmentRows } from '@/lib/google/sheets';
 
 type RouteContext = { params: Promise<{ projectId: string }> };
 
-export async function GET(request: NextRequest, context: RouteContext) {
+export async function GET(_request: NextRequest, context: RouteContext) {
   const authResult = await withAuth();
-  if (!authResult.ok) {
-    return authResult.response;
-  }
+  if (!authResult.ok) return authResult.response;
 
   const { projectId } = await context.params;
   const project = parseProjectId(projectId);
-  if (!project.ok) {
-    return project.response;
-  }
+  if (!project.ok) return project.response;
 
-  const queryParams = Object.fromEntries(request.nextUrl.searchParams);
-  const parsedQuery = assignmentListQuerySchema.safeParse(queryParams);
-  if (!parsedQuery.success) {
-    return validationError(parsedQuery.error);
-  }
+  const google = await requireGoogleSession();
+  if (!google.ok) return google.response;
 
-  const result = await listAssignments(project.projectId, parsedQuery.data);
-  if (!result) {
+  const sheetCheck = requireSheetConnection(google.session);
+  if (!sheetCheck.ok) {
     return jsonWithAuth(
       {
         data: [],
         meta: {
           total: 0,
-          limit: parsedQuery.data.limit,
-          offset: parsedQuery.data.offset,
+          spreadsheet_url: null,
+          connected: false,
         },
       },
       { auth: authResult.auth },
     );
   }
 
-  return jsonWithAuth(result, { auth: authResult.auth });
+  try {
+    const data = await listAssignmentRows(
+      google.auth,
+      sheetCheck.sheet.spreadsheetId,
+    );
+    return jsonWithAuth(
+      {
+        data,
+        meta: {
+          total: data.length,
+          spreadsheet_url: sheetCheck.sheet.spreadsheetUrl,
+          connected: true,
+        },
+      },
+      { auth: authResult.auth },
+    );
+  } catch (e) {
+    return apiError(
+      'SHEETS_API_ERROR',
+      e instanceof Error ? e.message : 'Ошибка чтения Google Sheet',
+      502,
+    );
+  }
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
   const authResult = await withAuth();
-  if (!authResult.ok) {
-    return authResult.response;
-  }
+  if (!authResult.ok) return authResult.response;
 
   const { projectId } = await context.params;
   const project = parseProjectId(projectId);
-  if (!project.ok) {
-    return project.response;
-  }
+  if (!project.ok) return project.response;
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
+    return apiError('VALIDATION_ERROR', 'Тело запроса должно быть JSON', 400);
+  }
+
+  const parsed = createPmiRowBodySchema.safeParse(body);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const google = await requireGoogleSession();
+  if (!google.ok) return google.response;
+
+  const sheetCheck = requireSheetConnection(google.session);
+  if (!sheetCheck.ok) return sheetCheck.response;
+
+  try {
+    const { row_number } = await appendRow(
+      google.auth,
+      sheetCheck.sheet.spreadsheetId,
+      parsed.data,
+    );
+    return jsonWithAuth(
+      { ok: true, row_number },
+      { auth: authResult.auth, status: 201 },
+    );
+  } catch (e) {
     return apiError(
-      'VALIDATION_ERROR',
-      'Тело запроса должно быть JSON',
-      400,
+      'SHEETS_API_ERROR',
+      e instanceof Error ? e.message : 'Ошибка записи в Google Sheet',
+      502,
     );
   }
-
-  const parsedBody = createAssignmentBodySchema.safeParse(body);
-  if (!parsedBody.success) {
-    return validationError(parsedBody.error);
-  }
-
-  return notImplemented('POST /assignments (создание поручения)');
 }
