@@ -7,6 +7,9 @@
       "use": "@vercel/next"
     }
   ],
+  "routes": [
+    { "src": "/(.*)", "dest": "/app/$1" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
