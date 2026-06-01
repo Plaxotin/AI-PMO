@@ -3,12 +3,31 @@ import { mkdtemp, unlink, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join, extname } from 'path';
 
+import { DOCUMENT_EXT, isDocumentExtension } from '@/lib/ingest/documents';
+
 const AUDIO_EXT = new Set(['.mp3', '.m4a', '.ogg', '.wav', '.opus']);
 const VIDEO_EXT = new Set(['.mp4', '.mov', '.webm', '.mkv']);
+const MEDIA_EXT = new Set([...AUDIO_EXT, ...VIDEO_EXT]);
+/** Legacy Word — отклоняем с подсказкой сохранить как .docx */
+const DOC_LEGACY_EXT = new Set(['.doc']);
+
 const MAX_BYTES = 500 * 1024 * 1024;
 const ASYNC_THRESHOLD = 25 * 1024 * 1024;
 
-export const ALLOWED_EXTENSIONS: string[] = [...AUDIO_EXT, ...VIDEO_EXT];
+export const ALLOWED_EXTENSIONS: string[] = [
+  ...MEDIA_EXT,
+  ...DOCUMENT_EXT,
+  ...DOC_LEGACY_EXT,
+];
+
+export function isMediaExtension(ext: string): boolean {
+  return MEDIA_EXT.has(ext.toLowerCase());
+}
+
+export function isIngestExtension(ext: string): boolean {
+  const e = ext.toLowerCase();
+  return MEDIA_EXT.has(e) || isDocumentExtension(e) || DOC_LEGACY_EXT.has(e);
+}
 
 export function validateIngestFile(
   name: string,
@@ -21,10 +40,18 @@ export function validateIngestFile(
     };
   }
   const ext = extname(name).toLowerCase();
-  if (!ALLOWED_EXTENSIONS.includes(ext)) {
+  if (!isIngestExtension(ext)) {
     return {
       ok: false,
-      message: `Формат не поддерживается. Допустимо: ${ALLOWED_EXTENSIONS.join(', ')}`,
+      message:
+        'Формат не поддерживается. Допустимо: аудио/видео (.mp3, .mp4, …), протокол Word (.docx), .txt',
+    };
+  }
+  if (ext === '.doc') {
+    return {
+      ok: false,
+      message:
+        'Формат .doc не поддерживается. Откройте файл в Word и сохраните как .docx.',
     };
   }
   return { ok: true };
@@ -49,7 +76,7 @@ export async function extractAudioPath(
   inputPath: string,
   ext: string,
 ): Promise<string> {
-  if (AUDIO_EXT.has(ext)) return inputPath;
+  if (AUDIO_EXT.has(ext.toLowerCase())) return inputPath;
 
   const outPath = inputPath.replace(/\.[^.]+$/, '.mp3');
   await runFfmpeg(['-i', inputPath, '-vn', '-acodec', 'libmp3lame', '-y', outPath]);

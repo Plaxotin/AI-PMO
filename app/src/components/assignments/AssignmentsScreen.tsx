@@ -452,7 +452,7 @@ export default function AssignmentsScreen() {
               ref={fileRef}
               type="file"
               className="hidden"
-              accept=".mp3,.m4a,.ogg,.wav,.opus,.mp4,.mov,.webm,.mkv"
+              accept=".mp3,.m4a,.ogg,.wav,.opus,.mp4,.mov,.webm,.mkv,.docx,.txt,.doc"
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) void handleFile(f);
@@ -468,7 +468,7 @@ export default function AssignmentsScreen() {
             </button>
           </div>
           <p className="mt-2 text-xs text-slate-500">
-            На Vercel загрузка файла до ~4,5 МБ; для длинных записей — mp3 или сжатое видео.
+            Файлы: аудио/видео, протокол Word (.docx), .txt. На Vercel — до ~4,5 МБ на файл.
           </p>
           {progress && (
             <p className="mt-2 text-sm text-cyan-400">{progress}</p>

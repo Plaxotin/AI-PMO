@@ -6,7 +6,12 @@ import { parseProjectId } from '@/lib/api/project';
 import { jsonWithAuth, withAuth } from '@/lib/api/route-helpers';
 import { apiError } from '@/lib/assignments/errors';
 import { validateIngestFile, shouldProcessAsync } from '@/lib/ingest/media';
-import { startAsyncIngest, processIngestFile } from '@/lib/ingest/processor';
+import {
+  isDocumentFile,
+  isMediaFile,
+  processIngestFile,
+  startAsyncIngest,
+} from '@/lib/ingest/processor';
 import { createJob, updateJob } from '@/lib/ingest/jobs';
 import { isSaluteConfigured } from '@/lib/stt/salute';
 import { isLlmConfigured } from '@/lib/llm/client';
@@ -21,9 +26,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
   const project = parseProjectId(projectId);
   if (!project.ok) return project.response;
 
-  if (!isSaluteConfigured()) {
-    return apiError('STT_ERROR', 'SaluteSpeech не настроен', 503);
-  }
   if (!isLlmConfigured()) {
     return apiError('LLM_ERROR', 'LLM не настроен', 503);
   }
@@ -37,6 +39,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
   const check = validateIngestFile(file.name, file.size);
   if (!check.ok) {
     return apiError('INGEST_ERROR', check.message, 400);
+  }
+
+  if (isMediaFile(file) && !isSaluteConfigured()) {
+    return apiError('STT_ERROR', 'SaluteSpeech не настроен (нужен для аудио/видео)', 503);
+  }
+
+  if (!isMediaFile(file) && !isDocumentFile(file)) {
+    return apiError('INGEST_ERROR', 'Неподдерживаемый тип файла', 400);
   }
 
   if (shouldProcessAsync(file.size)) {
