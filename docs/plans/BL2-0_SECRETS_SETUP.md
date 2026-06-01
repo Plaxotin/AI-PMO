@@ -67,6 +67,19 @@ GOOGLE_CLIENT_SECRET=GOCSPX-...
 GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
 ```
 
+### 1.2.2 «Ineligible accounts not added» при добавлении Test user
+
+Сообщение: *The following email addresses are either not associated with a Google Account or the account is not eligible…*
+
+| Причина | Что сделать |
+|---------|-------------|
+| **Аккаунт уже в списке** | Google **автоматически** добавляет владельца проекта Cloud. Откройте **Audience → Test users** и прокрутите список — если `plaxotin9@gmail.com` уже есть, **ничего добавлять не нужно**, сразу пробуйте вход на `/assignments`. |
+| **Опечатка в email** | Проверьте точное написание (точка vs цифра: `plaxotin9` vs `plaxotin`). Адрес должен совпадать с **основным** email Google-аккаунта, не алиасом «Отправить как». |
+| **Нет Google-аккаунта** | Откройте https://accounts.google.com/ под этим адресом. Если вход невозможен — создайте Google-аккаунт или используйте другой email. |
+| **Тип приложения Internal** | На **OAuth consent screen** тип должен быть **External** (для личного `@gmail.com`). **Internal** — только пользователи вашего Google Workspace. |
+| **Проект в организации Workspace** | Организация может запрещать consumer Gmail как test users. **Обход:** новый проект GCP → Location: **No organization** (личный аккаунт) → новый OAuth Client → env в Vercel. |
+| **Другой email владеет проектом** | В Cloud Console посмотрите, под кем вы вошли (аватар справа). Test user должен быть тот, **кем входите в BL-6**, либо его нужно добавить отдельно. |
+
 ### 1.2.1 Ошибка 403 `access_denied` («приложение не прошло проверку Google»)
 
 Типичная причина на пилоте: **OAuth consent screen → Publishing status = Testing**, а ваш Google-аккаунт **не добавлен** в **Test users**.
