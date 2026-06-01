@@ -51,6 +51,13 @@ export const batchPmiRowsBodySchema = z.object({
   rows: z.array(pmiRowSchema).min(1).max(100),
 });
 
+export const updatePmiRowsBodySchema = z.object({
+  rows: z
+    .array(pmiRowSchema.extend({ row_number: z.number().int().positive() }))
+    .min(1)
+    .max(100),
+});
+
 export const connectSheetBodySchema = z.object({
   spreadsheet_url: z.string().url(),
 });

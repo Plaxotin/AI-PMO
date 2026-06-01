@@ -206,6 +206,31 @@ export async function appendRow(
   return { row_number };
 }
 
+export async function updateRowsBatch(
+  auth: OAuth2Client,
+  spreadsheetId: string,
+  rows: SheetRow[],
+): Promise<{ rows_updated: number }> {
+  if (rows.length === 0) return { rows_updated: 0 };
+
+  const existing = await listAssignmentRows(auth, spreadsheetId);
+  const sheets = sheetsApi(auth);
+  const data = rows.map((row) => ({
+    range: `${TEMPLATE_SHEET_TITLE}!A${row.row_number}:K${row.row_number}`,
+    values: [buildSheetRowValues(row, existing)],
+  }));
+
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      valueInputOption: 'USER_ENTERED',
+      data,
+    },
+  });
+
+  return { rows_updated: rows.length };
+}
+
 export async function appendRowsBatch(
   auth: OAuth2Client,
   spreadsheetId: string,

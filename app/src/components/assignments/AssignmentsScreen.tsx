@@ -19,8 +19,6 @@ function apiRoot(): string {
   return `${prefix}/api/projects/${PROJECT_ID}`;
 }
 
-type DraftRow = ParsedAssignment & { draftId: string };
-
 type ColumnKey =
   | 'id'
   | 'brief_name'
@@ -43,11 +41,20 @@ const COLUMNS: { key: ColumnKey; label: string; filterable: boolean }[] = [
   { key: 'status', label: 'Статус', filterable: true },
 ];
 
-function cellValue(row: SheetRow | DraftRow, key: ColumnKey): string {
-  const r = row as SheetRow & ParsedAssignment;
+const EDITABLE_KEYS = new Set<ColumnKey>([
+  'brief_name',
+  'description',
+  'source',
+  'owner',
+  'priority',
+  'target_date',
+  'status',
+]);
+
+function cellValue(row: SheetRow, key: ColumnKey): string {
   switch (key) {
     case 'id':
-      return r.id != null ? String(r.id) : '';
+      return row.id != null ? String(row.id) : '';
     case 'brief_name':
       return row.brief_name ?? '';
     case 'description':
@@ -59,19 +66,30 @@ function cellValue(row: SheetRow | DraftRow, key: ColumnKey): string {
     case 'priority':
       return row.priority != null ? String(row.priority) : '';
     case 'date_added':
-      return 'date_added' in r ? (r.date_added ?? '') : '';
+      return row.date_added ?? '';
     case 'target_date':
       return row.target_date ?? '';
     case 'status':
-      return r.status != null ? String(r.status) : '';
+      return row.status != null ? String(row.status) : '';
     default:
       return '';
   }
 }
 
+function parsePriorityInput(v: string): 1 | 2 | 3 | null {
+  const n = Number.parseInt(v, 10);
+  if (n === 1 || n === 2 || n === 3) return n;
+  return null;
+}
+
+function parseStatusInput(v: string): 1 | 2 | 3 | null {
+  const n = Number.parseInt(v, 10);
+  if (n === 1 || n === 2 || n === 3) return n;
+  return null;
+}
+
 export default function AssignmentsScreen() {
   const [rows, setRows] = useState<SheetRow[]>([]);
-  const [drafts, setDrafts] = useState<DraftRow[]>([]);
   const [spreadsheetUrl, setSpreadsheetUrl] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [googleSignedIn, setGoogleSignedIn] = useState(false);
@@ -86,6 +104,8 @@ export default function AssignmentsScreen() {
   );
   const [connectUrl, setConnectUrl] = useState('');
   const [showConnect, setShowConnect] = useState(false);
+  const [registryEditMode, setRegistryEditMode] = useState(false);
+  const [editRows, setEditRows] = useState<SheetRow[] | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -144,8 +164,10 @@ export default function AssignmentsScreen() {
     }
   }, []);
 
+  const sourceRows = registryEditMode && editRows ? editRows : rows;
+
   const filteredRows = useMemo(() => {
-    let list = [...rows];
+    let list = [...sourceRows];
     for (const col of COLUMNS) {
       const f = filters[col.key];
       if (!f || f.size === 0) continue;
@@ -160,7 +182,7 @@ export default function AssignmentsScreen() {
       });
     }
     return list;
-  }, [rows, filters, sort]);
+  }, [sourceRows, filters, sort]);
 
   const uniqueValues = (key: ColumnKey): string[] => {
     const set = new Set<string>();
@@ -171,10 +193,37 @@ export default function AssignmentsScreen() {
     return [...set].sort((a, b) => a.localeCompare(b, 'ru', { numeric: true }));
   };
 
-  async function handleParseAndDraft() {
+  async function persistAssignments(items: ParsedAssignment[]) {
+    if (items.length === 0) return;
+
+    if (items.length === 1) {
+      const res = await fetch(`${apiRoot()}/assignments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(items[0]),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error?.message ?? 'Ошибка сохранения');
+      }
+      return;
+    }
+
+    const res = await fetch(`${apiRoot()}/assignments/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows: items }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data?.error?.message ?? 'Ошибка сохранения');
+    }
+  }
+
+  async function handleParseAndSave() {
     const text = inputText.trim();
     if (!text) return;
-    setProgress('Разбор текста…');
+    setProgress('Разбор и сохранение…');
     setError(null);
     try {
       const res = await fetch(`${apiRoot()}/assignments/parse`, {
@@ -185,42 +234,14 @@ export default function AssignmentsScreen() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error?.message ?? 'Ошибка LLM');
       const parsed = data.parsed as ParsedAssignment;
-      setDrafts((d) => [
-        { ...parsed, draftId: crypto.randomUUID() },
-        ...d,
-      ]);
+      await persistAssignments([parsed]);
       setInputText('');
+      await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка');
     } finally {
       setProgress(null);
     }
-  }
-
-  async function saveDraft(draft: DraftRow) {
-    setError(null);
-    const res = await fetch(`${apiRoot()}/assignments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(draft),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data?.error?.message ?? 'Ошибка сохранения');
-      return;
-    }
-    setDrafts((d) => d.filter((x) => x.draftId !== draft.draftId));
-    await refresh();
-  }
-
-  function discardDraft(draftId: string) {
-    setDrafts((d) => d.filter((x) => x.draftId !== draftId));
-  }
-
-  function updateDraft(draftId: string, patch: Partial<ParsedAssignment>) {
-    setDrafts((d) =>
-      d.map((row) => (row.draftId === draftId ? { ...row, ...patch } : row)),
-    );
   }
 
   async function handleFile(file: File) {
@@ -231,7 +252,7 @@ export default function AssignmentsScreen() {
       return;
     }
 
-    setProgress('Загрузка файла…');
+    setProgress('Загрузка и сохранение…');
     const form = new FormData();
     form.append('file', file);
     try {
@@ -247,7 +268,8 @@ export default function AssignmentsScreen() {
       if (data.async && data.job_id) {
         await pollJob(data.job_id);
       } else if (data.drafts?.length) {
-        addDraftsFromParsed(data.drafts);
+        await persistAssignments(data.drafts);
+        await refresh();
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка файла');
@@ -271,7 +293,9 @@ export default function AssignmentsScreen() {
       const data = parsed.data;
       if (data.stage) setProgress(data.stage);
       if (data.status === 'done' && data.drafts) {
-        addDraftsFromParsed(data.drafts);
+        setProgress('Сохранение в реестр…');
+        await persistAssignments(data.drafts);
+        await refresh();
         return;
       }
       if (data.status === 'failed') {
@@ -282,11 +306,47 @@ export default function AssignmentsScreen() {
     throw new Error('Таймаут обработки файла');
   }
 
-  function addDraftsFromParsed(items: ParsedAssignment[]) {
-    setDrafts((d) => [
-      ...items.map((p) => ({ ...p, draftId: crypto.randomUUID() })),
-      ...d,
-    ]);
+  function updateEditRow(rowNumber: number, patch: Partial<SheetRow>) {
+    setEditRows((prev) =>
+      prev?.map((r) => (r.row_number === rowNumber ? { ...r, ...patch } : r)) ??
+      null,
+    );
+  }
+
+  async function toggleRegistryEdit() {
+    if (!registryEditMode) {
+      setEditRows(rows.map((r) => ({ ...r })));
+      setRegistryEditMode(true);
+      setError(null);
+      return;
+    }
+
+    if (!editRows?.length) {
+      setRegistryEditMode(false);
+      setEditRows(null);
+      return;
+    }
+
+    setProgress('Сохранение реестра…');
+    setError(null);
+    try {
+      const res = await fetch(`${apiRoot()}/assignments/batch`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows: editRows }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error?.message ?? 'Ошибка сохранения реестра');
+      }
+      setRegistryEditMode(false);
+      setEditRows(null);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка');
+    } finally {
+      setProgress(null);
+    }
   }
 
   function startDictation() {
@@ -329,6 +389,121 @@ export default function AssignmentsScreen() {
     await refresh();
   }
 
+  function renderCell(row: SheetRow, key: ColumnKey) {
+    if (!registryEditMode || !EDITABLE_KEYS.has(key)) {
+      return (
+        <td key={key} className="px-2 py-2 text-slate-300">
+          {cellValue(row, key)}
+        </td>
+      );
+    }
+
+    const inputClass =
+      'w-full min-w-[80px] rounded border border-cyan-800/50 bg-slate-900 px-1 py-0.5 text-xs text-slate-100';
+
+    if (key === 'brief_name') {
+      return (
+        <td key={key} className="px-2 py-1">
+          <input
+            className={inputClass}
+            value={row.brief_name}
+            onChange={(e) =>
+              updateEditRow(row.row_number, { brief_name: e.target.value })
+            }
+          />
+        </td>
+      );
+    }
+    if (key === 'description') {
+      return (
+        <td key={key} className="px-2 py-1">
+          <input
+            className={inputClass}
+            value={row.description ?? ''}
+            onChange={(e) =>
+              updateEditRow(row.row_number, { description: e.target.value })
+            }
+          />
+        </td>
+      );
+    }
+    if (key === 'source') {
+      return (
+        <td key={key} className="px-2 py-1">
+          <input
+            className={inputClass}
+            value={row.source ?? ''}
+            onChange={(e) =>
+              updateEditRow(row.row_number, { source: e.target.value })
+            }
+          />
+        </td>
+      );
+    }
+    if (key === 'owner') {
+      return (
+        <td key={key} className="px-2 py-1">
+          <input
+            className={inputClass}
+            value={row.owner ?? ''}
+            onChange={(e) =>
+              updateEditRow(row.row_number, { owner: e.target.value })
+            }
+          />
+        </td>
+      );
+    }
+    if (key === 'priority') {
+      return (
+        <td key={key} className="px-2 py-1">
+          <input
+            className={inputClass}
+            value={row.priority?.toString() ?? ''}
+            onChange={(e) =>
+              updateEditRow(row.row_number, {
+                priority: parsePriorityInput(e.target.value),
+              })
+            }
+          />
+        </td>
+      );
+    }
+    if (key === 'target_date') {
+      return (
+        <td key={key} className="px-2 py-1">
+          <input
+            className={inputClass}
+            value={row.target_date ?? ''}
+            onChange={(e) =>
+              updateEditRow(row.row_number, { target_date: e.target.value })
+            }
+          />
+        </td>
+      );
+    }
+    if (key === 'status') {
+      return (
+        <td key={key} className="px-2 py-1">
+          <input
+            className={inputClass}
+            value={row.status?.toString() ?? ''}
+            onChange={(e) =>
+              updateEditRow(row.row_number, {
+                status: parseStatusInput(e.target.value) ?? row.status ?? 1,
+              })
+            }
+          />
+        </td>
+      );
+    }
+
+    return (
+      <td key={key} className="px-2 py-2 text-slate-300">
+        {cellValue(row, key)}
+      </td>
+    );
+  }
+
   if (!googleSignedIn && !loading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-950 p-8 text-slate-100">
@@ -366,6 +541,18 @@ export default function AssignmentsScreen() {
           <span className="rounded bg-slate-800 px-3 py-2 text-white">
             Реестр поручений
           </span>
+          <button
+            type="button"
+            className={
+              registryEditMode
+                ? 'rounded bg-cyan-700 px-3 py-2 text-left font-medium text-white hover:bg-cyan-600'
+                : 'rounded px-3 py-2 text-left text-slate-300 hover:bg-slate-800 hover:text-white'
+            }
+            onClick={() => void toggleRegistryEdit()}
+            disabled={loading || rows.length === 0}
+          >
+            {registryEditMode ? 'Сохранить реестр' : 'Редактировать реестр'}
+          </button>
           {spreadsheetUrl && (
             <a
               href={spreadsheetUrl}
@@ -387,10 +574,17 @@ export default function AssignmentsScreen() {
             type="button"
             className="px-3 py-2 text-left text-slate-300 hover:text-white"
             onClick={() => void refresh()}
+            disabled={registryEditMode}
           >
             Обновить
           </button>
         </nav>
+        {registryEditMode && (
+          <p className="mt-3 text-xs text-cyan-400/90">
+            Режим редактирования: измените ячейки в таблице и нажмите «Сохранить
+            реестр».
+          </p>
+        )}
         {showConnect && (
           <div className="mt-4 flex flex-col gap-2">
             <input
@@ -421,21 +615,23 @@ export default function AssignmentsScreen() {
         <div className="border-b border-slate-800 px-6 py-4">
           <div className="flex gap-2">
             <input
-              className="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 text-sm outline-none focus:border-cyan-600"
+              className="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 text-sm outline-none focus:border-cyan-600 disabled:opacity-50"
               placeholder="Введите поручение или загрузите протокол / запись совещания…"
               value={inputText}
+              disabled={registryEditMode}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  void handleParseAndDraft();
+                  void handleParseAndSave();
                 }
               }}
             />
             <button
               type="button"
               title="Диктовка"
-              className="rounded-lg border border-slate-700 px-3 hover:bg-slate-800"
+              className="rounded-lg border border-slate-700 px-3 hover:bg-slate-800 disabled:opacity-50"
+              disabled={registryEditMode}
               onClick={startDictation}
             >
               🎤
@@ -443,7 +639,8 @@ export default function AssignmentsScreen() {
             <button
               type="button"
               title="Файл"
-              className="rounded-lg border border-slate-700 px-3 hover:bg-slate-800"
+              className="rounded-lg border border-slate-700 px-3 hover:bg-slate-800 disabled:opacity-50"
+              disabled={registryEditMode}
               onClick={() => fileRef.current?.click()}
             >
               📎
@@ -461,14 +658,16 @@ export default function AssignmentsScreen() {
             />
             <button
               type="button"
-              className="rounded-lg bg-cyan-600 px-4 font-medium hover:bg-cyan-500"
-              onClick={() => void handleParseAndDraft()}
+              className="rounded-lg bg-cyan-600 px-4 font-medium hover:bg-cyan-500 disabled:opacity-50"
+              disabled={registryEditMode}
+              onClick={() => void handleParseAndSave()}
             >
               ➤
             </button>
           </div>
           <p className="mt-2 text-xs text-slate-500">
-            Файлы: аудио/видео, протокол Word (.docx), .txt. На Vercel — до ~4,5 МБ на файл.
+            Новые поручения сохраняются в Google Sheet сразу после разбора. Файлы:
+            аудио/видео, .docx, .txt (на Vercel — до ~4,5 МБ).
           </p>
           {progress && (
             <p className="mt-2 text-sm text-cyan-400">{progress}</p>
@@ -500,7 +699,7 @@ export default function AssignmentsScreen() {
                       >
                         {col.label}
                       </span>
-                      {col.filterable && (
+                      {col.filterable && !registryEditMode && (
                         <button
                           type="button"
                           className="ml-1 text-xs"
@@ -546,87 +745,19 @@ export default function AssignmentsScreen() {
                       )}
                     </th>
                   ))}
-                  <th className="w-20 px-2 py-2" />
                 </tr>
               </thead>
               <tbody>
-                {drafts.map((draft) => (
-                  <tr
-                    key={draft.draftId}
-                    className="border-b border-amber-900/50 bg-amber-950/40"
-                  >
-                    {COLUMNS.map((col) => (
-                      <td key={col.key} className="px-2 py-1">
-                        <input
-                          className="w-full min-w-[80px] rounded border border-amber-800/50 bg-amber-950/20 px-1 py-0.5 text-xs"
-                          value={
-                            col.key === 'brief_name'
-                              ? draft.brief_name
-                              : col.key === 'description'
-                                ? (draft.description ?? '')
-                                : col.key === 'source'
-                                  ? (draft.source ?? '')
-                                  : col.key === 'owner'
-                                    ? (draft.owner ?? '')
-                                    : col.key === 'priority'
-                                      ? (draft.priority?.toString() ?? '')
-                                      : col.key === 'target_date'
-                                        ? (draft.target_date ?? '')
-                                        : ''
-                          }
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            if (col.key === 'brief_name')
-                              updateDraft(draft.draftId, { brief_name: v });
-                            else if (col.key === 'description')
-                              updateDraft(draft.draftId, { description: v });
-                            else if (col.key === 'source')
-                              updateDraft(draft.draftId, { source: v });
-                            else if (col.key === 'owner')
-                              updateDraft(draft.draftId, { owner: v });
-                            else if (col.key === 'priority')
-                              updateDraft(draft.draftId, {
-                                priority: [1, 2, 3].includes(Number(v))
-                                  ? (Number(v) as 1 | 2 | 3)
-                                  : null,
-                              });
-                            else if (col.key === 'target_date')
-                              updateDraft(draft.draftId, { target_date: v });
-                          }}
-                        />
-                      </td>
-                    ))}
-                    <td className="px-2 py-1">
-                      <button
-                        type="button"
-                        className="mr-1 text-green-400 hover:text-green-300"
-                        title="Сохранить"
-                        onClick={() => void saveDraft(draft)}
-                      >
-                        ✓
-                      </button>
-                      <button
-                        type="button"
-                        className="text-red-400 hover:text-red-300"
-                        title="Удалить"
-                        onClick={() => discardDraft(draft.draftId)}
-                      >
-                        ✗
-                      </button>
-                    </td>
-                  </tr>
-                ))}
                 {filteredRows.map((row) => (
                   <tr
                     key={row.row_number}
-                    className="border-b border-slate-800 hover:bg-slate-900/50"
+                    className={
+                      registryEditMode
+                        ? 'border-b border-cyan-900/40 bg-cyan-950/20'
+                        : 'border-b border-slate-800 hover:bg-slate-900/50'
+                    }
                   >
-                    {COLUMNS.map((col) => (
-                      <td key={col.key} className="px-2 py-2 text-slate-300">
-                        {cellValue(row, col.key)}
-                      </td>
-                    ))}
-                    <td />
+                    {COLUMNS.map((col) => renderCell(row, col.key))}
                   </tr>
                 ))}
               </tbody>
