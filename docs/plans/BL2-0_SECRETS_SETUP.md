@@ -201,3 +201,27 @@ npm run verify:bl2-secrets
 1. Вход через Google → consent → refresh-токен в сессии.
 2. `POST /api/projects/:id/sheets/init` создаёт таблицу в Drive **пользователя**.
 3. «Подключить свой реестр» работает без шаринга на service account.
+
+---
+
+## 7. Загрузка Word и сбой деплоя Vercel
+
+### Сообщение «Допустимо: .mp3, .m4a, …» без `.docx`
+
+Код в `main` принимает **протокол Word (.docx)** и **.txt** (не старый `.doc`). Если в ошибке перечислены **только** аудио/видео — на проде **старая сборка** (деплой не доехал).
+
+Проверка: на https://ai-pmo-tawny.vercel.app/assignments в исходнике страницы у `<input type="file">` в `accept` должны быть `.docx,.txt`.
+
+### Файл Word
+
+| Формат | Поведение |
+|--------|-----------|
+| **.docx** | Поддерживается (текст → LLM → черновики поручений). Нужен `LLM_API_KEY`, SaluteSpeech **не** нужен. |
+| **.doc** (Word 97–2003) | Не поддерживается — в Word: **Файл → Сохранить как → .docx**. |
+| Размер на Vercel | Лимит тела запроса ~**4,5 МБ**; крупные протоколы сжимайте или делите. |
+
+### Деплой Vercel «Deployment failed» (functions + builds)
+
+В корневом `vercel.json` нельзя одновременно указывать legacy **`builds`** и **`functions`**. Лимиты ingest (`maxDuration`, `memory`) задаются в `app/vercel.json` и в `export const maxDuration` роута ingest.
+
+После исправления: **Deployments → Redeploy** последнего успешного коммита на `main` или дождитесь автодеплоя с GitHub.
