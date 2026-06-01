@@ -6,6 +6,10 @@ import {
   GOOGLE_OAUTH_ERROR_PARAM,
   googleOAuthErrorMessage,
 } from '@/lib/google/oauth-errors';
+import {
+  hostingUploadLimitMessage,
+  parseJsonResponse,
+} from '@/lib/api/parse-json-response';
 import type { ParsedAssignment, SheetRow } from '@/lib/pmi/types';
 
 const PROJECT_ID = DEFAULT_PROJECT_ID;
@@ -221,14 +225,25 @@ export default function AssignmentsScreen() {
 
   async function handleFile(file: File) {
     setError(null);
+    const limitMsg = hostingUploadLimitMessage(file.size);
+    if (limitMsg) {
+      setError(limitMsg);
+      return;
+    }
+
     setProgress('Загрузка файла…');
     const form = new FormData();
     form.append('file', file);
     try {
       const res = await fetch(`${apiRoot()}/ingest`, { method: 'POST', body: form });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error?.message ?? 'Ошибка инжеста');
+      const parsed = await parseJsonResponse<{
+        async?: boolean;
+        job_id?: string;
+        drafts?: ParsedAssignment[];
+      }>(res);
+      if (!parsed.ok) throw new Error(parsed.message);
 
+      const data = parsed.data;
       if (data.async && data.job_id) {
         await pollJob(data.job_id);
       } else if (data.drafts?.length) {
@@ -245,7 +260,15 @@ export default function AssignmentsScreen() {
     for (let i = 0; i < 120; i++) {
       setProgress('Обработка файла…');
       const res = await fetch(`${apiRoot()}/ingest/${jobId}`);
-      const data = await res.json();
+      const parsed = await parseJsonResponse<{
+        status?: string;
+        stage?: string;
+        drafts?: ParsedAssignment[];
+        error?: string;
+      }>(res);
+      if (!parsed.ok) throw new Error(parsed.message);
+
+      const data = parsed.data;
       if (data.stage) setProgress(data.stage);
       if (data.status === 'done' && data.drafts) {
         addDraftsFromParsed(data.drafts);
@@ -444,6 +467,9 @@ export default function AssignmentsScreen() {
               ➤
             </button>
           </div>
+          <p className="mt-2 text-xs text-slate-500">
+            На Vercel загрузка файла до ~4,5 МБ; для длинных записей — mp3 или сжатое видео.
+          </p>
           {progress && (
             <p className="mt-2 text-sm text-cyan-400">{progress}</p>
           )}

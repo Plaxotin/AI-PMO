@@ -12,6 +12,12 @@
     { "src": "/api/auth/(.*)", "dest": "/app/api/auth/$1" },
     { "src": "/(.*)", "dest": "/app/$1" }
   ],
+  "functions": {
+    "app/src/app/api/projects/[projectId]/ingest/route.ts": {
+      "maxDuration": 300,
+      "memory": 3008
+    }
+  },
   "headers": [
     {
       "source": "/(.*)",
