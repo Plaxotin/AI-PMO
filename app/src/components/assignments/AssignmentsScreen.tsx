@@ -13,6 +13,11 @@ import {
 import type { ParsedAssignment, SheetRow } from '@/lib/pmi/types';
 
 const PROJECT_ID = DEFAULT_PROJECT_ID;
+const PAGE_SIZE = 25;
+
+/** Shared focus ring for keyboard navigation (BL2-4). */
+const FOCUS_RING =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-void)]';
 
 function apiRoot(): string {
   const prefix = process.env.NEXT_PUBLIC_API_PREFIX ?? '';
@@ -30,16 +35,94 @@ type ColumnKey =
   | 'target_date'
   | 'status';
 
-const COLUMNS: { key: ColumnKey; label: string; filterable: boolean }[] = [
-  { key: 'id', label: 'ID', filterable: true },
-  { key: 'brief_name', label: 'Краткое название', filterable: true },
-  { key: 'description', label: 'Описание', filterable: false },
-  { key: 'source', label: 'Источник', filterable: false },
-  { key: 'owner', label: 'Ответственный', filterable: true },
-  { key: 'priority', label: 'Приоритет', filterable: true },
-  { key: 'target_date', label: 'Целевая дата', filterable: true },
-  { key: 'status', label: 'Статус', filterable: true },
+const COLUMNS: {
+  key: ColumnKey;
+  label: string;
+  filterable: boolean;
+  /** Tailwind width on th/td (Make proportions). */
+  widthClass: string;
+}[] = [
+  { key: 'id', label: 'ID', filterable: true, widthClass: 'w-[60px]' },
+  {
+    key: 'brief_name',
+    label: 'Краткое название',
+    filterable: true,
+    widthClass: 'min-w-[220px]',
+  },
+  {
+    key: 'description',
+    label: 'Описание',
+    filterable: false,
+    widthClass: 'min-w-[140px]',
+  },
+  { key: 'source', label: 'Источник', filterable: false, widthClass: 'min-w-[100px]' },
+  { key: 'owner', label: 'Ответственный', filterable: true, widthClass: 'min-w-[120px]' },
+  {
+    key: 'priority',
+    label: 'Приоритет',
+    filterable: true,
+    widthClass: 'w-[130px]',
+  },
+  {
+    key: 'target_date',
+    label: 'Целевая дата',
+    filterable: true,
+    widthClass: 'w-[130px]',
+  },
+  { key: 'status', label: 'Статус', filterable: true, widthClass: 'w-[130px]' },
 ];
+
+function columnWidthClass(key: ColumnKey): string {
+  return COLUMNS.find((c) => c.key === key)?.widthClass ?? '';
+}
+
+function priorityDisplayLabel(p: 1 | 2 | 3): string {
+  switch (p) {
+    case 1:
+      return 'Высокий';
+    case 2:
+      return 'Средний';
+    case 3:
+      return 'Низкий';
+  }
+}
+
+function statusDisplayLabel(s: 1 | 2 | 3): string {
+  switch (s) {
+    case 1:
+      return 'Не начато';
+    case 2:
+      return 'В работе';
+    case 3:
+      return 'Завершено';
+  }
+}
+
+function PriorityChip({ value }: { value: 1 | 2 | 3 | null | undefined }) {
+  if (value == null) {
+    return <span className="text-text-muted">—</span>;
+  }
+  const tone =
+    value === 1
+      ? 'chip border-cyan/25 bg-cyan-glow text-cyan'
+      : value === 2
+        ? 'chip border-border bg-bg-card text-text-secondary'
+        : 'chip border-border bg-bg-deep text-text-muted';
+  return <span className={tone}>{priorityDisplayLabel(value)}</span>;
+}
+
+function StatusChip({ value }: { value: 1 | 2 | 3 | null | undefined }) {
+  if (value == null) {
+    return <span className="text-text-muted">—</span>;
+  }
+  const tone =
+    value === 1
+      ? 'chip border-border bg-bg-deep text-text-muted'
+      : value === 2
+        ? 'chip border-cyan/25 bg-cyan-glow text-cyan'
+        : 'chip border-blue/30 bg-blue-glow text-blue';
+  return <span className={tone}>{statusDisplayLabel(value)}</span>;
+}
 
 const EDITABLE_KEYS = new Set<ColumnKey>([
   'brief_name',
@@ -104,15 +187,20 @@ export default function AssignmentsScreen() {
   );
   const [connectUrl, setConnectUrl] = useState('');
   const [showConnect, setShowConnect] = useState(false);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [registryEditMode, setRegistryEditMode] = useState(false);
   const [editRows, setEditRows] = useState<SheetRow[] | null>(null);
+  const [devPreview, setDevPreview] = useState(false);
+  const [page, setPage] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const settingsMenuRef = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => {
     setError(null);
     const statusRes = await fetch(`${apiRoot()}/sheets/status`);
     const status = await statusRes.json();
+    setDevPreview(Boolean(status.dev_preview));
     setGoogleSignedIn(Boolean(status.google_signed_in));
     setConnected(Boolean(status.connected));
     setSpreadsheetUrl(status.spreadsheet_url ?? null);
@@ -151,6 +239,40 @@ export default function AssignmentsScreen() {
   }, [refresh]);
 
   useEffect(() => {
+    setPage(0);
+  }, [filters, sort]);
+
+  useEffect(() => {
+    if (!showSettingsMenu) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (
+        settingsMenuRef.current &&
+        !settingsMenuRef.current.contains(e.target as Node)
+      ) {
+        setShowSettingsMenu(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowSettingsMenu(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [showSettingsMenu]);
+
+  useEffect(() => {
+    if (openFilter == null) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenFilter(null);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [openFilter]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     const oauthErr = params.get(GOOGLE_OAUTH_ERROR_PARAM);
@@ -183,6 +305,20 @@ export default function AssignmentsScreen() {
     }
     return list;
   }, [sourceRows, filters, sort]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+
+  useEffect(() => {
+    setPage((p) => Math.min(p, pageCount - 1));
+  }, [pageCount]);
+
+  const paginatedRows = useMemo(() => {
+    const start = page * PAGE_SIZE;
+    return filteredRows.slice(start, start + PAGE_SIZE);
+  }, [filteredRows, page]);
+
+  const pageStart = filteredRows.length === 0 ? 0 : page * PAGE_SIZE + 1;
+  const pageEnd = Math.min((page + 1) * PAGE_SIZE, filteredRows.length);
 
   const uniqueValues = (key: ColumnKey): string[] => {
     const set = new Set<string>();
@@ -389,21 +525,50 @@ export default function AssignmentsScreen() {
     await refresh();
   }
 
+  const cellPad = (key: ColumnKey) =>
+    `px-3 py-2.5 text-sm ${columnWidthClass(key)}`;
+
+  const inputClass =
+    'w-full min-w-[80px] rounded-md border border-border bg-bg-deep px-2 py-1 text-xs text-text-primary outline-none focus:border-cyan';
+
   function renderCell(row: SheetRow, key: ColumnKey) {
     if (!registryEditMode || !EDITABLE_KEYS.has(key)) {
+      if (key === 'priority') {
+        return (
+          <td key={key} className={cellPad(key)}>
+            <PriorityChip value={row.priority} />
+          </td>
+        );
+      }
+      if (key === 'status') {
+        return (
+          <td key={key} className={cellPad(key)}>
+            <StatusChip value={row.status} />
+          </td>
+        );
+      }
+      const isTitle = key === 'brief_name';
+      const isId = key === 'id';
+      const text = cellValue(row, key);
       return (
-        <td key={key} className="px-2 py-2 text-slate-300">
-          {cellValue(row, key)}
+        <td
+          key={key}
+          className={`${cellPad(key)} ${
+            isTitle
+              ? 'font-medium text-text-bright'
+              : isId
+                ? 'text-text-muted tabular-nums'
+                : 'text-text-secondary'
+          }`}
+        >
+          {text || <span className="text-text-muted">—</span>}
         </td>
       );
     }
 
-    const inputClass =
-      'w-full min-w-[80px] rounded border border-cyan-800/50 bg-slate-900 px-1 py-0.5 text-xs text-slate-100';
-
     if (key === 'brief_name') {
       return (
-        <td key={key} className="px-2 py-1">
+        <td key={key} className={`${cellPad(key)} py-1.5`}>
           <input
             className={inputClass}
             value={row.brief_name}
@@ -416,7 +581,7 @@ export default function AssignmentsScreen() {
     }
     if (key === 'description') {
       return (
-        <td key={key} className="px-2 py-1">
+        <td key={key} className={`${cellPad(key)} py-1.5`}>
           <input
             className={inputClass}
             value={row.description ?? ''}
@@ -429,7 +594,7 @@ export default function AssignmentsScreen() {
     }
     if (key === 'source') {
       return (
-        <td key={key} className="px-2 py-1">
+        <td key={key} className={`${cellPad(key)} py-1.5`}>
           <input
             className={inputClass}
             value={row.source ?? ''}
@@ -442,7 +607,7 @@ export default function AssignmentsScreen() {
     }
     if (key === 'owner') {
       return (
-        <td key={key} className="px-2 py-1">
+        <td key={key} className={`${cellPad(key)} py-1.5`}>
           <input
             className={inputClass}
             value={row.owner ?? ''}
@@ -455,7 +620,7 @@ export default function AssignmentsScreen() {
     }
     if (key === 'priority') {
       return (
-        <td key={key} className="px-2 py-1">
+        <td key={key} className={`${cellPad(key)} py-1.5`}>
           <input
             className={inputClass}
             value={row.priority?.toString() ?? ''}
@@ -470,7 +635,7 @@ export default function AssignmentsScreen() {
     }
     if (key === 'target_date') {
       return (
-        <td key={key} className="px-2 py-1">
+        <td key={key} className={`${cellPad(key)} py-1.5`}>
           <input
             className={inputClass}
             value={row.target_date ?? ''}
@@ -483,7 +648,7 @@ export default function AssignmentsScreen() {
     }
     if (key === 'status') {
       return (
-        <td key={key} className="px-2 py-1">
+        <td key={key} className={`${cellPad(key)} py-1.5`}>
           <input
             className={inputClass}
             value={row.status?.toString() ?? ''}
@@ -498,7 +663,7 @@ export default function AssignmentsScreen() {
     }
 
     return (
-      <td key={key} className="px-2 py-2 text-slate-300">
+      <td key={key} className={`${cellPad(key)} text-text-secondary`}>
         {cellValue(row, key)}
       </td>
     );
@@ -506,16 +671,18 @@ export default function AssignmentsScreen() {
 
   if (!googleSignedIn && !loading) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-950 p-8 text-slate-100">
-        <h1 className="text-2xl font-semibold">Реестр поручений (BL-6)</h1>
-        <p className="max-w-md text-center text-slate-400">
+      <div className="bg-bg-void text-text-primary flex min-h-screen flex-col items-center justify-center gap-4 p-8">
+        <h1 className="font-display text-2xl font-semibold">
+          AI PMO - Администратор поручений
+        </h1>
+        <p className="text-text-secondary max-w-md text-center">
           Войдите через Google, чтобы создать или подключить таблицу PMI Action Item
           Tracker.
         </p>
-        <p className="max-w-lg text-center text-xs text-slate-500">
+        <p className="text-text-muted max-w-lg text-center text-xs">
           Пока приложение в Google Cloud в статусе <strong>Testing</strong>, вход
           разрешён только аккаунтам из списка <strong>Test users</strong> (см.{' '}
-          <code className="text-slate-400">docs/plans/BL2-0_SECRETS_SETUP.md</code>
+          <code className="text-text-secondary">docs/plans/BL2-0_SECRETS_SETUP.md</code>
           ).
         </p>
         {error && (
@@ -523,10 +690,7 @@ export default function AssignmentsScreen() {
             {error}
           </p>
         )}
-        <a
-          href={`/api/auth/google?returnTo=/assignments`}
-          className="rounded-lg bg-blue-600 px-6 py-3 font-medium text-white hover:bg-blue-500"
-        >
+        <a href={`/api/auth/google?returnTo=/assignments`} className="btn-primary">
           Войти через Google
         </a>
       </div>
@@ -534,235 +698,347 @@ export default function AssignmentsScreen() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-950 text-slate-100">
-      <aside className="flex w-56 shrink-0 flex-col border-r border-slate-800 bg-slate-900 p-4">
-        <div className="mb-6 text-sm font-semibold text-cyan-400">AI PMO</div>
-        <nav className="flex flex-col gap-1 text-sm">
-          <span className="rounded bg-slate-800 px-3 py-2 text-white">
-            Реестр поручений
-          </span>
-          <button
-            type="button"
-            className={
-              registryEditMode
-                ? 'rounded bg-cyan-700 px-3 py-2 text-left font-medium text-white hover:bg-cyan-600'
-                : 'rounded px-3 py-2 text-left text-slate-300 hover:bg-slate-800 hover:text-white'
-            }
-            onClick={() => void toggleRegistryEdit()}
-            disabled={loading || rows.length === 0}
+    <div className="bg-bg-void text-text-primary min-h-screen">
+      <main className="flex min-h-screen flex-col">
+        {devPreview && (
+          <div
+            className="border-b border-cyan/30 bg-cyan-glow px-6 py-2 text-center text-sm text-cyan"
+            role="status"
           >
-            {registryEditMode ? 'Сохранить реестр' : 'Редактировать реестр'}
-          </button>
-          {spreadsheetUrl && (
-            <a
-              href={spreadsheetUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-3 py-2 text-slate-300 hover:text-white"
-            >
-              Открыть в Google Sheets ↗
-            </a>
-          )}
-          <button
-            type="button"
-            className="px-3 py-2 text-left text-slate-300 hover:text-white"
-            onClick={() => setShowConnect((v) => !v)}
-          >
-            Подключить свой реестр
-          </button>
-          <button
-            type="button"
-            className="px-3 py-2 text-left text-slate-300 hover:text-white"
-            onClick={() => void refresh()}
-            disabled={registryEditMode}
-          >
-            Обновить
-          </button>
-        </nav>
-        {registryEditMode && (
-          <p className="mt-3 text-xs text-cyan-400/90">
-            Режим редактирования: измените ячейки в таблице и нажмите «Сохранить
-            реестр».
-          </p>
-        )}
-        {showConnect && (
-          <div className="mt-4 flex flex-col gap-2">
-            <input
-              className="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs"
-              placeholder="URL Google Sheet"
-              value={connectUrl}
-              onChange={(e) => setConnectUrl(e.target.value)}
-            />
-            <button
-              type="button"
-              className="rounded bg-slate-700 px-2 py-1 text-xs hover:bg-slate-600"
-              onClick={() => void connectOwnSheet()}
-            >
-              Подключить
-            </button>
+            Режим предпросмотра (без Google): демо-данные для UI. Сохранение в Sheets
+            отключено. Уберите{' '}
+            <code className="text-text-secondary">BL6_DEV_SKIP_GOOGLE_AUTH=true</code> из{' '}
+            <code className="text-text-secondary">app/.env.local</code> для входа через Google.
           </div>
         )}
-      </aside>
 
-      <main className="flex flex-1 flex-col overflow-hidden">
-        <header className="border-b border-slate-800 px-6 py-4">
-          <h1 className="text-lg font-semibold">Реестр поручений</h1>
-          {connected && (
-            <p className="text-xs text-slate-500">Google Sheets подключён</p>
-          )}
+        <header className="glass sticky top-0 z-20 border-b border-border px-6 py-4 backdrop-blur-xl">
+          <div className="mx-auto flex w-full max-w-[1400px] items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-[8px] bg-gradient-to-r from-cyan-500 to-blue-500 text-sm font-bold text-white">
+                AI
+              </div>
+              <div>
+                <h1 className="font-display text-base font-semibold md:text-lg">
+                  AI PMO - Администратор поручений
+                </h1>
+                <p className="text-text-muted text-xs">
+                  {connected ? 'Google Sheets подключён' : 'Подключение Sheets...'}
+                </p>
+              </div>
+            </div>
+
+            <div ref={settingsMenuRef} className="relative flex items-center gap-2">
+              <button
+                type="button"
+                disabled
+                title="Уведомления — скоро"
+                aria-label="Уведомления (скоро)"
+                className={`flex h-9 w-9 items-center justify-center rounded-md border border-border bg-bg-card text-base opacity-50 ${FOCUS_RING}`}
+              >
+                🔔
+              </button>
+              <button
+                type="button"
+                className={
+                  registryEditMode
+                    ? `rounded-md border border-cyan/40 bg-cyan-glow px-3 py-2 text-xs font-medium text-cyan hover:bg-cyan/20 disabled:opacity-50 ${FOCUS_RING}`
+                    : `rounded-md border border-border bg-bg-card px-3 py-2 text-xs font-medium text-text-primary hover:bg-bg-card-hover disabled:opacity-50 ${FOCUS_RING}`
+                }
+                onClick={() => void toggleRegistryEdit()}
+                disabled={loading || rows.length === 0}
+              >
+                {registryEditMode ? 'Сохранить реестр' : 'Редактировать реестр'}
+              </button>
+              <button
+                type="button"
+                className={`rounded-md border border-border bg-bg-card px-3 py-2 text-xs font-medium text-text-primary hover:bg-bg-card-hover ${FOCUS_RING}`}
+                onClick={() => setShowSettingsMenu((v) => !v)}
+                aria-expanded={showSettingsMenu}
+                aria-haspopup="menu"
+              >
+                Настройки
+              </button>
+              {showSettingsMenu && (
+                <div className="glass absolute right-0 top-full z-30 mt-2 min-w-56 rounded-xl border border-border p-2 text-sm shadow-xl">
+                  {spreadsheetUrl && (
+                    <a
+                      href={spreadsheetUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block rounded-md px-3 py-2 text-text-primary hover:bg-bg-card-hover"
+                    >
+                      Открыть в Google Sheets ↗
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    className="block w-full rounded-md px-3 py-2 text-left text-text-primary hover:bg-bg-card-hover"
+                    onClick={() => {
+                      setShowConnect((v) => !v);
+                      setShowSettingsMenu(false);
+                    }}
+                  >
+                    Подключить свой реестр
+                  </button>
+                  <button
+                    type="button"
+                    className="block w-full rounded-md px-3 py-2 text-left text-text-primary hover:bg-bg-card-hover disabled:opacity-50"
+                    onClick={() => {
+                      setShowSettingsMenu(false);
+                      void refresh();
+                    }}
+                    disabled={registryEditMode}
+                  >
+                    Обновить
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </header>
 
-        <div className="border-b border-slate-800 px-6 py-4">
-          <div className="flex gap-2">
-            <input
-              className="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 text-sm outline-none focus:border-cyan-600 disabled:opacity-50"
-              placeholder="Введите поручение или загрузите протокол / запись совещания…"
-              value={inputText}
-              disabled={registryEditMode}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  void handleParseAndSave();
-                }
-              }}
-            />
-            <button
-              type="button"
-              title="Диктовка"
-              className="rounded-lg border border-slate-700 px-3 hover:bg-slate-800 disabled:opacity-50"
-              disabled={registryEditMode}
-              onClick={startDictation}
-            >
-              🎤
-            </button>
-            <button
-              type="button"
-              title="Файл"
-              className="rounded-lg border border-slate-700 px-3 hover:bg-slate-800 disabled:opacity-50"
-              disabled={registryEditMode}
-              onClick={() => fileRef.current?.click()}
-            >
-              📎
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              className="hidden"
-              accept=".mp3,.m4a,.ogg,.wav,.opus,.mp4,.mov,.webm,.mkv,.docx,.txt,.doc"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void handleFile(f);
-                e.target.value = '';
-              }}
-            />
-            <button
-              type="button"
-              className="rounded-lg bg-cyan-600 px-4 font-medium hover:bg-cyan-500 disabled:opacity-50"
-              disabled={registryEditMode}
-              onClick={() => void handleParseAndSave()}
-            >
-              ➤
-            </button>
-          </div>
-          <p className="mt-2 text-xs text-slate-500">
-            Новые поручения сохраняются в Google Sheet сразу после разбора. Файлы:
-            аудио/видео, .docx, .txt (на Vercel — до ~4,5 МБ).
-          </p>
-          {progress && (
-            <p className="mt-2 text-sm text-cyan-400">{progress}</p>
-          )}
-          {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
-        </div>
+        <div className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col px-6 py-6">
+          <div className="glass mb-4 rounded-2xl border border-border p-4 md:p-5">
+            <div className="flex min-w-0 flex-1 flex-wrap items-stretch gap-2">
+              <div className="flex min-w-[280px] flex-1 items-stretch gap-1 rounded-[var(--radius-sm)] border border-border bg-bg-deep/80 p-1 focus-within:border-cyan focus-within:ring-1 focus-within:ring-cyan/25">
+                <input
+                  className="text-text-primary placeholder:text-text-muted min-w-0 flex-1 border-0 bg-transparent px-3 py-2 text-sm outline-none disabled:opacity-50"
+                  placeholder="Введите поручение или загрузите протокол / запись совещания…"
+                  value={inputText}
+                  disabled={registryEditMode}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      void handleParseAndSave();
+                    }
+                  }}
+                />
+                <div className="flex shrink-0 items-stretch gap-1">
+                <button
+                  type="button"
+                  title="Диктовка"
+                  className={`flex h-11 w-11 items-center justify-center rounded-[var(--radius-sm)] border border-border bg-bg-card text-lg hover:bg-bg-card-hover disabled:opacity-50 ${FOCUS_RING}`}
+                  disabled={registryEditMode}
+                  onClick={startDictation}
+                >
+                  🎤
+                </button>
+                <button
+                  type="button"
+                  title="Файл"
+                  className={`flex h-11 w-11 items-center justify-center rounded-[var(--radius-sm)] border border-border bg-bg-card text-lg hover:bg-bg-card-hover disabled:opacity-50 ${FOCUS_RING}`}
+                  disabled={registryEditMode}
+                  onClick={() => fileRef.current?.click()}
+                >
+                  📎
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  className="hidden"
+                  accept=".mp3,.m4a,.ogg,.wav,.opus,.mp4,.mov,.webm,.mkv,.docx,.txt,.doc"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void handleFile(f);
+                    e.target.value = '';
+                  }}
+                />
+                <button
+                  type="button"
+                  className={`btn-primary flex h-11 min-w-11 items-center justify-center rounded-[var(--radius-sm)] px-4 py-0 text-base font-medium disabled:opacity-50 ${FOCUS_RING}`}
+                  disabled={registryEditMode}
+                  onClick={() => void handleParseAndSave()}
+                  title="Разобрать и сохранить"
+                >
+                  ➤
+                </button>
+                </div>
+              </div>
+            </div>
 
-        <div className="flex-1 overflow-auto px-6 py-4">
-          {loading ? (
-            <p className="text-slate-500">Загрузка…</p>
-          ) : (
-            <table className="w-full min-w-[900px] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-slate-700 text-left text-slate-400">
+            <p className="text-text-muted mt-2 text-xs">
+              Новые поручения сохраняются в Google Sheet сразу после разбора. Файлы:
+              аудио/видео, .docx, .txt (на Vercel — до ~4,5 МБ).
+            </p>
+
+            {registryEditMode && (
+              <p className="mt-2 text-xs text-cyan">
+                Режим редактирования: измените ячейки в таблице и нажмите «Сохранить
+                реестр».
+              </p>
+            )}
+            {showConnect && (
+              <div className="mt-3 flex flex-col gap-2 sm:max-w-md">
+                <input
+                  className="text-text-primary placeholder:text-text-muted rounded-md border border-border bg-bg-deep px-2 py-2 text-xs outline-none focus:border-cyan"
+                  placeholder="URL Google Sheet"
+                  value={connectUrl}
+                  onChange={(e) => setConnectUrl(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="rounded-md border border-border bg-bg-card px-2 py-2 text-xs text-text-primary hover:bg-bg-card-hover"
+                  onClick={() => void connectOwnSheet()}
+                >
+                  Подключить
+                </button>
+              </div>
+            )}
+            {progress && <p className="mt-2 text-sm text-cyan">{progress}</p>}
+            {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+          </div>
+
+          <div className="glass flex flex-1 flex-col overflow-hidden rounded-2xl border border-border">
+            {loading ? (
+              <p className="text-text-muted px-5 py-4">Загрузка…</p>
+            ) : (
+              <>
+              <div
+                className="overflow-x-auto p-3 [-webkit-overflow-scrolling:touch]"
+                role="region"
+                aria-label="Таблица реестра поручений"
+                tabIndex={0}
+              >
+              {filteredRows.length === 0 ? (
+                <p className="text-text-muted px-2 py-10 text-center text-sm">
+                  {rows.length === 0
+                    ? 'Реестр пуст. Добавьте поручение через поле ввода выше.'
+                    : 'Нет строк по выбранным фильтрам.'}
+                </p>
+              ) : (
+              <table className="w-full min-w-[960px] table-fixed border-collapse text-sm">
+                <colgroup>
                   {COLUMNS.map((col) => (
-                    <th key={col.key} className="relative px-2 py-2 font-medium">
-                      <span
-                        className="cursor-pointer hover:text-white"
-                        onClick={() =>
-                          setSort((s) =>
-                            s?.key === col.key
-                              ? {
-                                  key: col.key,
-                                  dir: s.dir === 'asc' ? 'desc' : 'asc',
-                                }
-                              : { key: col.key, dir: 'asc' },
-                          )
-                        }
+                    <col key={col.key} className={col.widthClass} />
+                  ))}
+                </colgroup>
+                <thead>
+                  <tr className="border-b border-border text-left text-text-muted">
+                    {COLUMNS.map((col) => (
+                      <th
+                        key={col.key}
+                        className={`relative px-3 py-2.5 font-medium ${col.widthClass}`}
                       >
-                        {col.label}
-                      </span>
-                      {col.filterable && !registryEditMode && (
-                        <button
-                          type="button"
-                          className="ml-1 text-xs"
+                        <span
+                          className="cursor-pointer hover:text-text-bright"
                           onClick={() =>
-                            setOpenFilter(
-                              openFilter === col.key ? null : col.key,
+                            setSort((s) =>
+                              s?.key === col.key
+                                ? {
+                                    key: col.key,
+                                    dir: s.dir === 'asc' ? 'desc' : 'asc',
+                                  }
+                                : { key: col.key, dir: 'asc' },
                             )
                           }
                         >
-                          ▾
-                        </button>
-                      )}
-                      {openFilter === col.key && (
-                        <div className="absolute z-10 mt-1 max-h-40 overflow-auto rounded border border-slate-600 bg-slate-900 p-2 shadow-lg">
-                          {uniqueValues(col.key).map((v) => (
-                            <label
-                              key={v}
-                              className="flex gap-2 whitespace-nowrap text-xs"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={
-                                  filters[col.key]?.has(v) ??
-                                  !(filters[col.key]?.size ?? 0)
-                                }
-                                onChange={() => {
-                                  setFilters((prev) => {
-                                    const next = { ...prev };
-                                    const set =
-                                      next[col.key] ??
-                                      new Set(uniqueValues(col.key));
-                                    if (set.has(v)) set.delete(v);
-                                    else set.add(v);
-                                    next[col.key] = set;
-                                    return next;
-                                  });
-                                }}
-                              />
-                              {v}
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRows.map((row) => (
-                  <tr
-                    key={row.row_number}
-                    className={
-                      registryEditMode
-                        ? 'border-b border-cyan-900/40 bg-cyan-950/20'
-                        : 'border-b border-slate-800 hover:bg-slate-900/50'
-                    }
-                  >
-                    {COLUMNS.map((col) => renderCell(row, col.key))}
+                          {col.label}
+                        </span>
+                        {col.filterable && !registryEditMode && (
+                          <button
+                            type="button"
+                            className={`ml-1 rounded px-0.5 text-xs hover:text-text-bright ${FOCUS_RING}`}
+                            aria-label={`Фильтр: ${col.label}`}
+                            aria-expanded={openFilter === col.key}
+                            onClick={() =>
+                              setOpenFilter(openFilter === col.key ? null : col.key)
+                            }
+                          >
+                            ▾
+                          </button>
+                        )}
+                        {openFilter === col.key && (
+                          <div className="glass absolute z-10 mt-1 max-h-40 min-w-[10rem] overflow-auto rounded-lg border border-border bg-bg-deep p-2 shadow-xl">
+                            {uniqueValues(col.key).map((v) => (
+                              <label
+                                key={v}
+                                className="flex gap-2 whitespace-nowrap text-xs text-text-primary"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={
+                                    filters[col.key]?.has(v) ??
+                                    !(filters[col.key]?.size ?? 0)
+                                  }
+                                  onChange={() => {
+                                    setFilters((prev) => {
+                                      const next = { ...prev };
+                                      const set =
+                                        next[col.key] ??
+                                        new Set(uniqueValues(col.key));
+                                      if (set.has(v)) set.delete(v);
+                                      else set.add(v);
+                                      next[col.key] = set;
+                                      return next;
+                                    });
+                                  }}
+                                />
+                                {v}
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                </thead>
+                <tbody>
+                  {paginatedRows.map((row) => (
+                    <tr
+                      key={row.row_number}
+                      className={
+                        registryEditMode
+                          ? 'border-b border-cyan/20 bg-cyan-glow/40'
+                          : 'border-b border-border/50 transition-colors hover:bg-bg-card-hover'
+                      }
+                    >
+                      {COLUMNS.map((col) => renderCell(row, col.key))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              )}
+              </div>
+              <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-2.5 text-xs text-text-muted">
+                <span>
+                  {filteredRows.length === 0
+                    ? `0 из ${rows.length}`
+                    : `${pageStart}–${pageEnd} из ${filteredRows.length}`}
+                  {filteredRows.length !== rows.length &&
+                    filteredRows.length > 0 &&
+                    ` (всего в реестре: ${rows.length})`}
+                </span>
+                {filteredRows.length > PAGE_SIZE && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className={`rounded-md border border-border bg-bg-card px-2.5 py-1 text-text-primary hover:bg-bg-card-hover disabled:opacity-40 ${FOCUS_RING}`}
+                      disabled={page <= 0}
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    >
+                      Назад
+                    </button>
+                    <span className="text-text-secondary">
+                      {page + 1} / {pageCount}
+                    </span>
+                    <button
+                      type="button"
+                      className={`rounded-md border border-border bg-bg-card px-2.5 py-1 text-text-primary hover:bg-bg-card-hover disabled:opacity-40 ${FOCUS_RING}`}
+                      disabled={page >= pageCount - 1}
+                      onClick={() =>
+                        setPage((p) => Math.min(pageCount - 1, p + 1))
+                      }
+                    >
+                      Вперёд
+                    </button>
+                  </div>
+                )}
+              </footer>
+              </>
+            )}
+          </div>
         </div>
       </main>
     </div>

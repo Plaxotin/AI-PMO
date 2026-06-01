@@ -6,6 +6,7 @@ import {
 import { apiError, validationError } from '@/lib/assignments/errors';
 import { parseProjectId } from '@/lib/api/project';
 import { jsonWithAuth, withAuth } from '@/lib/api/route-helpers';
+import { getDevPreviewRows, isDevPreviewMode } from '@/lib/dev/preview';
 import { createPmiRowBodySchema } from '@/lib/pmi/types';
 import { appendRow, listAssignmentRows } from '@/lib/google/sheets';
 
@@ -18,6 +19,22 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   const { projectId } = await context.params;
   const project = parseProjectId(projectId);
   if (!project.ok) return project.response;
+
+  if (isDevPreviewMode()) {
+    const data = getDevPreviewRows();
+    return jsonWithAuth(
+      {
+        data,
+        meta: {
+          total: data.length,
+          spreadsheet_url: null,
+          connected: true,
+          dev_preview: true,
+        },
+      },
+      { auth: authResult.auth },
+    );
+  }
 
   const google = await requireGoogleSession();
   if (!google.ok) return google.response;
