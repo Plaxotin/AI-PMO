@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "src/app/api/projects/[projectId]/ingest/route.ts": {
+      "maxDuration": 300,
+      "memory": 3008
+    }
+  }
+}
