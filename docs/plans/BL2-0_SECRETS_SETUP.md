@@ -67,6 +67,37 @@ GOOGLE_CLIENT_SECRET=GOCSPX-...
 GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
 ```
 
+### 1.2.1 Ошибка 403 `access_denied` («приложение не прошло проверку Google»)
+
+Типичная причина на пилоте: **OAuth consent screen → Publishing status = Testing**, а ваш Google-аккаунт **не добавлен** в **Test users**.
+
+**Что сделать (5 минут):**
+
+1. Откройте [Google Cloud Console](https://console.cloud.google.com/) → тот же проект, где создан Client ID `…apps.googleusercontent.com`.
+2. **APIs & Services → OAuth consent screen**.
+3. Убедитесь, что статус **Testing** (для пилота это нормально).
+4. Прокрутите до **Test users** → **+ Add users**.
+5. Добавьте **точный email**, под которым входите в Google (ваш `@gmail.com` или корпоративный).
+6. **Save** → подождите 1–2 минуты → снова [https://ai-pmo-tawny.vercel.app/assignments](https://ai-pmo-tawny.vercel.app/assignments) → «Войти через Google».
+
+**Проверьте также:**
+
+| Проверка | Где |
+|----------|-----|
+| `redirect_uri` в ошибке = `GOOGLE_REDIRECT_URI` в Vercel | Credentials → OAuth Client → Authorized redirect URIs |
+| Включены Sheets API и Drive API | APIs & Services → Library |
+| Scopes: `spreadsheets`, `drive.file` | OAuth consent screen → Scopes |
+
+**Если у вас Google Workspace:** можно выбрать тип приложения **Internal** — тогда все пользователи домена входят без Test users (без публикации в Google).
+
+**Для доступа любых внешних пользователей без списка Test users:** нужна **публикация** приложения (In production) и при необходимости **верификация Google** для чувствительных scopes — это отдельный процесс, не блокер пилота.
+
+Параметры из «Подробная информация» (норма для BL2-0):
+
+- `client_id=…apps.googleusercontent.com`
+- `redirect_uri=https://ai-pmo-tawny.vercel.app/api/auth/google/callback`
+- `scope=…/auth/spreadsheets …/auth/drive.file`
+
 ### 1.5 Миграция с Service Account
 
 Если ранее настраивали `GOOGLE_SERVICE_ACCOUNT_EMAIL` / `GOOGLE_PRIVATE_KEY` — **удалите** их из Cursor/Vercel и замените на три переменные OAuth выше.

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { apiError } from '@/lib/assignments/errors';
+import { GOOGLE_OAUTH_ERROR_PARAM } from '@/lib/google/oauth-errors';
 import { exchangeCodeForTokens, mergeTokensIntoSession } from '@/lib/google/oauth';
 import { getBl6Session, setBl6Session } from '@/lib/google/session';
 
@@ -7,14 +8,6 @@ export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get('code');
   const stateRaw = request.nextUrl.searchParams.get('state');
   const error = request.nextUrl.searchParams.get('error');
-
-  if (error) {
-    return apiError('GOOGLE_NOT_CONNECTED', `Google OAuth: ${error}`, 401);
-  }
-
-  if (!code) {
-    return apiError('VALIDATION_ERROR', 'Отсутствует code', 400);
-  }
 
   let returnTo = '/assignments';
   if (stateRaw) {
@@ -26,6 +19,17 @@ export async function GET(request: NextRequest) {
     } catch {
       // ignore invalid state
     }
+  }
+
+  if (error) {
+    const base = request.nextUrl.origin;
+    const dest = new URL(returnTo, base);
+    dest.searchParams.set(GOOGLE_OAUTH_ERROR_PARAM, error);
+    return NextResponse.redirect(dest);
+  }
+
+  if (!code) {
+    return apiError('VALIDATION_ERROR', 'Отсутствует code', 400);
   }
 
   try {

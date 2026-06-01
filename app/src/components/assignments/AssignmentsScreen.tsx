@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_PROJECT_ID } from '@/lib/config';
+import {
+  GOOGLE_OAUTH_ERROR_PARAM,
+  googleOAuthErrorMessage,
+} from '@/lib/google/oauth-errors';
 import type { ParsedAssignment, SheetRow } from '@/lib/pmi/types';
 
 const PROJECT_ID = DEFAULT_PROJECT_ID;
@@ -121,6 +125,20 @@ export default function AssignmentsScreen() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const oauthErr = params.get(GOOGLE_OAUTH_ERROR_PARAM);
+    const msg = googleOAuthErrorMessage(oauthErr);
+    if (msg) {
+      setError(msg);
+      params.delete(GOOGLE_OAUTH_ERROR_PARAM);
+      const next = params.toString();
+      const path = window.location.pathname;
+      window.history.replaceState(null, '', next ? `${path}?${next}` : path);
+    }
+  }, []);
 
   const filteredRows = useMemo(() => {
     let list = [...rows];
@@ -296,6 +314,17 @@ export default function AssignmentsScreen() {
           Войдите через Google, чтобы создать или подключить таблицу PMI Action Item
           Tracker.
         </p>
+        <p className="max-w-lg text-center text-xs text-slate-500">
+          Пока приложение в Google Cloud в статусе <strong>Testing</strong>, вход
+          разрешён только аккаунтам из списка <strong>Test users</strong> (см.{' '}
+          <code className="text-slate-400">docs/plans/BL2-0_SECRETS_SETUP.md</code>
+          ).
+        </p>
+        {error && (
+          <p className="max-w-lg rounded-lg border border-red-900/50 bg-red-950/40 px-4 py-3 text-sm text-red-300">
+            {error}
+          </p>
+        )}
         <a
           href={`/api/auth/google?returnTo=/assignments`}
           className="rounded-lg bg-blue-600 px-6 py-3 font-medium text-white hover:bg-blue-500"
