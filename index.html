@@ -2152,9 +2152,6 @@ document.querySelectorAll('.fade-up').forEach((el,i)=>{
     if((host==='localhost'||host==='127.0.0.1')&&location.port==='8080'){
       return 'http://localhost:3000/assignments'+qs;
     }
-    if(host==='ai-pmo.vercel.app'){
-      return 'https://ai-pmo-tawny.vercel.app/assignments'+qs;
-    }
     return '/assignments'+qs;
   }
   function updateTasksCardHref(){

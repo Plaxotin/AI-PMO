@@ -10,7 +10,7 @@ This workspace is the **AI-PMO** product repository on GitHub: **`Plaxotin/AI-PM
 
 ## Cursor Cloud specific instructions
 
-This is a zero-dependency static landing page (single `index.html` with inline CSS/JS) deployed on Vercel.
+This is a zero-dependency static landing page (single `index.html` with inline CSS/JS) deployed on Vercel together with the Next.js app in `app/` (see root `vercel.json`). Production URL: **https://ai-pmo-tawny.vercel.app/** — not `ai-pmo.vercel.app` unless that domain is added to the Vercel project.
 
 ### Running locally
 
