@@ -3,14 +3,20 @@
   "version": 2,
   "builds": [
     {
+      "src": "index.html",
+      "use": "@vercel/static"
+    },
+    {
       "src": "app/package.json",
       "use": "@vercel/next"
     }
   ],
   "routes": [
-    { "src": "/api/projects/(.*)", "dest": "/app/api/projects/$1" },
-    { "src": "/api/auth/(.*)", "dest": "/app/api/auth/$1" },
-    { "src": "/(.*)", "dest": "/app/$1" }
+    { "src": "/api/(.*)", "dest": "/app/api/$1" },
+    { "src": "/assignments(.*)", "dest": "/app/assignments$1" },
+    { "src": "/_next/(.*)", "dest": "/app/_next/$1" },
+    { "src": "/", "dest": "/index.html" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ],
   "headers": [
     {
