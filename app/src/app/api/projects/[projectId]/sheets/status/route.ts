@@ -29,7 +29,11 @@ export async function GET(_request: Request, context: RouteContext) {
 
   if (!isGoogleOAuthConfigured()) {
     return jsonWithAuth(
-      { connected: false, oauth_configured: false },
+      {
+        connected: false,
+        oauth_configured: false,
+        google_signed_in: false,
+      },
       { auth: authResult.auth },
     );
   }
