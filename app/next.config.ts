@@ -1,9 +1,14 @@
 import type { NextConfig } from "next";
 
-/** API routes are always at `/api/*` (local dev and Vercel). Do not use `/app` prefix. */
+/**
+ * Vercel monorepo build serves Next under `/app`; browser calls use `/app/api/*`.
+ * Local dev uses `/api/*` (no prefix). OAuth entry stays `/api/auth/*` (see vercel.json).
+ */
+const apiPrefix = process.env.VERCEL ? "/app" : "";
+
 const nextConfig: NextConfig = {
   env: {
-    NEXT_PUBLIC_API_PREFIX: "",
+    NEXT_PUBLIC_API_PREFIX: apiPrefix,
   },
   experimental: {
     serverActions: {
