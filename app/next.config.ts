@@ -1,11 +1,9 @@
 import type { NextConfig } from "next";
 
-/** Vercel builds from repo root via `app/package.json` — API lives under `/app`. */
-const apiPrefix = process.env.VERCEL ? "/app" : "";
-
+/** API routes are always at `/api/*` (local dev and Vercel). Do not use `/app` prefix. */
 const nextConfig: NextConfig = {
   env: {
-    NEXT_PUBLIC_API_PREFIX: apiPrefix,
+    NEXT_PUBLIC_API_PREFIX: "",
   },
   experimental: {
     serverActions: {

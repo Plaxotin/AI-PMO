@@ -12,9 +12,11 @@
     }
   ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "/app/api/$1" },
-    { "src": "/assignments(.*)", "dest": "/app/assignments$1" },
-    { "src": "/_next/(.*)", "dest": "/app/_next/$1" },
+    { "src": "/app/api/(.*)", "dest": "/api/$1" },
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/assignments(.*)", "dest": "/assignments$1" },
+    { "src": "/_next/(.*)", "dest": "/_next/$1" },
+    { "src": "/favicon.ico", "dest": "/favicon.ico" },
     { "src": "/", "dest": "/index.html" },
     { "src": "/(.*)", "dest": "/index.html" }
   ],

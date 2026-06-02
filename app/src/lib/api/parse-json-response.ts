@@ -23,6 +23,21 @@ export async function parseJsonResponse<T = unknown>(
     };
   }
 
+  const trimmed = text.trimStart();
+  if (
+    trimmed.startsWith('<!DOCTYPE') ||
+    trimmed.startsWith('<html') ||
+    trimmed.startsWith('<HTML')
+  ) {
+    return {
+      ok: false,
+      status: res.status,
+      message:
+        'Сервер вернул HTML вместо JSON (часто из‑за неверного URL API). ' +
+        'Обновите страницу; если ошибка повторяется — проверьте деплой /api на Vercel.',
+    };
+  }
+
   try {
     const data = JSON.parse(text) as T;
     if (!res.ok) {
