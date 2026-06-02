@@ -195,44 +195,115 @@ export default function AssignmentsScreen() {
   const fileRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
+  const sheetsInitPromiseRef = useRef<Promise<{
+    ok: boolean;
+    spreadsheetUrl: string | null;
+  }> | null>(null);
 
   const refresh = useCallback(async () => {
     setError(null);
-    const statusRes = await fetch(`${apiRoot()}/sheets/status`);
-    const status = await statusRes.json();
-    setDevPreview(Boolean(status.dev_preview));
-    setGoogleSignedIn(Boolean(status.google_signed_in));
-    setConnected(Boolean(status.connected));
-    setSpreadsheetUrl(status.spreadsheet_url ?? null);
+    try {
+      const statusRes = await fetch(`${apiRoot()}/sheets/status`, {
+        credentials: 'same-origin',
+      });
+      const statusParsed = await parseJsonResponse<{
+        connected?: boolean;
+        google_signed_in?: boolean;
+        oauth_configured?: boolean;
+        dev_preview?: boolean;
+        spreadsheet_url?: string | null;
+      }>(statusRes);
 
-    if (!status.google_signed_in) {
-      setLoading(false);
-      return;
-    }
-
-    if (!status.connected) {
-      const initRes = await fetch(`${apiRoot()}/sheets/init`, { method: 'POST' });
-      if (!initRes.ok) {
-        const err = await initRes.json();
-        setError(err?.error?.message ?? 'Не удалось создать таблицу');
-        setLoading(false);
+      if (!statusParsed.ok) {
+        setGoogleSignedIn(false);
+        setConnected(false);
+        setError(statusParsed.message);
         return;
       }
-      const initData = await initRes.json();
-      setSpreadsheetUrl(initData.spreadsheet_url);
-      setConnected(true);
-    }
 
-    const listRes = await fetch(`${apiRoot()}/assignments`);
-    const list = await listRes.json();
-    if (listRes.ok) {
-      setRows(list.data ?? []);
-      setSpreadsheetUrl(list.meta?.spreadsheet_url ?? spreadsheetUrl);
-    } else {
-      setError(list?.error?.message ?? 'Ошибка загрузки реестра');
+      const status = statusParsed.data;
+      setDevPreview(Boolean(status.dev_preview));
+
+      if (status.oauth_configured === false) {
+        setGoogleSignedIn(false);
+        setConnected(false);
+        setError(
+          'Google OAuth не настроен на сервере. См. docs/plans/BL2-0_SECRETS_SETUP.md',
+        );
+        return;
+      }
+
+      setGoogleSignedIn(Boolean(status.google_signed_in));
+      if (!status.google_signed_in) {
+        setConnected(false);
+        return;
+      }
+
+      let isConnected = Boolean(status.connected);
+      let sheetUrl = status.spreadsheet_url ?? null;
+
+      if (!isConnected) {
+        if (!sheetsInitPromiseRef.current) {
+          sheetsInitPromiseRef.current = (async () => {
+            const initRes = await fetch(`${apiRoot()}/sheets/init`, {
+              method: 'POST',
+              credentials: 'same-origin',
+            });
+            const initParsed = await parseJsonResponse<{
+              spreadsheet_url?: string;
+            }>(initRes);
+            if (!initParsed.ok) {
+              setError(initParsed.message);
+              return { ok: false, spreadsheetUrl: null };
+            }
+            return {
+              ok: true,
+              spreadsheetUrl: initParsed.data.spreadsheet_url ?? null,
+            };
+          })().finally(() => {
+            sheetsInitPromiseRef.current = null;
+          });
+        }
+
+        const initResult = await sheetsInitPromiseRef.current;
+        if (!initResult.ok) {
+          setConnected(false);
+          return;
+        }
+        isConnected = true;
+        sheetUrl = initResult.spreadsheetUrl ?? sheetUrl;
+      }
+
+      setConnected(isConnected);
+      setSpreadsheetUrl(sheetUrl);
+
+      const listRes = await fetch(`${apiRoot()}/assignments`, {
+        credentials: 'same-origin',
+      });
+      const listParsed = await parseJsonResponse<{
+        data?: SheetRow[];
+        meta?: { spreadsheet_url?: string | null; connected?: boolean };
+      }>(listRes);
+
+      if (!listParsed.ok) {
+        setError(listParsed.message);
+        return;
+      }
+
+      setRows(listParsed.data.data ?? []);
+      if (listParsed.data.meta?.spreadsheet_url) {
+        setSpreadsheetUrl(listParsed.data.meta.spreadsheet_url);
+      }
+      if (listParsed.data.meta?.connected) {
+        setConnected(true);
+      }
+    } catch (e) {
+      setConnected(false);
+      setError(e instanceof Error ? e.message : 'Ошибка сети');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [spreadsheetUrl]);
+  }, []);
 
   useEffect(() => {
     void refresh();
@@ -723,7 +794,13 @@ export default function AssignmentsScreen() {
                   AI PMO - Администратор поручений
                 </h1>
                 <p className="text-text-muted text-xs">
-                  {connected ? 'Google Sheets подключён' : 'Подключение Sheets...'}
+                  {loading
+                    ? 'Проверка подключения…'
+                    : connected
+                      ? 'Google Sheets подключён'
+                      : error
+                        ? 'Sheets не подключён'
+                        : 'Подключение Sheets…'}
                 </p>
               </div>
             </div>
