@@ -176,6 +176,7 @@ body.workspace-active{overflow:hidden}
   transition:border-color 0.3s,background 0.3s,transform 0.3s,box-shadow 0.3s;
   font-family:inherit;color:inherit;
 }
+a.tool-card{text-decoration:none;display:block;color:inherit}
 .tool-card:not(:disabled):hover{
   border-color:var(--border-hover);background:var(--bg-card-hover);
   transform:translateY(-3px);box-shadow:0 16px 48px rgba(0,0,0,0.35);
@@ -1293,13 +1294,13 @@ body.letter-workspace-active{overflow:hidden}
         <h3 data-i18n="platform.tool.audit.title">Project plan audit</h3>
         <p data-i18n="platform.tool.audit.desc">Automatic analysis and review of your project plan against PM best practices and standards</p>
       </button>
-      <button type="button" class="tool-card fade-up" data-tool-id="tasks" data-tool-active style="transition-delay:0.45s;">
+      <a class="tool-card fade-up" id="tool-card-tasks" data-tool-id="tasks" href="#" style="transition-delay:0.45s;">
         <div class="tool-card-top">
           <div class="tool-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M9 14l2 2 4-4"></path></svg></div>
         </div>
         <h3 data-i18n="platform.tool.tasks.title">Task administrator</h3>
         <p data-i18n="platform.tool.tasks.desc">Smart task and assignment management with automatic distribution, tracking, and execution control</p>
-      </button>
+      </a>
       <button type="button" class="tool-card tool-card--pro fade-up" data-tool-id="meeting" data-tool-tier="professional" style="transition-delay:0.5s;">
         <div class="tool-card-top">
           <div class="tool-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></div>
@@ -2143,6 +2144,24 @@ document.querySelectorAll('.fade-up').forEach((el,i)=>{
   let activeToolId=null;
   let selectedFile=null;
 
+  function getAssignmentsHref(){
+    const params=new URLSearchParams({from:'landing'});
+    if(currentLang)params.set('lang',currentLang);
+    const qs='?'+params.toString();
+    const host=location.hostname;
+    if((host==='localhost'||host==='127.0.0.1')&&location.port==='8080'){
+      return 'http://localhost:3000/assignments'+qs;
+    }
+    if(host==='ai-pmo.vercel.app'){
+      return 'https://ai-pmo-tawny.vercel.app/assignments'+qs;
+    }
+    return '/assignments'+qs;
+  }
+  function updateTasksCardHref(){
+    const card=document.getElementById('tool-card-tasks');
+    if(card)card.href=getAssignmentsHref();
+  }
+
   function t(key){
     if(currentLang==='ru'&&translations.ru[key])return translations.ru[key];
     const el=document.querySelector('[data-i18n="'+key+'"]');
@@ -2187,10 +2206,17 @@ document.querySelectorAll('.fade-up').forEach((el,i)=>{
   document.querySelectorAll('.tool-card[data-tool-active]').forEach(card=>{
     card.addEventListener('click',()=>{
       const id=card.getAttribute('data-tool-id');
+      if(id==='tasks'){location.href=getAssignmentsHref();return;}
       if(id==='letters'){openLetterWorkspace();return;}
       openWorkspace(id);
     });
   });
+  document.getElementById('tool-card-tasks')?.addEventListener('click',e=>{
+    e.preventDefault();
+    location.href=getAssignmentsHref();
+  });
+  updateTasksCardHref();
+  document.addEventListener('app:lang',updateTasksCardHref);
   document.querySelectorAll('.tool-card[data-tool-tier="professional"]').forEach(card=>{
     card.addEventListener('click',scrollToPricing);
   });
