@@ -4,7 +4,9 @@
 **Контекст бага:** пользователь загружает корпоративный бланк (DOCX), вводит текст, нажимает «Сформировать письмо» — в результате **пустой Word-документ с текстом**, без бланка, логотипа и разметки шаблона.  
 **Спека:** `docs/specs/SPEC-BL-18-official-letter-generator.md` (v1.2)  
 **ADR:** `docs/specs/ADR-BL-18-01-tenant-model.md`, `docs/specs/ADR-BL-18-02-production-decisions.md` (§5 плейсхолдеры, §4 DOCX)  
-**Предыдущие планы:** `docs/plans/BL18_PLAN.md` (landing mock), `docs/plans/BL18_DOWNLOAD_TEST_SCENARIO.md` (валидный OOXML без шаблона)
+**Предыдущие планы:**
+- **Устранение блокеров R1 (ваши действия):** [`BL18_R1_BLOCKERS_RESOLUTION_PLAN.md`](BL18_R1_BLOCKERS_RESOLUTION_PLAN.md)
+ `docs/plans/BL18_PLAN.md` (landing mock), `docs/plans/BL18_DOWNLOAD_TEST_SCENARIO.md` (валидный OOXML без шаблона)
 **Дизайн UI v2:** [Figma Make — Corporate Letter Generator](https://jolly-arrow-79732335.figma.site/) (продуктовое имя в макете: **«ДеловаяПочта: Генератор служебных писем»**)
 
 ---
