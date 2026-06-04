@@ -146,7 +146,8 @@
   - **Actions:** `curl -F file=@template-valid.docx -F name=Corp … POST /api/tenants/{DEFAULT_TENANT_ID}/letter-templates` → 201. Повторить с invalid → ошибка с чеклистом. `unzip -l` на сохранённом файле — структура исходного бланка сохранена.
   - **Expected:** Валидация отражает ADR §5.1; байты шаблона на диске идентичны загруженным.
   - **Evidence:** Вывод curl; лог SQL; скрин/список плейсхолдеров из API metadata.
-- **status:** `planned`
+- **status:** `ready_for_test`
+- **implemented_date:** 2026-06-04
 
 ---
 

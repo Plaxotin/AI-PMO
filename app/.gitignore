@@ -20,6 +20,9 @@
 # production
 /build
 
+# BL-18 local template storage
+.data/
+
 # misc
 .DS_Store
 *.pem

@@ -15,7 +15,13 @@ export type ApiErrorCode =
   | 'SHEETS_API_ERROR'
   | 'LLM_ERROR'
   | 'STT_ERROR'
-  | 'INGEST_ERROR';
+  | 'INGEST_ERROR'
+  | 'BL18_DISABLED'
+  | 'FILE_TOO_LARGE'
+  | 'TENANT_STORAGE_QUOTA_EXCEEDED'
+  | 'TEMPLATE_VALIDATION_FAILED'
+  | 'TENANT_MISMATCH'
+  | 'TENANT_NOT_FOUND';
 
 export type ApiErrorBody = {
   error: {
