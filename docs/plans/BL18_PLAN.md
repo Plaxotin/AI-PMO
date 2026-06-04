@@ -1,5 +1,21 @@
 # BL-18 — Official Letter Generator: Implementation Plan
 
+> **Статус (2026-06-04):** фазы **BL18-P1–P3** (landing mock в `index.html`) — **выполнены** (verified).  
+> **Актуальный план реализации** — [`BL18_REMEDIATION_PLAN.md`](BL18_REMEDIATION_PLAN.md): backend (docxtemplater, API), **Design v2** ([Figma Make](https://jolly-arrow-79732335.figma.site/)), маршрут `/letters`.  
+> Этот документ сохранён как **история** landing-фаз и не описывает целевой продукт.
+
+### Скоуп v2 (решения продукта)
+
+| Тема | v2 (remediation R1–R7) | На развитие |
+|------|------------------------|-------------|
+| UI | Figma v2 «ДеловаяПочта», 3 колонки | — |
+| Вложения | **Нет** | BL18-R8 |
+| «Диктовать» (STT) | **Скрыто** | BL18-R9 |
+| Исходный Figma file | Make site + чеклист | BL18-R10 (файл позже) |
+| Сборка в бланк | docxtemplater (R2) | — |
+
+---
+
 **Spec:** `docs/SPEC-BL-18-official-letter-generator.md`
 **Repository:** `Plaxotin/AI-PMO` (single `index.html`, inline CSS/JS, deployed on Vercel)
 **Created:** 2026-05-24

@@ -34,6 +34,20 @@
 
 **MVP-ограничение по auth:** в prod спека и ADR требуют сессию; для локальной разработки допустим существующий режим `getAuthResult().mode === 'disabled'` (как в BL1-0), но **не** откладывать схему `tenant_id` — ADR A₀.
 
+
+---
+
+## Продуктовые решения (зафиксировано 2026-06-04)
+
+| # | Вопрос | Решение |
+|---|--------|---------|
+| 1 | Исходный Figma file (не Make site) | **Пока нет** — пользователь предоставит позже в рамках развития фичи; до этого — вёрстка по [Figma Make site](https://jolly-arrow-79732335.figma.site/) + скриншоты; токены уточняются при появлении файла |
+| 2 | Вложения (0–5) в UI и потоке v2 | **Убрать из текущего скоупа** — функционал **на развитие** (post-v2). MVP v2: только шаблон + поля письма; ZIP = **только** `letter.docx` (допустимо по SPEC §2.1) |
+| 3 | Кнопка **«Диктовать»** в макете | **Скрыть** в UI (не показывать); STT — **на развитие** (§3.2 спеки) |
+
+**Связь со SPEC:** полный SPEC-BL-18 по вложениям остаётся целевым для prod; в remediation v2 backend/API **не требует** multipart вложений до отдельной фазы **BL18-R8** (см. backlog ниже).
+
+
 **Implementer:** перед каждой фазой — **явное одобрение пользователя** (см. `docs/SUBAGENTS_WORKFLOW.md`).
 
 ---
@@ -79,10 +93,11 @@
 | **Тип документа** (select, напр. «Служебная записка») | Метаданные шаблона / паспорт стиля (§4) | Нет; только optional passport textarea |
 | **Получатель / Обращение**, **Тема**, **Содержание** (отдельные поля) | LLM JSON: `salutation`, `subject`, `body` (ADR §3) | Одно поле «суть» |
 | Счётчик символов, **«Очистить»**, **«Сбросить»** | Лимит gist 30–50k (ADR) | Нет счётчика |
-| Кнопка **«Диктовать»** (микрофон) | **Вне MVP** (§3.2 STT) | Нет |
+| Кнопка **«Диктовать»** (микрофон) | **На развитие** — **скрыть** в v2 | Не показывать |
 | Правая колонка **превью** («Здесь появится готовое письмо») | §3.1 п.9 предпросмотр / скачивание | Preview под формой после generate |
 | **«Сформировать письмо»** disabled без бланка | Валидация до generate | Disabled без template file + gist |
 | Светлая корпоративная тема (не glass landing) | UX продукта AI PMO | Glass-morphism лендинга |
+| Вложения (файлы) | SPEC §3.1 — **на развитие в v2** | Step 3 в `index.html` (убрать в R7) |
 
 ### Решение по каналу UI (зафиксировано для remediation)
 
@@ -225,6 +240,7 @@
   - Удалить зависимость от клиентского `buildDocxBlob` / `buildMockLetter` для prod-потока.
   - Регрессия: итоговый DOCX — ZIP (OOXML), не `text/plain`; `unzip -t` на пакете.
 - **out_of_scope:**
+  - **Приём и упаковка вложений** в generate/ZIP для v2 (отложено на **BL18-R8**; acceptance v2 — ZIP только с `letter.docx`).
   - Полный audit persist (частично — минимальная запись `generation_id`; полный audit в R5).
   - UI лендинга (R6).
   - Async 202 polling для больших файлов (можно last; зафиксировать sync MVP).
@@ -306,9 +322,9 @@
   - Responsive: desktop-first как в макете; tablet — сворачивание sidebar (достаточно breakpoint + drawer).
 - **out_of_scope:**
   - Реальный вызов generate / скачивание DOCX-ZIP (фаза **R7**).
-  - **STT «Диктовать»** — кнопка в макете: показать disabled + tooltip «Скоро» или скрыть до post-MVP (§3.2 спеки).
+  - **STT «Диктовать»** — **не рендерить** в UI (решение продукта 2026-06-04).
+  - **Вложения** — не в UI и не в API-клиенте v2 (фаза **BL18-R8** / развитие).
   - Полная вкладка **История** с данными — skeleton + empty state; наполнение из audit API в R7/R5.
-  - Вложения (файлы) в форме — отдельный блок под compose или фаза R7; в Figma на скрине не видно — согласовать с дизайнером.
 - **dependencies:** `BL18-R1` **желательно** (список бланков из API); допустим старт с mock-данными 3 шаблонов как в макете, затем подмена fetch в R7.
 - **files_or_areas:**
   - `app/src/app/letters/page.tsx`, `app/src/app/letters/layout.tsx` (новые)
@@ -337,7 +353,7 @@
 - **goal:** Полный пользовательский поток на **новом UI**: выбор/добавление бланка → заполнение полей → generate → превью + скачивание DOCX/ZIP **из шаблона**; устранение корневого бага.
 - **scope:**
   - `TemplateSidebar`: `GET /api/tenants/:tenantId/letter-templates`; «+ Добавить» → `POST` upload + validation errors в UI.
-  - `LetterComposeForm`: собрать `gist_text` из полей (или передать structured: salutation/subject/body в body generate — согласовать с R3); вложения (0–5) — UI блок; чекбокс трансграницы.
+  - `LetterComposeForm`: собрать `gist_text` из полей (или structured salutation/subject/body в generate — согласовать с R3); чекбокс трансграницы. **Без** UI вложений (v2).
   - Generate → `POST …/letters/generate` → preview из ответа (текстовые поля) + кнопки скачивания `download_docx_url` / `download_zip_url`.
   - Вкладка **История**: список последних `generation_id` / audit (минимум: время, шаблон, повторное скачивание).
   - Удалить mock-поток: `buildMockLetter`, `buildDocxBlob`, `#letter-workspace` JS — или редирект `/letters` при `BL18_ENABLED=true`.
@@ -353,7 +369,7 @@
 - **acceptance_criteria:**
   1. Сценарий бага на `/letters`: бланк из sidebar → содержание → generate → DOCX **с корпоративной вёрсткой** бланка.
   2. Плейсхолдеры подписанта в Word не заполнены автоматически.
-  3. ZIP с `letter.docx` + оригинальные вложения.
+  3. ZIP содержит **только** `letter.docx` (вложения — post-v2, фаза R8).
   4. Нет `buildDocxBlob` в prod-потоке.
   5. E2E T11 из `BL18_DOWNLOAD_TEST_SCENARIO.md` на staging.
 - **testing_scenario:**
@@ -389,17 +405,24 @@ flowchart LR
 
 ---
 
-## Open questions
+## Решения по open questions (закрыто 2026-06-04)
 
-1. ~~**Канал UI**~~ — **закрыто:** `app/letters` + Design v2 Figma; `index.html` workspace deprecated в R7.
-2. **Object storage в dev:** filesystem `./.data/letters` vs обязательный MinIO с первой фазы?
-3. **Тестовый корпоративный шаблон:** fixture `fixtures/bl18/template-valid.docx` — эталон из «Основной бланк» в макете?
-4. **Auth в dev:** допустим ли generate без Supabase до настройки auth?
-5. **Figma:** экспорт токенов (цвета, типографика, отступы) — есть ли исходный Figma file (не только Make site) для точного match?
-6. **Вложения в Design v2:** в макете не показаны — добавить блок под формой (как в SPEC) или отдельный шаг?
-7. **«Диктовать»:** скрыть, disabled, или вынести в post-MVP roadmap в UI?
+См. таблицу **«Продуктовые решения»** выше. Кратко:
 
----
+1. **Figma file** — позже; до этого Make site + чеклист `BL18_FIGMA_V2_CHECKLIST.md`.
+2. **Вложения** — out of scope v2 → фаза **BL18-R8** (развитие).
+3. **Диктовать** — скрыть в R6/R7.
+4. **Канал UI** — `app/letters`, Design v2.
+5. **Object storage / auth / fixture** — без изменений (см. ниже в backlog).
+
+### Backlog развития (после R7)
+
+| phase_id | title | status |
+|----------|-------|--------|
+| `BL18-R8` | Вложения: UI, upload, AV, ZIP с оригиналами, перечень в письме (SPEC §11 п.4, п.6) | `planned` |
+| `BL18-R9` | STT «Диктовать» | `planned` |
+| `BL18-R10` | Импорт дизайн-токенов из исходного Figma file | `planned` |
+
 
 ## Implementer handoff
 
