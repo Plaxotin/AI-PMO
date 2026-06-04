@@ -5,6 +5,7 @@
 **Спека:** `docs/specs/SPEC-BL-18-official-letter-generator.md` (v1.2)  
 **ADR:** `docs/specs/ADR-BL-18-01-tenant-model.md`, `docs/specs/ADR-BL-18-02-production-decisions.md` (§5 плейсхолдеры, §4 DOCX)  
 **Предыдущие планы:** `docs/plans/BL18_PLAN.md` (landing mock), `docs/plans/BL18_DOWNLOAD_TEST_SCENARIO.md` (валидный OOXML без шаблона)
+**Дизайн UI v2:** [Figma Make — Corporate Letter Generator](https://jolly-arrow-79732335.figma.site/) (продуктовое имя в макете: **«ДеловаяПочта: Генератор служебных писем»**)
 
 ---
 
@@ -29,7 +30,7 @@
   }
 ```
 
-План последовательно переводит BL-18 с landing-demo на **spec-compliant** контур: серверное хранение шаблона → валидация плейсхолдеров → LLM только для разрешённых полей → **docxtemplater** merge в загруженный DOCX → валидный DOCX + ZIP → аудит. UI на лендинге подключается к API на финальной фазе.
+План последовательно переводит BL-18 с landing-demo на **spec-compliant** контур: серверное хранение шаблона → валидация плейсхолдеров → LLM только для разрешённых полей → **docxtemplater** merge в загруженный DOCX → валидный DOCX + ZIP → аудит. Целевой UI — **Design v2** по макету Figma (трёхколоночный layout: бланки | форма | превью), реализуется в **`app/letters`**, а не в вертикальном wizard `#letter-workspace` в `index.html`. Подключение к API — после сборки backend (фазы R4–R5).
 
 **MVP-ограничение по auth:** в prod спека и ADR требуют сессию; для локальной разработки допустим существующий режим `getAuthResult().mode === 'disabled'` (как в BL1-0), но **не** откладывать схему `tenant_id` — ADR A₀.
 
@@ -60,7 +61,34 @@
 | Валидация русского языка сути (кириллица ≥70%) | **Нет** |
 | Антивирус вложений (ClamAV) | **Нет** |
 
+
 ---
+
+## Design v2 — эталон UI (Figma Make)
+
+**Макет:** https://jolly-arrow-79732335.figma.site/  
+**Статус в проде сейчас:** устаревший wizard в `index.html` (одна колонка, 4 шага, upload файла на сессию).  
+**Целевое состояние:** полноэкранное приложение «ДеловаяПочта» с постоянной библиотекой бланков.
+
+### Соответствие экранов (макет → продукт)
+
+| Элемент макета (Figma v2) | SPEC / ADR | Текущий `index.html` |
+|---------------------------|------------|----------------------|
+| Левая колонка **«Бланки»** / **«История»**, список шаблонов, **«+ Добавить»** | §3.1 п.2 версионирование шаблона; REST templates (ADR §10) | Одиночный upload DOCX на сессию, без списка и истории |
+| Выбор бланка обязателен («Выберите бланк письма для продолжения») | `template_id` в generate | Файл в `templateFile`, без выделенного списка |
+| **Тип документа** (select, напр. «Служебная записка») | Метаданные шаблона / паспорт стиля (§4) | Нет; только optional passport textarea |
+| **Получатель / Обращение**, **Тема**, **Содержание** (отдельные поля) | LLM JSON: `salutation`, `subject`, `body` (ADR §3) | Одно поле «суть» |
+| Счётчик символов, **«Очистить»**, **«Сбросить»** | Лимит gist 30–50k (ADR) | Нет счётчика |
+| Кнопка **«Диктовать»** (микрофон) | **Вне MVP** (§3.2 STT) | Нет |
+| Правая колонка **превью** («Здесь появится готовое письмо») | §3.1 п.9 предпросмотр / скачивание | Preview под формой после generate |
+| **«Сформировать письмо»** disabled без бланка | Валидация до generate | Disabled без template file + gist |
+| Светлая корпоративная тема (не glass landing) | UX продукта AI PMO | Glass-morphism лендинга |
+
+### Решение по каналу UI (зафиксировано для remediation)
+
+- **Основной маршрут:** `app/src/app/letters/page.tsx` + компоненты `app/src/components/letters/*` по макету Figma v2.
+- **Лендинг:** карточка «Официальные письма» → ссылка на `/letters`; `#letter-workspace` — **deprecated** после R7 (удалить или редирект).
+- **Токены дизайна:** вынести в `app/src/components/letters/letters-theme.css` (или Tailwind theme) по Figma; не смешивать с CSS переменными `index.html`.
 
 ## Фаза BL18-R1 — Схема данных, хранение шаблона, валидация плейсхолдеров
 
@@ -259,38 +287,80 @@
 
 ---
 
-## Фаза BL18-R6 — Подключение UI: замена mock на API
+## Фаза BL18-R6 — UI Design v2 (Figma Make → Next.js)
 
 - **phase_id:** `BL18-R6`
-- **title:** Landing / UI вызывает backend BL-18 вместо buildMockLetter
-- **goal:** Сценарий пользователя на https://ai-pmo-tawny.vercel.app/ (или `/letters` в app) загружает бланк → вводит суть → получает **письмо в шаблоне** через API; устранение корневого бага.
+- **title:** Экран «ДеловаяПочта» по макету Figma v2 (layout, компоненты, состояния)
+- **goal:** Заменить устаревший `#letter-workspace` в `index.html` на целевой трёхколоночный интерфейс по https://jolly-arrow-79732335.figma.site/ ; пользовательский сценарий со скриншота (бланки слева, форма по центру, превью справа) воспроизводится в браузере.
 - **scope:**
-  - Вариант A (минимальный diff лендинга): в `index.html` заменить `setTimeout` + `buildMockLetter` + `buildDocxBlob` на `fetch` к `/api/tenants/{tenantId}/letter-templates` и `/letters/generate`; скачивание по `download_docx_url` / `download_zip_url`.
-  - Вариант B (предпочтительно для долгосрочного): страница `app/src/app/letters/page.tsx` с тем же UX; карточка на лендинге ведёт на `/letters`.
-  - Upload шаблона при первом использовании или отдельным шагом → `template_id` для generate.
-  - UI: чекбокс трансграницы, сообщения об ошибках `TEMPLATE_VALIDATION_FAILED`, `GIST_NOT_RUSSIAN`.
-  - Удалить или за gate оставить `buildDocxBlob` только как fallback `BL18_MOCK_MODE` для offline-демо (document in env).
-  - Обновить `letters.ws.security_notice` — текст соответствует реальному поведению.
+  - Страница `app/src/app/letters/page.tsx`, layout full-height без glass-лендинга.
+  - Компоненты (предлагаемая декомпозиция):
+    - `LetterAppShell` — шапка «ДеловаяПочта: Генератор служебных писем»;
+    - `TemplateSidebar` — вкладки **Бланки** / **История**, список карточек шаблона (название, категория, badge «РУ»), кнопка **+ Добавить**, выделение активного бланка;
+    - `LetterComposeForm` — предупреждение «Выберите бланк…», select **Тип документа**, поля **Получатель**, **Тема**, **Содержание** (textarea + счётчик символов + «Очистить»), кнопки **Сбросить** / **Сформировать письмо** (disabled без выбранного `template_id`);
+    - `LetterPreviewPane` — empty state «Здесь появится готовое письмо» + после generate — HTML-превью структурированного текста (не DOCX в iframe на MVP);
+    - `TemplateUploadModal` — загрузка DOCX при «+ Добавить» (вызов API R1, когда готов; до R7 — mock list + local state).
+  - Стили: светлая корпоративная палитра по Figma (отдельный CSS-модуль, не переменные `--glass-*` лендинга).
+  - i18n: RU по умолчанию для BL-18 (EN — post-MVP или ключи `letters.v2.*`).
+  - Маршрут с лендинга: карточка tool `letters` → `href="/letters"` вместо `openLetterWorkspace()`.
+  - Responsive: desktop-first как в макете; tablet — сворачивание sidebar (достаточно breakpoint + drawer).
 - **out_of_scope:**
-  - Полноценный UI выбора тенанта (A₀ — один default tenant в конфиге).
-  - Auth onboarding (использовать существующую сессию Supabase когда настроена).
-- **dependencies:** `BL18-R4` (минимум), `BL18-R5` для prod.
+  - Реальный вызов generate / скачивание DOCX-ZIP (фаза **R7**).
+  - **STT «Диктовать»** — кнопка в макете: показать disabled + tooltip «Скоро» или скрыть до post-MVP (§3.2 спеки).
+  - Полная вкладка **История** с данными — skeleton + empty state; наполнение из audit API в R7/R5.
+  - Вложения (файлы) в форме — отдельный блок под compose или фаза R7; в Figma на скрине не видно — согласовать с дизайнером.
+- **dependencies:** `BL18-R1` **желательно** (список бланков из API); допустим старт с mock-данными 3 шаблонов как в макете, затем подмена fetch в R7.
 - **files_or_areas:**
-  - `index.html` — JS блок letter workspace (~2320–2810): удалить mock generation, добавить API client
-  - **или** `app/src/app/letters/page.tsx`, `app/src/components/letters/LetterWorkspace.tsx` (новые)
-  - `vercel.json` — маршрут `/letters` уже предусмотрен
+  - `app/src/app/letters/page.tsx`, `app/src/app/letters/layout.tsx` (новые)
+  - `app/src/components/letters/*` (новые)
+  - `index.html` — изменить routing карточки `letters` на `/letters`; пометить `#letter-workspace` как deprecated в комментарии
+  - `docs/plans/BL18_FIGMA_V2_CHECKLIST.md` (новый) — чеклист pixel/behavior parity с макетом
+- **acceptance_criteria:**
+  1. `/letters` визуально соответствует Figma v2: 3 колонки, вкладки Бланки/История, поля формы, превью-плейсхолдер.
+  2. Без выбранного бланка «Сформировать письмо» disabled; отображается красная подсказка «Выберите бланк письма для продолжения».
+  3. Выбор бланка в sidebar подсвечивает карточку и разблокирует generate (пока без backend — mock success в preview).
+  4. Счётчик символов в поле «Содержание» обновляется при вводе.
+  5. Карточка на лендинге открывает `/letters`, а не overlay `#letter-workspace`.
+- **testing_scenario:**
+  - **Setup:** `npm run dev` в `app/`, открыть `/letters`.
+  - **Actions:** Сверить с https://jolly-arrow-79732335.figma.site/ и со скриншотом заказчика; выбрать бланк → ввести текст из баг-репорта → убедиться, что кнопка generate активна; сброс формы.
+  - **Expected:** Layout и copy совпадают с макетом; нет регрессии glass-стиля на лендинге.
+  - **Evidence:** Скриншоты side-by-side (Figma site vs `/letters`); опционально visual diff.
+- **status:** `planned`
+
+---
+
+## Фаза BL18-R7 — Подключение Design v2 к backend API
+
+- **phase_id:** `BL18-R7`
+- **title:** API generate + downloads в UI «ДеловаяПочта»; отключение mock в index.html
+- **goal:** Полный пользовательский поток на **новом UI**: выбор/добавление бланка → заполнение полей → generate → превью + скачивание DOCX/ZIP **из шаблона**; устранение корневого бага.
+- **scope:**
+  - `TemplateSidebar`: `GET /api/tenants/:tenantId/letter-templates`; «+ Добавить» → `POST` upload + validation errors в UI.
+  - `LetterComposeForm`: собрать `gist_text` из полей (или передать structured: salutation/subject/body в body generate — согласовать с R3); вложения (0–5) — UI блок; чекбокс трансграницы.
+  - Generate → `POST …/letters/generate` → preview из ответа (текстовые поля) + кнопки скачивания `download_docx_url` / `download_zip_url`.
+  - Вкладка **История**: список последних `generation_id` / audit (минимум: время, шаблон, повторное скачивание).
+  - Удалить mock-поток: `buildMockLetter`, `buildDocxBlob`, `#letter-workspace` JS — или редирект `/letters` при `BL18_ENABLED=true`.
+  - Ошибки: `TEMPLATE_VALIDATION_FAILED`, `GIST_NOT_RUSSIAN`, квота, AV — toast/inline по макету.
+- **out_of_scope:**
+  - STT «Диктовать».
+  - Мультитенант picker в UI.
+- **dependencies:** `BL18-R4`, `BL18-R5` (prod), `BL18-R6`.
+- **files_or_areas:**
+  - `app/src/components/letters/*` — API hooks, `app/src/lib/letters/api-client.ts`
+  - `index.html` — deprecate/remove letter workspace mock
   - `app/src/lib/config.ts` — `DEFAULT_TENANT_ID`, `BL18_ENABLED`
 - **acceptance_criteria:**
-  1. Ручной сценарий бага: upload корпоративного бланка → gist → generate → скачанный DOCX **визуально совпадает с бланком** (логотип, поля), текст в теле письма на месте `{{LETTER_BODY}}`.
-  2. Плейсхолдеры подписанта в Word остаются для ручного ввода.
-  3. ZIP содержит реальные вложения.
-  4. Нет вызовов `buildDocxBlob(lastGeneratedText)` для основного потока.
-  5. E2E из `BL18_DOWNLOAD_TEST_SCENARIO.md` T11 проходит против prod/staging API.
+  1. Сценарий бага на `/letters`: бланк из sidebar → содержание → generate → DOCX **с корпоративной вёрсткой** бланка.
+  2. Плейсхолдеры подписанта в Word не заполнены автоматически.
+  3. ZIP с `letter.docx` + оригинальные вложения.
+  4. Нет `buildDocxBlob` в prod-потоке.
+  5. E2E T11 из `BL18_DOWNLOAD_TEST_SCENARIO.md` на staging.
 - **testing_scenario:**
-  - **Setup:** Деплой с BL18_ENABLED; тот же корпоративный шаблон, что в баг-репорте.
-  - **Actions:** Полный GUI-поток + открытие DOCX в Word; сравнить с исходным бланком side-by-side.
-  - **Expected:** Баг «пустой Word без бланка» **не воспроизводится**.
-  - **Evidence:** Скриншот Word до/после; вложенный recording; hash DOCX ≠ hash пустого `buildDocxBlob` output.
+  - **Setup:** BL18_ENABLED, эталонный бланк, текст как на скриншоте пользователя.
+  - **Actions:** E2E в браузере + `file`/`unzip` на артефактах.
+  - **Expected:** Баг «пустой Word» не воспроизводится; UI остаётся Design v2.
+  - **Evidence:** Word screenshot + recording `/letters`.
 - **status:** `planned`
 
 ---
@@ -304,31 +374,42 @@ flowchart LR
   R3[R3: LLM + guard]
   R4[R4: Generate + ZIP]
   R5[R5: Audit + AV]
-  R6[R6: UI → API]
+  R6[R6: Figma UI v2]
+  R7[R7: UI + API]
   R1 --> R2
   R2 --> R3
   R3 --> R4
   R1 --> R4
+  R1 --> R6
   R4 --> R5
-  R4 --> R6
-  R5 --> R6
+  R4 --> R7
+  R5 --> R7
+  R6 --> R7
 ```
 
 ---
 
 ## Open questions
 
-1. **Канал UI:** оставляем `#letter-workspace` в `index.html` (вариант A) или переносим на `app/letters` (вариант B)? Рекомендация: **B** для единого auth и env; **A** — если нужен быстрый hotfix без Next UI.
+1. ~~**Канал UI**~~ — **закрыто:** `app/letters` + Design v2 Figma; `index.html` workspace deprecated в R7.
 2. **Object storage в dev:** filesystem `./.data/letters` vs обязательный MinIO с первой фазы?
-3. **Тестовый корпоративный шаблон:** нужен закреплённый fixture в репо (`fixtures/bl18/template-valid.docx`) для CI — кто предоставляет эталонный бланк заказчика?
-4. **Auth в dev:** допустим ли generate без Supabase (как assignments) до настройки auth, или блокировать?
+3. **Тестовый корпоративный шаблон:** fixture `fixtures/bl18/template-valid.docx` — эталон из «Основной бланк» в макете?
+4. **Auth в dev:** допустим ли generate без Supabase до настройки auth?
+5. **Figma:** экспорт токенов (цвета, типографика, отступы) — есть ли исходный Figma file (не только Make site) для точного match?
+6. **Вложения в Design v2:** в макете не показаны — добавить блок под формой (как в SPEC) или отдельный шаг?
+7. **«Диктовать»:** скрыть, disabled, или вынести в post-MVP roadmap в UI?
 
 ---
 
 ## Implementer handoff
 
-Запросить у пользователя разрешение на фазу **`BL18-R1`** (миграции + upload шаблона + валидация плейсхолдеров). Это разблокирует docxtemplater merge и устраняет класс ошибки «шаблон игнорируется» на уровне архитектуры.
+**Порядок для видимого прогресса UX:**
 
-После R1–R2 можно провести **ранний smoke** merge без LLM, чтобы подтвердить исправление template-aware DOCX до полного E2E.
+1. **`BL18-R1`** — backend шаблонов (блокирует реальный список бланков).
+2. **`BL18-R6`** — можно **параллельно после старта R1** на mock-шаблонах: экран по Figma v2, чтобы закрыть расхождение с макетом «ДеловаяПочта».
+3. **`BL18-R2` → R3 → R4` → **`BL18-R7`** — функциональное исправление бага (template-aware DOCX + API в новом UI).
+4. **`BL18-R5`** — перед prod вместе с R7.
 
-**Не начинать** с фазы BL18-DL из `BL18_DOWNLOAD_TEST_SCENARIO.md` как финального решения — она чинит только валидность пустого OOXML, **не** подстановку в бланк; после R2 сценарий DL применяется к **серверному** выходу.
+Запросить у пользователя разрешение на **`BL18-R1`** и/или **`BL18-R6`** в зависимости от приоритета (backend-first vs design-first).
+
+После R1–R2 — smoke merge без LLM. **Не** полагаться на BL18-DL / `buildDocxBlob` как финальное решение.
