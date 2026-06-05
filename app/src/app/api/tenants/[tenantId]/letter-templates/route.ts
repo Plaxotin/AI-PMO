@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server';
 
+export const runtime = 'nodejs';
+
 import {
   ensureTenantReady,
   parseAndValidateTenantId,
