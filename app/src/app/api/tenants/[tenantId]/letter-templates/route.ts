@@ -13,27 +13,37 @@ import { processTemplateDocxUpload } from '@/lib/letters/process-template-upload
 type RouteContext = { params: Promise<{ tenantId: string }> };
 
 export async function GET(_request: NextRequest, context: RouteContext) {
-  const bl18 = requireBl18Enabled();
-  if (!bl18.ok) return bl18.response;
+  try {
+    const bl18 = requireBl18Enabled();
+    if (!bl18.ok) return bl18.response;
 
-  const authResult = await withAuth();
-  if (!authResult.ok) return authResult.response;
+    const authResult = await withAuth();
+    if (!authResult.ok) return authResult.response;
 
-  const db = ensureDatabase();
-  if (!db.ok) return db.response;
+    const db = ensureDatabase();
+    if (!db.ok) return db.response;
 
-  const { tenantId: tenantIdParam } = await context.params;
-  const tenant = parseAndValidateTenantId(tenantIdParam);
-  if (!tenant.ok) return tenant.response;
+    const { tenantId: tenantIdParam } = await context.params;
+    const tenant = parseAndValidateTenantId(tenantIdParam);
+    if (!tenant.ok) return tenant.response;
 
-  const ready = await ensureTenantReady(tenant.tenantId);
-  if (!ready.ok) return ready.response;
+    const ready = await ensureTenantReady(tenant.tenantId);
+    if (!ready.ok) return ready.response;
 
-  const data = await listLetterTemplates(tenant.tenantId);
-  return jsonWithAuth({ data }, { auth: authResult.auth });
+    const data = await listLetterTemplates(tenant.tenantId);
+    return jsonWithAuth({ data }, { auth: authResult.auth });
+  } catch (e) {
+    console.error('[BL-18] GET letter-templates', e);
+    return apiError(
+      'INTERNAL_ERROR',
+      e instanceof Error ? e.message : 'Ошибка базы данных',
+      500,
+    );
+  }
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
+  try {
   const bl18 = requireBl18Enabled();
   if (!bl18.ok) return bl18.response;
 
@@ -86,4 +96,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
     auth: authResult.auth,
     status: 201,
   });
+  } catch (e) {
+    console.error('[BL-18] POST letter-templates', e);
+    return apiError(
+      'INTERNAL_ERROR',
+      e instanceof Error ? e.message : 'Ошибка базы данных',
+      500,
+    );
+  }
 }

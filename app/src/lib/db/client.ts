@@ -4,15 +4,28 @@ import { isSupabaseConfigured } from '@/lib/config';
 
 let sql: ReturnType<typeof postgres> | null = null;
 
+function postgresOptions(connectionString: string) {
+  const needsSsl =
+    connectionString.includes('supabase.co') ||
+    /sslmode=require/i.test(connectionString);
+
+  return {
+    /** Serverless-friendly pool (Vercel). */
+    max: 1,
+    prepare: false,
+    connect_timeout: 15,
+    idle_timeout: 20,
+    ...(needsSsl ? { ssl: 'require' as const } : {}),
+  };
+}
+
 export function getSql() {
-  if (!process.env.DATABASE_URL) {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
     return null;
   }
   if (!sql) {
-    sql = postgres(process.env.DATABASE_URL, {
-      max: 5,
-      prepare: false,
-    });
+    sql = postgres(connectionString, postgresOptions(connectionString));
   }
   return sql;
 }

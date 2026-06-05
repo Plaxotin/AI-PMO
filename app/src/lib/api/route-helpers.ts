@@ -37,7 +37,7 @@ export function databaseUnavailableResponse() {
 }
 
 export function ensureDatabase() {
-  if (!isDatabaseConfigured()) {
+  if (!process.env.DATABASE_URL) {
     return { ok: false as const, response: databaseUnavailableResponse() };
   }
   return { ok: true as const };
