@@ -10,7 +10,6 @@ import {
 import { jsonWithAuth, withAuth, ensureDatabase } from '@/lib/api/route-helpers';
 import { apiError } from '@/lib/assignments/errors';
 import { listLetterTemplates } from '@/lib/db/letter-templates';
-import { processTemplateDocxUpload } from '@/lib/letters/process-template-upload';
 
 type RouteContext = { params: Promise<{ tenantId: string }> };
 
@@ -77,6 +76,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
   const stylePassport = form.get('style_passport');
 
   const bytes = Buffer.from(await file.arrayBuffer());
+  const { processTemplateDocxUpload } = await import(
+    '@/lib/letters/process-template-upload'
+  );
   const result = await processTemplateDocxUpload({
     tenantId: tenant.tenantId,
     fileName: file.name,
