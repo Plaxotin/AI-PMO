@@ -15,6 +15,7 @@
     { "src": "/api/(.*)", "dest": "/app/api/$1" },
     { "src": "/app/api/(.*)", "dest": "/app/api/$1" },
     { "src": "/assignments(.*)", "dest": "/app/assignments$1" },
+    { "src": "/dashboard(.*)", "dest": "/app/dashboard$1" },
     { "src": "/_next/(.*)", "dest": "/app/_next/$1" },
     { "src": "/favicon.ico", "dest": "/app/favicon.ico" },
     { "src": "/", "dest": "/index.html" },

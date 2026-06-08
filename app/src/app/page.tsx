@@ -8,12 +8,20 @@ export default function Home() {
         BL2-0: единый экран реестра поручений с Google Sheets, smart-input и AI-инжестом
         файлов.
       </p>
-      <Link
-        className="inline-flex w-fit rounded-lg bg-blue-600 px-5 py-2.5 text-white hover:bg-blue-500"
-        href="/assignments"
-      >
-        Открыть реестр поручений (BL-6)
-      </Link>
+      <div className="flex flex-wrap gap-3">
+        <Link
+          className="inline-flex w-fit rounded-lg bg-blue-600 px-5 py-2.5 text-white hover:bg-blue-500"
+          href="/assignments"
+        >
+          Открыть реестр поручений (BL-6)
+        </Link>
+        <Link
+          className="inline-flex w-fit rounded-lg border border-cyan/30 bg-cyan-glow px-5 py-2.5 text-cyan hover:border-cyan/50"
+          href="/dashboard"
+        >
+          Дашборд программы цифровизации (мокап)
+        </Link>
+      </div>
     </main>
   );
 }
