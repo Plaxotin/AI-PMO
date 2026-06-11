@@ -1,0 +1,28 @@
+---
+description: Где лежит документация AI PMO (Notion vs GitHub)
+alwaysApply: true
+---
+
+# Документация AI PMO
+
+Не спрашивать пользователя, где искать документацию. Разделение обязательное:
+
+## Notion — продуктовая документация
+
+- Хаб проекта: https://app.notion.com/p/33a2fbb64c0e80baa2e4f8cac9adb618
+- Продуктовые материалы (видение, описания фич, концепции): https://app.notion.com/p/3632fbb64c0e81ca919ec74125a20a00
+- Бэклог и приоритизация: https://app.notion.com/p/32d71c1c84004354ae367b2886ced001
+
+Использовать Notion MCP (`notion-search`, `notion-fetch`), если подключён.
+
+## GitHub — спеки реализации и планы фаз
+
+- `docs/specs/` — контракты реализации, ADR, критерии для кода
+- `docs/plans/` — фазы, kickoff, verification, runbook
+- Индекс: `docs/README.md`
+
+## Порядок чтения
+
+1. Контекст «что и зачем» → Notion
+2. Контракт «как реализовать фазу» → `docs/specs/` + `docs/plans/`
+3. При расхождении: для кода — GitHub; для продуктовых решений — Notion, пока не перенесено в спеку

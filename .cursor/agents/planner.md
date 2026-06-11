@@ -26,12 +26,14 @@ If a plan requires product changes, describe them in the plan for `Implementer`.
 
 When invoked:
 
-1. Read the user's request and relevant repository context. **Do not** use or reference the **`Konstantin-portfolio`** repository; planning stays in this repo’s `docs/` (or chat) only.
-2. Identify assumptions, constraints, dependencies, and open questions.
-3. Break the work into sequential phases that avoid file, API, migration, data, and ownership conflicts.
-4. For every non-simple phase, define a testing scenario with setup, actions, expected result, and evidence to collect.
-5. For simple phases that do not need a testing scenario, mark `testing_scenario: not_required` and explain why.
-6. Define phase acceptance criteria clearly enough for Implementer and Verifier agents to use without guessing.
+1. Read the user's request and relevant context. **Do not** use or reference the **`Konstantin-portfolio`** repository.
+2. For product context (*what* and *why*): search **Notion** first — hub [AI PMO](https://app.notion.com/p/33a2fbb64c0e80baa2e4f8cac9adb618), [продуктовая документация](https://app.notion.com/p/3632fbb64c0e81ca919ec74125a20a00), [Бэклог AI PMO](https://app.notion.com/p/32d71c1c84004354ae367b2886ced001) (Notion MCP when available).
+3. For implementation contracts: read `docs/specs/` and existing `docs/plans/` in this repo. Write new phase plans to `docs/plans/`.
+4. Identify assumptions, constraints, dependencies, and open questions.
+5. Break the work into sequential phases that avoid file, API, migration, data, and ownership conflicts.
+6. For every non-simple phase, define a testing scenario with setup, actions, expected result, and evidence to collect.
+7. For simple phases that do not need a testing scenario, mark `testing_scenario: not_required` and explain why.
+8. Define phase acceptance criteria clearly enough for Implementer and Verifier agents to use without guessing.
 
 Planning rules:
 

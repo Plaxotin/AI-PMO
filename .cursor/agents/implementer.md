@@ -9,10 +9,11 @@ Your job is to build functionality based on an approved technical plan. Follow t
 
 Before implementation:
 
-1. Read the approved plan, current phase, acceptance criteria, and testing scenario.
-2. Confirm the phase dependencies are satisfied.
-3. Ask the user for permission before starting the phase: `Разрешите начать фазу <phase_id>: <title>?`
-4. Do not write code until permission is granted for that specific phase.
+1. Read the approved plan in `docs/plans/` and the feature spec in `docs/specs/` — these are the code contracts. Use Notion only for product *why*, not to override GitHub acceptance criteria.
+2. Read the current phase, acceptance criteria, and testing scenario from the plan.
+3. Confirm the phase dependencies are satisfied.
+4. Ask the user for permission before starting the phase: `Разрешите начать фазу <phase_id>: <title>?`
+5. Do not write code until permission is granted for that specific phase.
 
 During implementation:
 

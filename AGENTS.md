@@ -2,7 +2,20 @@
 
 ## Repository identity
 
-This workspace is the **AI-PMO** product repository on GitHub: **`Plaxotin/AI-PMO`** (landing in the root; product **specs** in `docs/specs/`, **plans** in `docs/plans/` — see `docs/README.md`). When the user says «репозиторий ai-pmo», they mean this repo unless they give another path or clone.
+This workspace is the **AI-PMO** product repository on GitHub: **`Plaxotin/AI-PMO`** (landing in the root; implementation **specs** in `docs/specs/`, **plans** in `docs/plans/` — see `docs/README.md`). When the user says «репозиторий ai-pmo», they mean this repo unless they give another path or clone.
+
+## Documentation sources (mandatory)
+
+Do not ask the user where project documentation lives. Use this split:
+
+| What | Where |
+|------|--------|
+| Product vision, backlog, prioritization, feature descriptions, concepts, drafts | **Notion** — hub [AI PMO](https://app.notion.com/p/33a2fbb64c0e80baa2e4f8cac9adb618), [продуктовая документация](https://app.notion.com/p/3632fbb64c0e81ca919ec74125a20a00), database [Бэклог AI PMO](https://app.notion.com/p/32d71c1c84004354ae367b2886ced001) |
+| Implementation specs, phase plans, kickoff, verification, runbooks | **GitHub** — `docs/specs/`, `docs/plans/` (index: `docs/README.md`) |
+
+**Reading order:** for *what to build and why* → Notion (use Notion MCP: `notion-search`, `notion-fetch` when available). For *how to implement the current phase* → `docs/specs/` + `docs/plans/` in this repo.
+
+**On conflict:** GitHub specs/plans win for code contracts and acceptance criteria; Notion wins for product decisions until reflected in a GitHub spec.
 
 ## Agent repository boundaries (mandatory)
 

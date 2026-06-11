@@ -11,7 +11,7 @@ Landing page for AI PMO service.
 
 **Лендинг:** edit `index.html` → push to `main` → auto-deploy (Vercel root).
 
-**Документация:** `docs/README.md` — спеки в `docs/specs/`, планы в `docs/plans/`.
+**Документация:** продукт и бэклог — [Notion](https://app.notion.com/p/33a2fbb64c0e80baa2e4f8cac9adb618); спеки реализации и планы фаз — `docs/README.md` (`docs/specs/`, `docs/plans/`).
 
 **Приложение (BL1-0+):** см. `app/README.md` и `docs/plans/BL1-0_ENV.md`.
 
