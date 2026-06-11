@@ -23,24 +23,20 @@ Do not ask the user where project documentation lives. Use this split:
 
 ## Cursor Cloud specific instructions
 
-This is a zero-dependency static landing page (single `index.html` with inline CSS/JS) deployed on Vercel together with the Next.js app in `app/` (see root `vercel.json`). Production URL: **https://ai-pmo-tawny.vercel.app/** — not `ai-pmo.vercel.app` unless that domain is added to the Vercel project.
+Monorepo: static landing (`index.html` at repo root) + Next.js app in `app/`, routed by root `vercel.json`. Production URL: **https://ai-pmo-tawny.vercel.app/** — not `ai-pmo.vercel.app` unless that domain is added to the Vercel project. Architecture overview: `ARCHITECTURE.md`.
 
 ### Running locally
 
-Serve files with any static HTTP server from the repo root:
+**Landing** (no build): serve from repo root, e.g. `python3 -m http.server 8080` → `http://localhost:8080`.
 
-```
-python3 -m http.server 8080
-```
-
-Then open `http://localhost:8080` in a browser.
+**App:** `cd app && npm install && npm run dev` → `http://localhost:3000`. See `app/README.md` and `docs/plans/BL1-0_ENV.md`.
 
 ### Key notes
 
-- There is **no build step**, no package manager, no linting tooling, and no automated tests.
-- The `vercel.json` sets `"buildCommand": null` — Vercel deploys the directory as-is.
-- The page includes a client-side EN/RU language toggle and a mock email signup form (purely front-end, no backend calls).
-- All styles and scripts are inline in `index.html`.
+- **Landing:** zero-dependency static `index.html` (inline CSS/JS); no npm build for the root page.
+- **App:** Next.js in `app/` — `npm run build`, tests (`vitest`), lint (`eslint`). Root `package.json` runs `vercel-build` → `app/`.
+- **Database:** SQL migrations and seeds in `supabase/`; BL-18 test DOCX in `fixtures/bl18/`.
+- Landing includes EN/RU toggle and a mock email signup (front-end only).
 
 ## Subagent workflow
 

@@ -32,6 +32,15 @@
 | [BL18-PROD-RUNBOOK.md](plans/BL18-PROD-RUNBOOK.md) | BL-18 — runbook |
 | [BL1-0_BL18-ALIGNMENT.md](plans/BL1-0_BL18-ALIGNMENT.md) | BL-6 ↔ BL-18 выравнивание |
 
+## Инфраструктура репозитория
+
+| Путь | Назначение |
+|------|------------|
+| [`../ARCHITECTURE.md`](../ARCHITECTURE.md) | Деплой, структура каталогов, модули BL-6 / BL-18 |
+| [`../supabase/`](../supabase/) | SQL-миграции и seed (BL1, BL-18) |
+| [`../fixtures/bl18/`](../fixtures/bl18/) | DOCX-фикстуры для приёмки и тестов BL-18 |
+
 ## Процесс разработки
 
 - [SUBAGENTS_WORKFLOW.md](SUBAGENTS_WORKFLOW.md) — Planner / Implementer / Verifier
+- [CONTRIBUTING.md](../CONTRIBUTING.md) — быстрый старт для разработчиков
