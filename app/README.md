@@ -24,4 +24,4 @@ npm run verify:bl2-secrets
 
 ## Деплой
 
-Корневой `vercel.json` указывает `rootDirectory: "app"`. Лендинг в корне репозитория (`index.html`) — отдельный статический артефакт; прод-приложение BL-6 — Next.js из `app/`.
+Корневой [`vercel.json`](../vercel.json) собирает **два артефакта**: статический `index.html` (лендинг на `/`) и Next.js из `app/` (маршруты `/assignments`, `/dashboard`, `/api/*`). Лимиты тяжёлых functions — в [`app/vercel.json`](vercel.json). Обзор: [`ARCHITECTURE.md`](../ARCHITECTURE.md).

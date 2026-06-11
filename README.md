@@ -1,10 +1,15 @@
 # AI PMO — Your AI-Powered Project Management Office
 
-Landing page for AI PMO service.
+Landing page and Next.js app for the AI PMO service.
+
+## Architecture & structure
+
+See **[ARCHITECTURE.md](./ARCHITECTURE.md)** for deployment (static landing + Next.js), directory map, tech stack, and feature modules (BL-6, BL-18). Quick start for developers: **[CONTRIBUTING.md](./CONTRIBUTING.md)**.
 
 ## Tech Stack
 - **Landing:** static HTML/CSS/JS (`index.html`) — Vercel root
-- **App (BL-1):** Next.js in `app/` — реестр поручений, API `/api/projects/:projectId/assignments`
+- **App:** Next.js in `app/` — BL-6 assignments (`/assignments`), BL-18 letters (`/dashboard`), API under `/api/`
+- **Database:** PostgreSQL via Supabase — migrations in `supabase/`
 - Fonts: DM Sans, Instrument Sans (Google Fonts)
 
 ## Development

@@ -1,0 +1,27 @@
+# Dependencies (root npm scripts delegate to app/)
+node_modules/
+
+# Vercel
+.vercel
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# IDE (optional local)
+.vscode/
+.idea/
+*.swp
+*~
