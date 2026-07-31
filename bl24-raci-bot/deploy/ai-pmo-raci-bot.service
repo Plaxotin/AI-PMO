@@ -1,0 +1,17 @@
+[Unit]
+Description=AI PMO BL-24 RACI Telegram bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=aipmo
+WorkingDirectory=/opt/ai-pmo-raci-bot
+EnvironmentFile=/opt/ai-pmo-raci-bot/.env
+ExecStart=/opt/ai-pmo-raci-bot/.venv/bin/python bot.py
+Restart=always
+RestartSec=5
+# Логи: journalctl -u ai-pmo-raci-bot -f
+
+[Install]
+WantedBy=multi-user.target
