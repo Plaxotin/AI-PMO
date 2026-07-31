@@ -28,6 +28,7 @@ def chat(messages: list[dict], temperature: float = 0.3,
         "model": MODEL,
         "messages": messages,
         "temperature": temperature,
+        "max_tokens": 6000,  # RACI 18x11 с notes не влезает в дефолт — ответ обрывался
     }
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
@@ -59,5 +60,13 @@ def chat_json(messages: list[dict], temperature: float = 0.3) -> dict:
     raw = chat(messages, temperature=temperature, json_mode=True)
     try:
         return json.loads(raw)
-    except json.JSONDecodeError as e:
-        raise KimiError(f"Kimi вернул не-JSON: {raw[:300]}") from e
+    except json.JSONDecodeError:
+        pass
+    # Запасной путь: вырезаем JSON от первой { до последней } (обёртки/пролог модели)
+    start, end = raw.find("{"), raw.rfind("}")
+    if start != -1 and end > start:
+        try:
+            return json.loads(raw[start:end + 1])
+        except json.JSONDecodeError:
+            pass
+    raise KimiError(f"Kimi вернул не-JSON: {raw[:300]}")

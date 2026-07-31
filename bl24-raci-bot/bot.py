@@ -12,6 +12,8 @@ import tempfile
 from pathlib import Path
 
 from aiogram import Bot, Dispatcher, F
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -46,14 +48,17 @@ KB_MODE = InlineKeyboardMarkup(inline_keyboard=[[
 ]])
 
 WELCOME = (
-    "👋 Привет! Я генерирую <b>RACI-матрицу</b> по методологии PMBOK "
-    "(Responsible · Accountable · Consulted · Informed) и присылаю её в Excel.\n\n"
+    "👋 Привет! Я генерирую <b>RACI-матрицу</b>, которая помогает командам "
+    "прояснять роли в проекте и определять, кто отвечает за выполнение конкретной задачи. "
+    "Каждая буква обозначает роль: <b>R</b>esponsible (ответственный), "
+    "<b>A</b>ccountable (подотчётный), <b>C</b>onsulted (консультирующий) и "
+    "<b>I</b>nformed (информируемый).\n\n"
     "1️⃣ Опишите проект: цель, состав работ, кто участвует (роли), ключевые фазы.\n"
-    "2️⃣ Я сгенерирую матрицу и пришлю файл .xlsx.\n\n"
+    "2️⃣ Я сгенерирую матрицу и пришлю файл в формате .xlsx.\n\n"
     "⚠️ <b>Конфиденциальность (152-ФЗ):</b> не отправляйте персональные данные, "
     "коммерческую тайну и иные чувствительные сведения — используйте роли "
     "(«Спонсор», «Команда разработки»), а не ФИО.\n\n"
-    "Жму /start — и просто пришлите описание проекта."
+    "Для старта пришлите описание проекта."
 )
 
 
@@ -63,8 +68,8 @@ async def on_start(message: Message, state: FSMContext) -> None:
     await state.set_state(Form.waiting_description)
 
 
-async def on_description(message: Message, state: FSMContext) -> None:
-    text = (message.text or "").strip()
+async def _start_description(message: Message, state: FSMContext, text: str) -> None:
+    """Общая логика приёма описания проекта (личка и группы)."""
     if not text:
         await message.answer("Пришлите описание проекта текстом.")
         return
@@ -78,6 +83,52 @@ async def on_description(message: Message, state: FSMContext) -> None:
         reply_markup=KB_CONFIRM,
     )
     await state.set_state(Form.confirm)
+
+
+async def on_description(message: Message, state: FSMContext) -> None:
+    text = (message.text or "").strip()
+    await _start_description(message, state, text)
+
+
+# --- Групповой режим ---
+GROUP_TYPES = ("group", "supergroup")
+_ME_CACHE: dict = {}
+
+
+async def _me(message: Message):
+    """username бота с кэшем (для поиска упоминаний)."""
+    if "username" not in _ME_CACHE:
+        _ME_CACHE["username"] = (await message.bot.get_me()).username
+    return _ME_CACHE["username"]
+
+
+async def on_group_text(message: Message, state: FSMContext) -> None:
+    """В группе бот отвечает только на упоминание @бота или reply на его сообщение.
+
+    Срабатывает, когда у пользователя нет активного состояния (state-хендлер
+    on_description зарегистрирован раньше и перехватывает ответы в диалоге).
+    """
+    text = (message.text or "").strip()
+    username = await _me(message)
+    mention = f"@{username}"
+    is_reply_to_bot = bool(
+        message.reply_to_message
+        and message.reply_to_message.from_user
+        and message.reply_to_message.from_user.is_bot
+        and message.reply_to_message.from_user.username == username
+    )
+    if mention in text:
+        text = text.replace(mention, "").strip()
+    elif not is_reply_to_bot:
+        return  # к боту не обращались — молчим
+    if not text:
+        await message.answer(
+            f"Опишите проект после упоминания, например:\n"
+            f"{mention} внедрение CRM, 3 месяца, участвуют РП, аналитик, "
+            f"два разработчика, отдел продаж и подрядчик"
+        )
+        return
+    await _start_description(message, state, text)
 
 
 async def on_confirm(callback: CallbackQuery, state: FSMContext) -> None:
@@ -139,9 +190,13 @@ def main() -> None:
     dp = Dispatcher()
     dp.message.register(on_start, CommandStart())
     dp.message.register(on_description, Form.waiting_description)
+    dp.message.register(on_group_text, F.chat.type.in_(GROUP_TYPES))
     dp.callback_query.register(on_confirm, Form.confirm)
     dp.callback_query.register(on_mode, Form.choose_mode)
-    asyncio.run(dp.start_polling(Bot(BOT_TOKEN)))
+    asyncio.run(dp.start_polling(Bot(
+        BOT_TOKEN,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )))
 
 
 if __name__ == "__main__":
