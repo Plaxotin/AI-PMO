@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Парсер текстовых команд бота @Plaxotin_task_bot (BL-6, v2.0).
+Парсер текстовых команд бота @Plaxotin_task_bot (BL-6, v2.1).
 
 Чистая логика без сети и ввода-вывода:
-  вход  — текст сообщения, роль пользователя, тип чата;
+  вход  — текст сообщения и роль пользователя;
   выход — структура ParsedCommand (имя команды + аргументы) или понятная ошибка.
 
-Роли:    "user" | "admin" | "superadmin"
-Тип чата: "group" | "private"
+Модель v2.1:
+  - групповой чат не парсится вообще (бот там молчит, только рассылки);
+  - личка доступна всем: обычным пользователям — кнопки + «реестр»/«помощь»,
+    админам — все текстовые команды, суперадмину — ещё и конфигурация.
+
+Роли: "user" | "admin" | "superadmin"
 """
 
 import re
 from dataclasses import dataclass, field
 from datetime import date, timedelta
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 
 
 # ======== РЕЗУЛЬТАТ РАЗБОРА ========
@@ -23,7 +27,7 @@ from typing import Dict, Optional, Tuple
 class ParsedCommand:
     """Результат разбора команды."""
     ok: bool
-    name: str = ""                  # 'list_my', 'close', 'create', ...
+    name: str = ""                  # 'close', 'create', 'new_registry', ...
     args: Dict = field(default_factory=dict)
     error: str = ""                 # текст для пользователя, если ok=False
 
@@ -101,22 +105,21 @@ def normalize_date(text: str, today: Optional[date] = None) -> Optional[str]:
 
 # ======== СПРАВКА ========
 
-def help_text(role: str = "user", chat_type: str = "group") -> str:
-    """Краткая справка по командам с учётом роли и контекста."""
+def help_text(role: str = "user") -> str:
+    """Краткая справка по командам с учётом роли (модель v2.1 — личка)."""
     lines = [
         "Вот что я умею:",
         "",
-        "📋 <b>мои поручения</b> — ваши активные поручения",
-        "📋 <b>все поручения</b> — полный список",
-        "📋 <b>поручения &lt;проект&gt;</b> — фильтр по проекту",
-        "📋 <b>поручения статус &lt;статус&gt;</b> — фильтр по статусу",
-        "✅ <b>закрыть #N</b> — закрыть своё поручение",
-        "➕ <b>создать поручение: Проект=…; Описание=…; Ответственный=…; Срок=…</b>",
+        "📋 Кнопка <b>«Мои поручения»</b> — ваши открытые поручения, закрытие в один тап",
+        "✅ Кнопка <b>«Закрыть поручение»</b> — то же самое",
+        "🔗 <b>реестр</b> — ссылка на таблицу поручений",
     ]
-    if role in ("admin", "superadmin") and chat_type == "private":
+    if role in ("admin", "superadmin"):
         lines += [
             "",
-            "<b>Администрирование реестра (личка):</b>",
+            "<b>Команды администратора:</b>",
+            "📋 <b>все поручения</b> / <b>поручения &lt;проект&gt;</b> / <b>поручения статус &lt;статус&gt;</b>",
+            "➕ <b>создать поручение: Проект=…; Описание=…; Ответственный=…; Срок=…</b>",
             "📅 <b>срок #N &lt;дата&gt;</b>",
             "🔄 <b>статус #N &lt;статус&gt;</b>",
             "👤 <b>ответственный #N &lt;имя&gt;</b>",
@@ -124,8 +127,9 @@ def help_text(role: str = "user", chat_type: str = "group") -> str:
             "💬 <b>комментарий #N &lt;текст&gt;</b>",
             "🗑 <b>удалить #N</b>",
             "📊 <b>дайджест</b> — дайджест дедлайнов",
+            "🆕 <b>новый реестр &lt;название&gt;</b> — создать и переключиться на новую таблицу",
         ]
-    if role == "superadmin" and chat_type == "private":
+    if role == "superadmin":
         lines += [
             "",
             "<b>Конфигурация (суперадмин):</b>",
@@ -137,10 +141,10 @@ def help_text(role: str = "user", chat_type: str = "group") -> str:
     return "\n".join(lines)
 
 
-def unknown_command(role: str = "user", chat_type: str = "group") -> ParsedCommand:
+def unknown_command(role: str = "user") -> ParsedCommand:
     return ParsedCommand(
         ok=False,
-        error="🤔 Не понял команду.\n\n" + help_text(role, chat_type),
+        error="🤔 Не понял команду.\n\n" + help_text(role),
     )
 
 
@@ -220,66 +224,48 @@ def _parse_create(payload: str, today: Optional[date]) -> ParsedCommand:
     return ParsedCommand(ok=True, name="create", args=fields)
 
 
-# ======== ДОСТУП ========
+# ======== ДОСТУП (v2.1: всё происходит в личке) ========
 
-# Команды, доступные всем (в группе — через упоминание)
-_GROUP_COMMANDS = {"help", "list_my", "list_all", "list_project", "list_status",
-                   "close", "create"}
-# Команды админов (только личка)
-_ADMIN_COMMANDS = {"deadline", "status", "assignee", "description", "comment",
-                   "delete", "digest"}
-# Команды суперадмина (только личка)
+# Доступно всем пользователям в личке
+_PUBLIC_COMMANDS = {"help", "registry_link", "close"}
+# Только админы и суперадмин
+_ADMIN_COMMANDS = {"list_my", "list_all", "list_project", "list_status",
+                   "create", "deadline", "status", "assignee", "description",
+                   "comment", "delete", "digest", "new_registry"}
+# Только суперадмин
 _SUPERADMIN_COMMANDS = {"add_admin", "remove_admin", "list_admins",
                         "set_limits", "versions", "rollback"}
 
 
-def _check_access(name: str, role: str, chat_type: str) -> Optional[ParsedCommand]:
-    """Проверяет, может ли пользователь выполнить команду здесь.
+def _check_access(name: str, role: str) -> Optional[ParsedCommand]:
+    """Проверяет, может ли роль выполнить команду.
 
     Возвращает None, если доступ есть, иначе ParsedCommand с ошибкой.
     """
-    if name in _GROUP_COMMANDS:
+    if name in _PUBLIC_COMMANDS:
         return None
-
-    if name in _ADMIN_COMMANDS:
-        if chat_type != "private":
-            return ParsedCommand(
-                ok=False,
-                error="🔒 Эта команда доступна только в личных сообщениях боту.",
-            )
-        if role not in ("admin", "superadmin"):
-            return ParsedCommand(
-                ok=False,
-                error="🔒 Эта команда доступна только администраторам.",
-            )
-        return None
-
-    if name in _SUPERADMIN_COMMANDS:
-        if chat_type != "private":
-            return ParsedCommand(
-                ok=False,
-                error="🔒 Эта команда доступна только в личных сообщениях боту.",
-            )
-        if role != "superadmin":
-            return ParsedCommand(
-                ok=False,
-                error="🔒 Эта команда доступна только суперадминистратору.",
-            )
-        return None
-
+    if name in _ADMIN_COMMANDS and role not in ("admin", "superadmin"):
+        return ParsedCommand(
+            ok=False,
+            error="🔒 Эта команда доступна только администраторам.",
+        )
+    if name in _SUPERADMIN_COMMANDS and role != "superadmin":
+        return ParsedCommand(
+            ok=False,
+            error="🔒 Эта команда доступна только суперадминистратору.",
+        )
     return None
 
 
 # ======== ГЛАВНЫЙ РАЗБОР ========
 
-def parse(text: str, role: str = "user", chat_type: str = "group",
+def parse(text: str, role: str = "user",
           today: Optional[date] = None) -> ParsedCommand:
-    """Разбирает текст команды.
+    """Разбирает текст команды (v2.1 — только личка).
 
     Args:
-        text: текст сообщения (уже без упоминания бота).
+        text: текст сообщения.
         role: "user" | "admin" | "superadmin".
-        chat_type: "group" | "private".
         today: дата «сегодня» (МСК), для тестов.
 
     Returns:
@@ -289,28 +275,24 @@ def parse(text: str, role: str = "user", chat_type: str = "group",
     low = norm.lower()
 
     if not norm:
-        return unknown_command(role, chat_type)
+        return unknown_command(role)
 
     def finish(name: str, args: Dict) -> ParsedCommand:
-        denial = _check_access(name, role, chat_type)
+        denial = _check_access(name, role)
         if denial is not None:
             return denial
         return ParsedCommand(ok=True, name=name, args=args)
 
     def finish_admin_id(body_pattern: str, name: str, arg_name: str) -> Optional[ParsedCommand]:
         """Команды вида «<слово> #N <значение>»."""
-        m = re.match(body_pattern, low)
+        m = re.match(body_pattern, norm, flags=re.IGNORECASE)
         if not m:
             return None
-        task_id, value = m.group(1), norm[m.start(2):].strip()
-        # значение берём из исходного регистра: позиция группы 2 в norm
-        m2 = re.match(body_pattern, norm, flags=re.IGNORECASE)
-        if m2:
-            value = m2.group(2).strip()
+        task_id, value = m.group(1), m.group(2).strip()
         if not value:
             return ParsedCommand(
                 ok=False,
-                error=f"❌ Укажите значение после номера поручения.",
+                error="❌ Укажите значение после номера поручения.",
             )
         return finish(name, {"id": int(task_id), arg_name: value})
 
@@ -318,7 +300,11 @@ def parse(text: str, role: str = "user", chat_type: str = "group",
     if low in ("помощь", "справка", "команды", "help", "/start", "/help", "старт"):
         return finish("help", {})
 
-    # --- просмотр ---
+    # --- ссылка на реестр ---
+    if low == "реестр":
+        return finish("registry_link", {})
+
+    # --- просмотр (админы) ---
     if low == "мои поручения":
         return finish("list_my", {})
     if low in ("все поручения", "всё поручения", "все поручение"):
@@ -332,7 +318,7 @@ def parse(text: str, role: str = "user", chat_type: str = "group",
     if m:
         return finish("list_project", {"project": m.group(1).strip()})
 
-    # --- закрытие ---
+    # --- закрытие (всем, но только своё — проверка в обработчике) ---
     m = re.match(r"^закрыть\s*#\s*(\d+)$", low) or re.match(r"^закрыть\s+(\d+)$", low)
     if m:
         return finish("close", {"id": int(m.group(1))})
@@ -344,6 +330,11 @@ def parse(text: str, role: str = "user", chat_type: str = "group",
         if not cmd.ok:
             return cmd
         return finish("create", cmd.args)
+
+    # --- новый реестр ---
+    m = re.match(r"^новый\s+реестр\s+(.+)$", norm, flags=re.IGNORECASE)
+    if m:
+        return finish("new_registry", {"title": m.group(1).strip()})
 
     # --- админские команды «<слово> #N <значение>» ---
     r = finish_admin_id(r"^срок\s*#\s*(\d+)\s+(.+)$", "deadline", "date")
@@ -415,4 +406,4 @@ def parse(text: str, role: str = "user", chat_type: str = "group",
     if m:
         return finish("rollback", {"version": m.group(1)})
 
-    return unknown_command(role, chat_type)
+    return unknown_command(role)
