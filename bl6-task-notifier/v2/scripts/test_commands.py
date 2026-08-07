@@ -402,5 +402,61 @@ class TestUnknown(unittest.TestCase):
         self.assertIn("откатить конфиг", text)
 
 
+# ======== LLM-МАРШРУТИЗАЦИЯ (v2.2) ========
+
+class TestLlmRouting(unittest.TestCase):
+    def test_admin_routes_to_llm(self):
+        self.assertEqual(commands.route_unrecognized("admin"), "llm")
+
+    def test_superadmin_routes_to_llm(self):
+        self.assertEqual(commands.route_unrecognized("superadmin"), "llm")
+
+    def test_user_no_llm(self):
+        # Обычный пользователь: сразу «Не понял»/кнопки, без LLM
+        self.assertEqual(commands.route_unrecognized("user"), "fallback")
+
+    def test_unrecognized_admin_text_is_not_ok(self):
+        # Свободная форма не парсится → уходит в llm-путь по route_unrecognized
+        c = parse("перенеси пожалуйста дедлайн двенадцатой задачи на пятницу", **ADMIN)
+        self.assertFalse(c.ok)
+        self.assertEqual(commands.route_unrecognized("admin"), "llm")
+
+    def test_unrecognized_user_text_stays_fallback(self):
+        c = parse("перенеси пожалуйста дедлайн задачи", **USER)
+        self.assertFalse(c.ok)
+        self.assertEqual(commands.route_unrecognized("user"), "fallback")
+
+
+class TestLlmExtractJson(unittest.TestCase):
+    """Чистые тесты разбора ответа модели (без сети)."""
+
+    def test_plain_json(self):
+        import llm
+        d = llm.extract_json('{"command_text": "закрыть #12"}')
+        self.assertEqual(d, {"command_text": "закрыть #12"})
+
+    def test_markdown_wrapped(self):
+        import llm
+        d = llm.extract_json('```json\n{"command_text": "все поручения"}\n```')
+        self.assertEqual(d["command_text"], "все поручения")
+
+    def test_null_command(self):
+        import llm
+        d = llm.extract_json('{"command_text": null}')
+        self.assertIsNone(d["command_text"])
+
+    def test_garbage(self):
+        import llm
+        self.assertIsNone(llm.extract_json("просто текст без json"))
+        self.assertIsNone(llm.extract_json(""))
+        self.assertIsNone(llm.extract_json(None))
+
+    def test_no_config_returns_none(self):
+        # Локально kimi.json нет → interpret_free_text обязан вернуть None без сети
+        import llm
+        self.assertIsNone(llm.interpret_free_text("закрой задачу", "12.08.2026",
+                                                  log_fn=lambda m: None))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

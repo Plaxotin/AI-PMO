@@ -1,0 +1,5 @@
+{
+  "api_key": "sk-...получить у владельца...",
+  "base_url": "https://api.moonshot.ai/v1",
+  "model": "moonshot-v1-8k"
+}

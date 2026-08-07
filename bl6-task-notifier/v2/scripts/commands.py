@@ -148,6 +148,15 @@ def unknown_command(role: str = "user") -> ParsedCommand:
     )
 
 
+def route_unrecognized(role: str) -> str:
+    """Куда направить нераспознанный текст из лички (v2.2).
+
+    "llm"      — админ/суперадмин: свободная форма уходит в LLM-переводчик;
+    "fallback" — обычный пользователь: сразу «Не понял»/приветствие с кнопками.
+    """
+    return "llm" if role in ("admin", "superadmin") else "fallback"
+
+
 # ======== РАЗБОР КОМАНДЫ СОЗДАНИЯ ========
 
 _CREATE_FIELDS = {

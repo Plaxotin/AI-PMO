@@ -29,6 +29,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
 import commands
+import llm
 
 # ======== ПУТИ ========
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -918,16 +919,31 @@ def digest_loop():
 # ======== ПРИВЕТСТВИЕ ========
 
 def greeting_text(first_name: str, role: str) -> str:
-    text = (
+    if role in ("admin", "superadmin"):
+        # v2.2: короткое приветствие для админов — только компактный список команд
+        return (
+            f"👋 <b>Привет, {html.escape(first_name or 'друг')}!</b>\n\n"
+            f"<b>Вот что я умею:</b>\n"
+            f"📋 Кнопки «Мои поручения» / «Закрыть поручение» — список, закрытие в один тап\n"
+            f"🔗 <b>реестр</b> — ссылка на таблицу\n"
+            f"📋 <b>все поручения</b> / <b>поручения &lt;проект&gt;</b> / "
+            f"<b>поручения статус &lt;статус&gt;</b>\n"
+            f"➕ <b>создать поручение: Проект=…; Описание=…; Ответственный=…; Срок=…</b>\n"
+            f"📅 <b>срок #N &lt;дата&gt;</b> · 🔄 <b>статус #N &lt;статус&gt;</b> · "
+            f"👤 <b>ответственный #N &lt;имя&gt;</b>\n"
+            f"📝 <b>описание #N &lt;текст&gt;</b> · 💬 <b>комментарий #N &lt;текст&gt;</b> · "
+            f"🗑 <b>удалить #N</b>\n"
+            f"📊 <b>дайджест</b> · 🆕 <b>новый реестр &lt;название&gt;</b>\n\n"
+            f"💬 А ещё вы можете написать мне любую задачу по изменению реестра "
+            f"поручений в свободной форме — я пойму и предложу подтверждение."
+        )
+    return (
         f"👋 <b>Привет, {html.escape(first_name or 'друг')}!</b>\n\n"
         f"Я бот реестра поручений.\n\n"
         f"📋 <b>Мои поручения</b> — ваши открытые задачи, закрытие в один тап\n"
         f"✅ <b>Закрыть поручение</b> — то же самое\n\n"
         f"Команда <b>реестр</b> — ссылка на таблицу."
     )
-    if role in ("admin", "superadmin"):
-        text += "\n\n🛠 Вам доступны команды администратора — напишите <b>помощь</b>."
-    return text
 
 
 # ======== DISPATCH ========
@@ -1119,6 +1135,21 @@ def process_updates(updates: List[Dict]):
                     response = cmd_create_execute(state["data"], username, first_name)
                 elif state["state"] == "confirm_delete":
                     response = cmd_delete_execute(state["data"]["id"], username)
+                elif state["state"] == "confirm_llm":
+                    # Исполняем LLM-интерпретацию через обычный путь:
+                    # parse (проверки прав) → dispatch (аудит, кэш)
+                    cmd2 = commands.parse(state["data"]["command_text"],
+                                          role=role, today=now_msk().date())
+                    if not cmd2.ok:
+                        response = cmd2.error
+                    elif cmd2.name == "help":
+                        response = commands.help_text(role)
+                    else:
+                        try:
+                            response = dispatch(cmd2, username, first_name, chat_id, key)
+                        except Exception as e:
+                            log(f"⚠️ Ошибка выполнения LLM-команды {cmd2.name}: {e}")
+                            response = "❌ Внутренняя ошибка при выполнении команды."
                 else:
                     response = "❌ Неизвестное состояние, отменено."
             else:
@@ -1131,15 +1162,37 @@ def process_updates(updates: List[Dict]):
         # --- разбор команды ---
         cmd = commands.parse(text, role=role, today=now_msk().date())
 
-        # Обычный пользователь: нераспознанное → приветствие + кнопки
-        if role == "user" and not cmd.ok:
+        if not cmd.ok:
+            # Маршрутизация нераспознанного текста (v2.2)
+            if commands.route_unrecognized(role) == "llm":
+                # Админ/суперадмин: свободная форма → Kimi → подтверждение
+                command_text = llm.interpret_free_text(
+                    text, now_msk().strftime("%d.%m.%Y"), log_fn=log)
+                if command_text:
+                    # Проверяем, что интерпретация вообще парсится и разрешена роли
+                    check = commands.parse(command_text, role=role,
+                                           today=now_msk().date())
+                    if check.ok and check.name != "help":
+                        _set_user_state(key, "confirm_llm",
+                                        {"command_text": command_text})
+                        send_message(
+                            chat_id,
+                            f"🤖 <b>Понял так:</b> <code>{html.escape(command_text)}</code>\n\n"
+                            f"Выполнить? Напишите <b>да</b> (60 сек), "
+                            f"любой другой текст — отмена.",
+                            reply_to=message.get('message_id'))
+                    else:
+                        send_message(chat_id, cmd.error,
+                                     reply_to=message.get('message_id'),
+                                     reply_markup=main_keyboard())
+                else:
+                    send_message(chat_id, cmd.error,
+                                 reply_to=message.get('message_id'),
+                                 reply_markup=main_keyboard())
+                continue
+            # Обычный пользователь: сразу приветствие + кнопки
             send_message(chat_id, greeting_text(first_name, role),
                          reply_to=message.get('message_id'),
-                         reply_markup=main_keyboard())
-            continue
-
-        if not cmd.ok:
-            send_message(chat_id, cmd.error, reply_to=message.get('message_id'),
                          reply_markup=main_keyboard())
             continue
 
@@ -1161,7 +1214,8 @@ def process_updates(updates: List[Dict]):
 # ======== ОСНОВНОЙ ЦИКЛ (как в v1.0/v2.0) ========
 
 def main_loop():
-    log("🤖 Бот v2.1 запущен. Личка для всех (кнопки), группа — только рассылки, "
+    log("🤖 Бот v2.2 запущен. Личка для всех (кнопки), группа — только рассылки, "
+        "LLM-режим для админов, "
         f"дайджест в {load_config().get('digest_time', '20:47')} МСК.")
 
     threading.Thread(target=digest_loop, daemon=True).start()
