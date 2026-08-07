@@ -397,9 +397,12 @@ class TestUnknown(unittest.TestCase):
         text = commands.help_text("admin")
         self.assertIn("новый реестр", text)
 
-    def test_help_text_superadmin_has_config(self):
+    def test_help_text_superadmin_short_no_config(self):
+        # v2.2.1: владелец попросил убрать блок конфигурации из справки
         text = commands.help_text("superadmin")
-        self.assertIn("откатить конфиг", text)
+        self.assertNotIn("откатить конфиг", text)
+        self.assertNotIn("Конфигурация", text)
+        self.assertIn("свободной форме", text)
 
 
 # ======== LLM-МАРШРУТИЗАЦИЯ (v2.2) ========
