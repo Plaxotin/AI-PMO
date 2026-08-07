@@ -1,0 +1,12 @@
+{
+  "spreadsheet_id": "1cAtTZIRXNKuH-3DTWx9WbDniVL491epx6mUek_F3XZI",
+  "superadmin": "plaxotin",
+  "admins": ["plaxotin"],
+  "limits": {
+    "per_min": 10,
+    "per_day": 100,
+    "admin_per_day": 1000,
+    "global_day": 500
+  },
+  "digest_time": "20:47"
+}
