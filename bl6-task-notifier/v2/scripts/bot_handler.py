@@ -920,29 +920,23 @@ def digest_loop():
 
 def greeting_text(first_name: str, role: str) -> str:
     if role in ("admin", "superadmin"):
-        # v2.2: короткое приветствие для админов — только компактный список команд
+        # v2.2.2: одинаково короткое приветствие — без списка команд
         return (
             f"👋 <b>Привет, {html.escape(first_name or 'друг')}!</b>\n\n"
             f"<b>Вот что я умею:</b>\n"
-            f"📋 Кнопки «Мои поручения» / «Закрыть поручение» — список, закрытие в один тап\n"
-            f"🔗 <b>реестр</b> — ссылка на таблицу\n"
-            f"📋 <b>все поручения</b> / <b>поручения &lt;проект&gt;</b> / "
-            f"<b>поручения статус &lt;статус&gt;</b>\n"
-            f"➕ <b>создать поручение: Проект=…; Описание=…; Ответственный=…; Срок=…</b>\n"
-            f"📅 <b>срок #N &lt;дата&gt;</b> · 🔄 <b>статус #N &lt;статус&gt;</b> · "
-            f"👤 <b>ответственный #N &lt;имя&gt;</b>\n"
-            f"📝 <b>описание #N &lt;текст&gt;</b> · 💬 <b>комментарий #N &lt;текст&gt;</b> · "
-            f"🗑 <b>удалить #N</b>\n"
-            f"📊 <b>дайджест</b> · 🆕 <b>новый реестр &lt;название&gt;</b>\n\n"
+            f"📋 Кнопки «Мои поручения» / «Закрыть поручение» — ваши открытые "
+            f"поручения, закрытие в один тап\n"
+            f"🔗 <b>реестр</b> — ссылка на таблицу поручений\n\n"
             f"💬 А ещё вы можете написать мне любую задачу по изменению реестра "
-            f"поручений в свободной форме — я пойму и предложу подтверждение."
+            f"поручений в свободной форме — я пойму и предложу подтверждение.\n\n"
+            f"📋 Реестр: {registry_link()}"
         )
     return (
         f"👋 <b>Привет, {html.escape(first_name or 'друг')}!</b>\n\n"
         f"Я бот реестра поручений.\n\n"
         f"📋 <b>Мои поручения</b> — ваши открытые задачи, закрытие в один тап\n"
         f"✅ <b>Закрыть поручение</b> — то же самое\n\n"
-        f"Команда <b>реестр</b> — ссылка на таблицу."
+        f"📋 Реестр: {registry_link()}"
     )
 
 
@@ -1141,7 +1135,7 @@ def process_updates(updates: List[Dict]):
                     cmd2 = commands.parse(state["data"]["command_text"],
                                           role=role, today=now_msk().date())
                     if not cmd2.ok:
-                        response = cmd2.error
+                        response = with_footer(cmd2.error)
                     elif cmd2.name == "help":
                         response = commands.help_text(role)
                     else:
@@ -1182,11 +1176,11 @@ def process_updates(updates: List[Dict]):
                             f"любой другой текст — отмена.",
                             reply_to=message.get('message_id'))
                     else:
-                        send_message(chat_id, cmd.error,
+                        send_message(chat_id, with_footer(cmd.error),
                                      reply_to=message.get('message_id'),
                                      reply_markup=main_keyboard())
                 else:
-                    send_message(chat_id, cmd.error,
+                    send_message(chat_id, with_footer(cmd.error),
                                  reply_to=message.get('message_id'),
                                  reply_markup=main_keyboard())
                 continue

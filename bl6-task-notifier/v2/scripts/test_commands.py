@@ -393,9 +393,12 @@ class TestUnknown(unittest.TestCase):
         self.assertIn("реестр", text)
         self.assertNotIn("новый реестр", text)
 
-    def test_help_text_admin_has_new_registry(self):
+    def test_help_text_admin_short_no_command_list(self):
+        # v2.2.2: справка одинаково короткая, без списка команд админа
         text = commands.help_text("admin")
-        self.assertIn("новый реестр", text)
+        self.assertNotIn("новый реестр", text)
+        self.assertNotIn("Команды администратора", text)
+        self.assertIn("свободной форме", text)
 
     def test_help_text_superadmin_short_no_config(self):
         # v2.2.1: владелец попросил убрать блок конфигурации из справки
