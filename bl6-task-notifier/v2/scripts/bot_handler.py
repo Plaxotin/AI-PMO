@@ -287,30 +287,42 @@ def run_task_manager(*args) -> Tuple[bool, str]:
 
 
 def get_all_tasks(force: bool = False) -> List[Dict]:
-    """Получает все поручения из реестра (с кэшем TTL 60 с)."""
+    """Получает все поручения из реестра (с кэшем TTL 60 с).
+
+    Основной путь — `list --json` (полные поля без обрезки, включая источник).
+    Fallback — разбор текстового вывода `list` (обрезанного).
+    """
     if not force and time.time() - _tasks_cache["ts"] < _CACHE_TTL:
         return _tasks_cache["data"]
 
-    success, output = run_task_manager('list')
-    if not success:
-        return _tasks_cache["data"]  # отдаём устаревший кэш, лучше чем ничего
+    success, output = run_task_manager('list', '--json')
+    tasks: List[Dict] = []
+    if success:
+        try:
+            tasks = json.loads(output.strip())
+        except json.JSONDecodeError:
+            success = False  # ушли в fallback
 
-    tasks = []
-    for line in output.split('\n'):
-        line = line.strip()
-        if not line or line.startswith('Найдено') or line.startswith('ID') or line.startswith('-'):
-            continue
-        # Формат: ID Статус Срок Контрагент Ответственный Описание
-        parts = line.split(None, 5)
-        if len(parts) >= 5:
-            tasks.append({
-                'id': parts[0],
-                'status': parts[1],
-                'deadline': parts[2],
-                'project': parts[3],
-                'assignee': parts[4],
-                'description': parts[5] if len(parts) > 5 else ''
-            })
+    if not success:
+        success2, output2 = run_task_manager('list')
+        if not success2:
+            return _tasks_cache["data"]  # отдаём устаревший кэш, лучше чем ничего
+        tasks = []
+        for line in output2.split('\n'):
+            line = line.strip()
+            if not line or line.startswith('Найдено') or line.startswith('ID') or line.startswith('-'):
+                continue
+            # Формат: ID Статус Срок Контрагент Ответственный Описание
+            parts = line.split(None, 5)
+            if len(parts) >= 5:
+                tasks.append({
+                    'id': parts[0],
+                    'status': parts[1],
+                    'deadline': parts[2],
+                    'project': parts[3],
+                    'assignee': parts[4],
+                    'description': parts[5] if len(parts) > 5 else ''
+                })
     _tasks_cache["ts"] = time.time()
     _tasks_cache["data"] = tasks
     return tasks
@@ -512,15 +524,13 @@ def format_task_list(tasks: List[Dict], title: str) -> str:
     lines = [f"<b>{title}</b> ({len(tasks)} шт.)\n"]
     for task in tasks:
         status_emoji = _STATUS_EMOJI.get(task.get('status', ''), "⚪")
-        desc = task.get('description', '')
-        desc_short = desc[:60] + "…" if len(desc) > 60 else desc
-        project = task.get('project', 'Без проекта')
-        project_short = project[:20] + "…" if len(project) > 20 else project
         lines.append(
-            f"<b>#{task.get('id', '?')}</b> {status_emoji} <b>{task.get('status', '?')}</b>\n"
-            f"   📁 {html.escape(project_short)}\n"
-            f"   📝 {html.escape(desc_short)}\n"
-            f"   👤 {html.escape(task.get('assignee', '?'))}  📅 {task.get('deadline', '?')}\n"
+            f"<b>#{task.get('id', '?')}</b> {status_emoji} <b>{task.get('status', '?')}</b>  "
+            f"📅 {task.get('deadline', '?')}\n"
+            f"   📝 {html.escape(task.get('description', ''))}\n"
+            f"   📁 {html.escape(task.get('project') or 'Без проекта')}  "
+            f"👤 {html.escape(task.get('assignee', '?'))}  "
+            f"📣 {html.escape(task.get('author') or '?')}\n"
         )
     return "\n".join(lines)
 
@@ -556,9 +566,20 @@ def build_my_tasks_view(username: str) -> Tuple[str, Optional[Dict]]:
                          "callback_data": f"close:{t['id']}"}])
     buttons.append([{"text": "🔄 Обновить", "callback_data": "refresh"}])
 
+    blocks = []
+    for t in tasks:
+        status_emoji = _STATUS_EMOJI.get(t.get('status', ''), "⚪")
+        blocks.append(
+            f"<b>#{t.get('id', '?')}</b> {status_emoji} <b>{t.get('status', '?')}</b>  "
+            f"📅 {t.get('deadline', '?')}\n"
+            f"📝 {html.escape(t.get('description', ''))}\n"
+            f"📁 {html.escape(t.get('project') or 'Без проекта')}  "
+            f"📣 {html.escape(t.get('author') or '?')}"
+        )
     text = with_footer(
         f"📋 <b>Ваши открытые поручения</b> ({len(tasks)}) — {html.escape(assignee)}\n\n"
-        f"Нажмите на поручение, чтобы закрыть его."
+        + "\n\n".join(blocks)
+        + "\n\nНажмите на поручение ниже, чтобы закрыть его."
     )
     return text, {"inline_keyboard": buttons}
 

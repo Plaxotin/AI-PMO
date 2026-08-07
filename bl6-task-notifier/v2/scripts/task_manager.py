@@ -176,7 +176,26 @@ def list_tasks(args):
     if not filtered:
         print("Поручения не найдены")
         return
-    
+
+    # Полный машиночитаемый вывод без обрезки (для бота)
+    if getattr(args, 'json', False):
+        def cell(row, i):
+            return row[i] if len(row) > i else ""
+        data = [{
+            "id": cell(r, 0),
+            "created": cell(r, 1),
+            "author": cell(r, 2),
+            "project": cell(r, 3),
+            "description": cell(r, 4),
+            "assignee": cell(r, 5),
+            "deadline": cell(r, 6),
+            "status": cell(r, 7),
+            "closed": cell(r, 8),
+            "comment": cell(r, 9),
+        } for r in filtered]
+        print(json.dumps(data, ensure_ascii=False))
+        return
+
     print(f"\nНайдено поручений: {len(filtered)}\n")
     print(f"{'ID':<5} {'Статус':<12} {'Срок':<12} {'Контрагент':<20} {'Ответственный':<20} {'Описание'}")
     print("-" * 100)
@@ -493,6 +512,8 @@ def main():
     list_parser.add_argument('--status', help='Фильтр по статусу (через запятую)')
     list_parser.add_argument('--project', help='Фильтр по проекту')
     list_parser.add_argument('--assignee', help='Фильтр по ответственному')
+    list_parser.add_argument('--json', action='store_true',
+                             help='Полный JSON-вывод без обрезки (для бота)')
     
     # update
     update_parser = subparsers.add_parser('update', help='Обновить поручение')
