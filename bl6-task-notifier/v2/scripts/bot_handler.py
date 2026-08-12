@@ -6,7 +6,8 @@
 Модель v2.1:
   - Групповой чат: бот НЕ реагирует на сообщения. Группа получает только
     автоматические рассылки (утренний дайджест дедлайнов через check-deadlines,
-    вечерний дайджест изменений в 20:47 МСК).
+    вечерний дайджест изменений в 20:47 МСК). Исключение (v2.2.4): команды
+    /идея и /баг — сбор фидбека во вкладку «Бэклог BL-6» с подтверждением.
   - Личка — для всех: обычным пользователям приветствие + inline-кнопки
     «📋 Мои поручения» (закрытие в один тап) и «📂 Открыть реестр» (v2.2.3:
     кнопка «Закрыть поручение» удалена), админам — ещё и свободная форма
@@ -30,6 +31,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
 import commands
+import feedback
 import llm
 
 # ======== ПУТИ ========
@@ -870,7 +872,7 @@ def build_evening_digest() -> Optional[str]:
     if not entries:
         return None
     action_emoji = {"create": "➕", "close": "✅", "update": "✏️", "delete": "🗑",
-                    "new_registry": "🆕"}
+                    "new_registry": "🆕", "feedback": "💡"}
     lines = [f"📊 <b>Изменения реестра за {today}</b> ({len(entries)})\n"]
     for row in entries:
         row = list(row) + [""] * (5 - len(row))
@@ -1072,6 +1074,56 @@ def process_callback(callback: Dict):
     answer_callback_query(callback_id, text="❓ Неизвестная кнопка.")
 
 
+# ======== ФИДБЕК ИЗ ОБЩЕГО ЧАТА (v2.2.4) ========
+
+def _handle_group_feedback(message: Dict, fb_type: str, fb_text: str):
+    """Приём идеи/бага из общего чата: запись во вкладку «Бэклог BL-6».
+
+    Единственное исключение из правила «в группе бот молчит».
+    Антифлуд общий с остальными командами. Запись логируется в аудит
+    (действие feedback) — попадает в вечерний дайджест.
+    """
+    chat_id = message.get('chat', {}).get('id')
+    from_user = message.get('from', {})
+    username = from_user.get('username', '')
+    user_id = from_user.get('id')
+    msg_id = message.get('message_id')
+
+    if not fb_text:
+        send_message(chat_id,
+                     "ℹ️ Пустое сообщение. Напишите так:\n"
+                     "<code>/идея ваш текст</code> или <code>/баг ваш текст</code>",
+                     reply_to=msg_id)
+        return
+
+    cfg = load_config()
+    role = resolve_role(username, cfg)
+    allowed, warning = flood.check(user_id, role, cfg["limits"])
+    if not allowed:
+        if warning:
+            send_message(chat_id, warning, reply_to=msg_id)
+        log(f"Антифлуд (фидбек): @{username} ({user_id}) заблокирован")
+        return
+
+    try:
+        num = feedback.add_feedback(username, fb_type, fb_text, log_fn=log)
+    except Exception as e:
+        log(f"⚠️ Ошибка записи фидбека: {e}")
+        send_message(chat_id,
+                     "❌ Не удалось записать. Попробуйте позже или передайте "
+                     "администратору лично.",
+                     reply_to=msg_id)
+        return
+
+    audit("feedback", num, f"{fb_type}: {fb_text[:100]}", username)
+    log(f"Фидбек #{num} ({fb_type}) от @{username}: {fb_text[:80]}")
+    kind = "идею" if fb_type == "Идея" else "баг"
+    send_message(chat_id,
+                 f"✅ Записал {kind} <b>#{num}</b>. Спасибо!\n"
+                 f"Администратор посмотрит и возьмёт в работу.",
+                 reply_to=msg_id)
+
+
 # ======== ОБРАБОТКА ОБНОВЛЕНИЙ ========
 
 def process_updates(updates: List[Dict]):
@@ -1095,8 +1147,14 @@ def process_updates(updates: List[Dict]):
         chat = message.get('chat', {})
         chat_id = chat.get('id')
 
-        # --- группа: бот молчит (v2.1). Группа получает только рассылки. ---
+        # --- группа: бот молчит (v2.1), кроме команд сбора фидбека (v2.2.4) ---
         if chat.get('type') != 'private':
+            fb = feedback.parse_feedback_command(text, BOT_USERNAME)
+            if fb:
+                try:
+                    _handle_group_feedback(message, fb[0], fb[1])
+                except Exception as e:
+                    log(f"⚠️ Ошибка обработки фидбека: {e}")
             continue
 
         from_user = message.get('from', {})
@@ -1207,8 +1265,8 @@ def process_updates(updates: List[Dict]):
 # ======== ОСНОВНОЙ ЦИКЛ (как в v1.0/v2.0) ========
 
 def main_loop():
-    log("🤖 Бот v2.2 запущен. Личка для всех (кнопки), группа — только рассылки, "
-        "LLM-режим для админов, "
+    log("🤖 Бот v2.2.4 запущен. Личка для всех (кнопки), группа — рассылки + "
+        "сбор /идея /баг, LLM-режим для админов, "
         f"дайджест в {load_config().get('digest_time', '20:47')} МСК.")
 
     threading.Thread(target=digest_loop, daemon=True).start()
