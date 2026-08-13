@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Сбор идей и багов от участников общего чата (v2.2.4).
+Сбор идей и багов от участников общего чата (v2.2.4 → v3.1).
 
 Участник пишет в группу:
     /идея <текст>   — предложение по улучшению
     /баг <текст>    — сообщение о проблеме
 
-Записи попадают во вкладку «Бэклог BL-6» в таблице реестра поручений.
+Записи попадают во вкладку «Бэклог BL-6» в активной таблице реестра поручений.
 Владелец периодически просматривает вкладку и меняет статусы:
 Новое → В работе → Сделано / Отклонено.
 
 Модуль автономен: свои пути к конфигу и свой gspread-клиент, чтобы
 минимизировать пересечения с параллельными правками bot_handler.py.
+v3.1: использует активный реестр из cfg['registries'] (как task_manager.py).
 """
 
 import os
@@ -42,6 +43,27 @@ _CMD_ALIASES = {
 }
 
 
+def _load_config() -> dict:
+    if not os.path.exists(CONFIG_PATH):
+        return {}
+    try:
+        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _get_active_spreadsheet_id() -> str:
+    """Возвращает id активного реестра (как task_manager.py)."""
+    cfg = _load_config()
+    registries = cfg.get("registries", [])
+    for reg in registries:
+        if reg.get("active"):
+            return reg.get("id", "")
+    # fallback на старую схему
+    return cfg.get("spreadsheet_id", "")
+
+
 def parse_feedback_command(text: str,
                            bot_username: str = "") -> Optional[Tuple[str, str]]:
     """Распознаёт команду фидбека. Возвращает (тип, текст) или None.
@@ -65,16 +87,6 @@ def parse_feedback_command(text: str,
     return fb_type, rest.strip()
 
 
-def _load_config() -> dict:
-    if not os.path.exists(CONFIG_PATH):
-        return {}
-    try:
-        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-
 def _now_msk() -> datetime:
     return datetime.now(timezone.utc).astimezone(MSK)
 
@@ -90,9 +102,9 @@ def _get_feedback_sheet(log_fn=print):
     creds = Credentials.from_service_account_file(creds_file, scopes=scopes)
     client = gspread.authorize(creds)
 
-    spreadsheet_id = _load_config().get('spreadsheet_id')
+    spreadsheet_id = _get_active_spreadsheet_id()
     if not spreadsheet_id:
-        raise RuntimeError("spreadsheet_id не задан в config.json")
+        raise RuntimeError("active spreadsheet_id не задан в config.json")
     spreadsheet = client.open_by_key(spreadsheet_id)
 
     try:
