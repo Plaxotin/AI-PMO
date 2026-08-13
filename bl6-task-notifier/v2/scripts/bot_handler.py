@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Бот @Plaxotin_task_bot — «Администратор поручений», v2.1.
+Бот @Plaxotin_task_bot — «Администратор поручений», v3.1.
 
-Модель v2.1:
+Модель v3.0:
   - Групповой чат: бот НЕ реагирует на сообщения. Группа получает только
     автоматические рассылки (утренний дайджест дедлайнов через check-deadlines,
-    вечерний дайджест изменений в 20:47 МСК).
+    вечерний дайджест изменений в 20:47 МСК). Исключение (v3.1): команды
+    /идея и /баг — сбор фидбека во вкладку «Бэклог BL-6» с подтверждением.
   - Личка — для всех: обычным пользователям приветствие + inline-кнопки
-    «📋 Мои поручения» (закрытие в один тап) и «📂 Открыть реестр» (v2.2.3:
-    кнопка «Закрыть поручение» удалена), админам — ещё и свободная форма
-    через LLM, суперадмину — конфигурация.
+    «📋 Мои поручения» (закрытие в один тап), «📂 Открыть реестр»,
+    «📋 Выбрать реестр».
+  - Админы/суперадмин: ТОЛЬКО свободная форма через LLM (канонические
+    команды полностью отключены).
+  - Два реестра с возможностью переключения через inline-кнопки.
 
-Сохранено из v2.0: роли, антифлуд (токен-бакет), аудит-лог (лист «Лог»),
-кэш чтения TTL 60 с, умные даты, защита от дублей, версии конфигурации.
-
-Long polling и tg_api — как в v1.0/v2.0 (проверенная связка).
+Сохранено из v2.2: роли, антифлуд, аудит-лог, кэш TTL 60 с,
+умные даты, защита от дублей, версии конфигурации.
 """
 
 import html
@@ -30,6 +31,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
 import commands
+import feedback
 import llm
 
 # ======== ПУТИ ========
@@ -82,6 +84,7 @@ def load_config() -> Dict:
     limits.update(cfg.get("limits") or {})
     cfg["limits"] = limits
     cfg.setdefault("digest_time", "20:47")
+    cfg.setdefault("registries", [])
     return cfg
 
 
@@ -104,8 +107,17 @@ def resolve_role(username: str, cfg: Dict) -> str:
 
 
 def registry_link() -> str:
-    sid = load_config().get('spreadsheet_id', '')
+    sid = get_active_registry().get('id', '')
     return f"https://docs.google.com/spreadsheets/d/{sid}/edit"
+
+
+def get_active_registry() -> Dict:
+    """Возвращает активный реестр из конфига."""
+    cfg = load_config()
+    for r in cfg.get('registries', []):
+        if r.get('active'):
+            return r
+    return {"id": cfg.get('spreadsheet_id', ''), "name": "Реестр"}
 
 
 def with_footer(text: str) -> str:
@@ -124,7 +136,6 @@ def tg_api(method: str, params: Dict = None) -> Dict:
     """Вызов метода Telegram Bot API."""
     config = load_telegram_config()
     url = f"https://api.telegram.org/bot{config['bot_token']}/{method}"
-    # read timeout должен быть больше long-poll timeout, иначе гонка → "Read timed out"
     poll = (params or {}).get('timeout', 0)
     req_timeout = (10, poll + 15) if poll else 30
     try:
@@ -187,38 +198,29 @@ def answer_callback_query(callback_query_id: str, text: str = None):
     tg_api('answerCallbackQuery', payload)
 
 
-# ======== INLINE-КЛАВИАТУРЫ (v2.1, минимальные) ========
+# ======== INLINE-КЛАВИАТУРЫ ========
 
 def main_keyboard() -> Dict:
-    # v2.2.3: кнопка «Закрыть поручение» удалена по требованию владельца —
-    # закрытие делается в один тап внутри «Мои поручения» или прямо в реестре.
     return {"inline_keyboard": [
         [{"text": "📋 Мои поручения", "callback_data": "my_tasks"}],
         [{"text": "📂 Открыть реестр", "url": registry_link()}],
+        [{"text": "📋 Выбрать реестр", "callback_data": "select_registry"}],
     ]}
 
 
-# ======== АНТИФЛУД (токен-бакет в памяти процесса) ========
+# ======== АНТИФЛУД ========
 
 class FloodControl:
-    """Лимиты: N команд/мин и M команд/день на пользователя, глобальный потолок в день.
-
-    Первое превышение окна → одно предупреждение; дальше — молчаливый игнор
-    до конца окна.
-    """
-
     def __init__(self):
-        self._minute: Dict[str, Dict] = {}   # user_id -> {window_start, count, warned}
-        self._day: Dict[str, Dict] = {}      # user_id -> {date, count, warned}
+        self._minute: Dict[str, Dict] = {}
+        self._day: Dict[str, Dict] = {}
         self._global = {"date": "", "count": 0, "warned": False}
 
     def check(self, user_id: int, role: str, limits: Dict) -> Tuple[bool, Optional[str]]:
-        """Возвращает (разрешено, текст предупреждения или None)."""
         uid = str(user_id)
         now = time.time()
         today = now_msk().strftime("%d.%m.%Y")
 
-        # Глобальный потолок
         if self._global["date"] != today:
             self._global = {"date": today, "count": 0, "warned": False}
         if self._global["count"] >= limits["global_day"]:
@@ -229,7 +231,6 @@ class FloodControl:
             return False, warn
         self._global["count"] += 1
 
-        # Дневной лимит пользователя
         day_limit = limits["admin_per_day"] if role in ("admin", "superadmin") else limits["per_day"]
         d = self._day.get(uid)
         if not d or d["date"] != today:
@@ -244,7 +245,6 @@ class FloodControl:
             return False, warn
         d["count"] += 1
 
-        # Минутный лимит (для обычных пользователей; админов не душим поминутно)
         if role not in ("admin", "superadmin"):
             m = self._minute.get(uid)
             if not m or now - m["window_start"] >= 60:
@@ -291,11 +291,6 @@ def run_task_manager(*args) -> Tuple[bool, str]:
 
 
 def get_all_tasks(force: bool = False) -> List[Dict]:
-    """Получает все поручения из реестра (с кэшем TTL 60 с).
-
-    Основной путь — `list --json` (полные поля без обрезки, включая источник).
-    Fallback — разбор текстового вывода `list` (обрезанного).
-    """
     if not force and time.time() - _tasks_cache["ts"] < _CACHE_TTL:
         return _tasks_cache["data"]
 
@@ -305,18 +300,17 @@ def get_all_tasks(force: bool = False) -> List[Dict]:
         try:
             tasks = json.loads(output.strip())
         except json.JSONDecodeError:
-            success = False  # ушли в fallback
+            success = False
 
     if not success:
         success2, output2 = run_task_manager('list')
         if not success2:
-            return _tasks_cache["data"]  # отдаём устаревший кэш, лучше чем ничего
+            return _tasks_cache["data"]
         tasks = []
         for line in output2.split('\n'):
             line = line.strip()
             if not line or line.startswith('Найдено') or line.startswith('ID') or line.startswith('-'):
                 continue
-            # Формат: ID Статус Срок Контрагент Ответственный Описание
             parts = line.split(None, 5)
             if len(parts) >= 5:
                 tasks.append({
@@ -358,7 +352,7 @@ def get_assignee_by_telegram(username: str) -> Optional[str]:
     return None
 
 
-# ======== АУДИТ-ЛОГ (лист «Лог» в той же таблице) ========
+# ======== АУДИТ-ЛОГ ========
 
 AUDIT_SHEET = "Лог"
 AUDIT_HEADERS = ["Дата/время", "Telegram user", "Действие", "ID поручения", "Детали"]
@@ -377,7 +371,7 @@ def _gsheets_client():
 
 def _get_spreadsheet():
     client = _gsheets_client()
-    spreadsheet_id = load_config().get('spreadsheet_id')
+    spreadsheet_id = get_active_registry().get('id')
     return client.open_by_key(spreadsheet_id)
 
 
@@ -395,7 +389,6 @@ def _get_audit_sheet():
 
 
 def audit(action: str, task_id, details: str, username: str):
-    """Пишет строку в аудит-лог. Ошибки глотаем с логом — не роняем команду."""
     try:
         ws = _get_audit_sheet()
         ws.append_row([
@@ -410,7 +403,6 @@ def audit(action: str, task_id, details: str, username: str):
 
 
 def read_audit_entries() -> List[List[str]]:
-    """Читает все строки аудит-лога (без заголовка)."""
     try:
         ws = _get_audit_sheet()
         values = ws.get_all_values()
@@ -421,7 +413,6 @@ def read_audit_entries() -> List[List[str]]:
 
 
 def find_recent_duplicate(project: str, description: str, minutes: int = 10) -> Optional[List[str]]:
-    """Ищет create-запись с теми же проектом+описанием за последние N минут."""
     cutoff = now_msk() - timedelta(minutes=minutes)
     for row in reversed(read_audit_entries()):
         if len(row) < 5 or row[2] != "create":
@@ -431,8 +422,7 @@ def find_recent_duplicate(project: str, description: str, minutes: int = 10) -> 
         except ValueError:
             continue
         if ts < cutoff:
-            break  # лог хронологический, дальше только старее
-        # details формата: "Проект=… | Описание=… | Ответственный=… | Срок=…"
+            break
         parts = dict(p.split("=", 1) for p in (row[4] or "").split(" | ") if "=" in p)
         if (parts.get("Проект", "").strip().lower() == project.strip().lower()
                 and parts.get("Описание", "").strip().lower() == description.strip().lower()):
@@ -440,10 +430,9 @@ def find_recent_duplicate(project: str, description: str, minutes: int = 10) -> 
     return None
 
 
-# ======== ЧАТЫ АДМИНОВ (fallback для дайджеста) ========
+# ======== ЧАТЫ АДМИНОВ ========
 
 def remember_admin_chat(username: str, chat_id):
-    """Запоминает chat_id админа (Telegram не позволяет писать по username)."""
     if not username:
         return
     data = {}
@@ -480,17 +469,15 @@ def get_admin_chat_ids(cfg: Dict) -> List[int]:
 
 
 def get_group_chat_id() -> Optional[int]:
-    """chat_id общего чата из telegram.json — цель автоматических рассылок."""
     try:
         return load_telegram_config().get('chat_id')
     except Exception:
         return None
 
 
-# ======== СОСТОЯНИЯ (подтверждения) ========
-# Ключ — "chat_id:user_id"; живут только подтверждения создания/удаления.
+# ======== СОСТОЯНИЯ ========
 _user_states: Dict[str, Dict] = {}
-CONFIRM_TIMEOUT = 60  # секунд
+CONFIRM_TIMEOUT = 60
 
 
 def _state_key(chat_id, user_id) -> str:
@@ -514,7 +501,6 @@ def _clear_user_state(key: str):
 
 
 # ======== ФОРМАТИРОВАНИЕ ========
-
 _STATUS_EMOJI = {
     "Новое": "🆕", "В работе": "🔵", "На проверке": "🟡",
     "Выполнено": "✅", "Отменено": "❌", "Просрочено": "🔴",
@@ -539,10 +525,9 @@ def format_task_list(tasks: List[Dict], title: str) -> str:
     return "\n".join(lines)
 
 
-# ======== КНОПОЧНЫЙ СЦЕНАРИЙ ПОЛЬЗОВАТЕЛЯ ========
+# ======== КНОПОЧНЫЙ СЦЕНАРИЙ ========
 
 def get_open_tasks_for(username: str) -> Tuple[Optional[str], List[Dict]]:
-    """(имя в реестре или None, его открытые поручения)."""
     assignee = get_assignee_by_telegram(username)
     if not assignee:
         return None, []
@@ -553,7 +538,6 @@ def get_open_tasks_for(username: str) -> Tuple[Optional[str], List[Dict]]:
 
 
 def build_my_tasks_view(username: str) -> Tuple[str, Optional[Dict]]:
-    """Текст + клавиатура со списком открытых поручений (по кнопке на поручение)."""
     assignee, tasks = get_open_tasks_for(username)
     if not assignee:
         return ("❓ Вы не найдены в реестре.\n"
@@ -588,11 +572,22 @@ def build_my_tasks_view(username: str) -> Tuple[str, Optional[Dict]]:
     return text, {"inline_keyboard": buttons}
 
 
-def handle_close_callback(task_id: int, username: str) -> Tuple[str, bool]:
-    """Закрытие поручения по кнопке. Возвращает (текст для тоста, успех).
+def build_registry_selector() -> Tuple[str, Optional[Dict]]:
+    """Строит список реестров с кнопками переключения."""
+    cfg = load_config()
+    registries = cfg.get('registries', [])
+    lines = ["<b>📋 Доступные реестры:</b>\n"]
+    buttons = []
+    for r in registries:
+        mark = " ✅" if r.get('active') else ""
+        lines.append(f"• {html.escape(r.get('name', 'Без названия'))}{mark}")
+        if not r.get('active'):
+            buttons.append([{"text": f"📋 {r.get('name')}",
+                             "callback_data": f"switch_registry:{r.get('name')}"}])
+    return "\n".join(lines), {"inline_keyboard": buttons}
 
-    Проверка владельца по user_mapping — защита от подделки callback_data.
-    """
+
+def handle_close_callback(task_id: int, username: str) -> Tuple[str, bool]:
     assignee = get_assignee_by_telegram(username)
     if not assignee:
         return "❌ Вы не найдены в реестре, обратитесь к администратору.", False
@@ -646,7 +641,6 @@ def cmd_list_status(status: str) -> str:
 
 
 def cmd_close_task(task_id: int, username: str) -> str:
-    """Закрытие своего поручения текстом (проверка по user_mapping)."""
     toast, success = handle_close_callback(task_id, username)
     if success:
         return with_footer(toast)
@@ -721,13 +715,11 @@ def cmd_delete_execute(task_id: int, username: str) -> str:
 
 
 def cmd_digest() -> str:
-    """Ручной дайджест дедлайнов (check-deadlines также шлёт сводку в общий чат)."""
     success, output = run_task_manager('check-deadlines')
     return output.strip() if output.strip() else ("✅ Готово." if success else "❌ Ошибка check-deadlines")
 
 
 def cmd_new_registry(title: str, username: str) -> str:
-    """Создаёт новую Google-таблицу и переключает реестр на неё."""
     try:
         client = _gsheets_client()
         spreadsheet = client.create(title)
@@ -767,6 +759,25 @@ def cmd_new_registry(title: str, username: str) -> str:
     except Exception as e:
         log(f"⚠️ Ошибка создания реестра: {e}")
         return f"❌ Не удалось создать реестр: <code>{html.escape(str(e)[:200])}</code>"
+
+
+def cmd_switch_registry(name: str, username: str) -> str:
+    """Переключает активный реестр по названию."""
+    cfg = load_config()
+    registries = cfg.get('registries', [])
+    for r in registries:
+        if r.get('name') == name:
+            for reg in registries:
+                reg['active'] = (reg.get('name') == name)
+            cfg['spreadsheet_id'] = r['id']
+            save_config(cfg)
+            invalidate_cache()
+            audit("switch_registry", "-", f"Переключено на «{name}»", username)
+            return with_footer(
+                f"✅ Активный реестр изменён на «<b>{html.escape(name)}</b>»\n\n"
+                f"📋 {registry_link()}"
+            )
+    return f"❌ Реестр «<b>{html.escape(name)}</b>» не найден."
 
 
 def cmd_add_admin(cfg: Dict, username: str) -> str:
@@ -836,8 +847,6 @@ def cmd_rollback(version: str) -> str:
                     shutil.copy2(os.path.join(src_scripts, fname),
                                  os.path.join(SCRIPT_DIR, fname))
         for fname in ("config.json", "user_mapping.json"):
-            # в снапшотах файлы лежат в .credentials/ (как в v1.0), но
-            # поддерживаем и вариант в корне снапшота
             candidates = [os.path.join(src, ".credentials", fname),
                           os.path.join(src, fname)]
             for fpath in candidates:
@@ -853,7 +862,7 @@ def cmd_rollback(version: str) -> str:
     log(f"Откат конфигурации на {version}, перезапуск сервиса")
 
     def _restart():
-        time.sleep(2)  # даём ответу уйти в Telegram
+        time.sleep(2)
         subprocess.run(["systemctl", "restart", "plaxotin-task-bot"], timeout=30)
 
     threading.Thread(target=_restart, daemon=True).start()
@@ -861,16 +870,15 @@ def cmd_rollback(version: str) -> str:
             f"🔄 Перезапускаю сервис (пара секунд)…")
 
 
-# ======== ВЕЧЕРНИЙ ДАЙДЖЕСТ ИЗМЕНЕНИЙ ========
+# ======== ВЕЧЕРНИЙ ДАЙДЖЕСТ ========
 
 def build_evening_digest() -> Optional[str]:
-    """Сводка изменений реестра за сегодня (МСК). None, если изменений не было."""
     today = now_msk().strftime("%d.%m.%Y")
     entries = [r for r in read_audit_entries() if r and str(r[0]).startswith(today)]
     if not entries:
         return None
     action_emoji = {"create": "➕", "close": "✅", "update": "✏️", "delete": "🗑",
-                    "new_registry": "🆕"}
+                    "new_registry": "🆕", "switch_registry": "🔄", "feedback": "💡"}
     lines = [f"📊 <b>Изменения реестра за {today}</b> ({len(entries)})\n"]
     for row in entries:
         row = list(row) + [""] * (5 - len(row))
@@ -885,12 +893,6 @@ def build_evening_digest() -> Optional[str]:
 
 
 def digest_loop():
-    """Фоновый поток: раз в 30 с проверяет, не пора ли отправить дайджест (МСК).
-
-    Получатели — админы в личку (требование владельца); fallback — общий чат,
-    если ни один админ ещё не написал боту.
-    Нет изменений за день — не отправляем.
-    """
     last_sent_date = None
     while True:
         try:
@@ -910,8 +912,7 @@ def digest_loop():
                         group_chat = get_group_chat_id()
                         if group_chat:
                             send_message(group_chat, text)
-                            log("Вечерний дайджест отправлен в общий чат "
-                                "(нет зарегистрированных личек админов)")
+                            log("Вечерний дайджест отправлен в общий чат")
                 else:
                     log("Вечерний дайджест: изменений за день нет, не отправляю")
         except Exception as e:
@@ -922,17 +923,18 @@ def digest_loop():
 # ======== ПРИВЕТСТВИЕ ========
 
 def greeting_text(first_name: str, role: str) -> str:
+    reg = get_active_registry()
+    reg_info = f"\n\n📋 Активный реестр: <b>{html.escape(reg.get('name', 'Неизвестно'))}</b>"
     if role in ("admin", "superadmin"):
-        # v2.2.3: блок «Вот что я умею» удалён, только свободная форма
         return (
-            f"👋 <b>Привет, {html.escape(first_name or 'друг')}!</b>\n\n"
+            f"👋 <b>Привет, {html.escape(first_name or 'друг')}!</b>{reg_info}\n\n"
             f"💬 Напишите мне любую задачу по изменению реестра поручений "
             f"в свободной форме — я пойму, внесу правки и пришлю "
             f"подтверждение.\n\n"
             f"📋 Реестр: {registry_link()}"
         )
     return (
-        f"👋 <b>Привет, {html.escape(first_name or 'друг')}!</b>\n\n"
+        f"👋 <b>Привет, {html.escape(first_name or 'друг')}!</b>{reg_info}\n\n"
         f"Я бот реестра поручений.\n\n"
         f"📋 <b>Мои поручения</b> — ваши открытые задачи, закрытие в один тап\n\n"
         f"📋 Реестр: {registry_link()}"
@@ -1003,6 +1005,8 @@ def dispatch(cmd: "commands.ParsedCommand", username: str, first_name: str,
         return cmd_digest()
     if name == "new_registry":
         return cmd_new_registry(args["title"], username)
+    if name == "switch_registry":
+        return cmd_switch_registry(args["name"], username)
 
     if name == "add_admin":
         return cmd_add_admin(cfg, args["username"])
@@ -1020,7 +1024,7 @@ def dispatch(cmd: "commands.ParsedCommand", username: str, first_name: str,
     return "🤔 Не понял команду."
 
 
-# ======== ОБРАБОТКА CALLBACK (inline-кнопки) ========
+# ======== ОБРАБОТКА CALLBACK ========
 
 def process_callback(callback: Dict):
     callback_id = callback.get('id')
@@ -1037,7 +1041,6 @@ def process_callback(callback: Dict):
     cfg = load_config()
     role = resolve_role(username, cfg)
 
-    # Антифлуд и на кнопки
     allowed, warning = flood.check(user_id, role, cfg["limits"])
     if not allowed:
         answer_callback_query(callback_id, text=warning or "⏳ Лимит команд исчерпан.")
@@ -1055,6 +1058,19 @@ def process_callback(callback: Dict):
         answer_callback_query(callback_id)
         return
 
+    if data == "select_registry":
+        text, keyboard = build_registry_selector()
+        send_message(chat_id, text, reply_markup=keyboard)
+        answer_callback_query(callback_id)
+        return
+
+    if data.startswith("switch_registry:"):
+        registry_name = data.split(":", 1)[1]
+        response = cmd_switch_registry(registry_name, username)
+        send_message(chat_id, response)
+        answer_callback_query(callback_id)
+        return
+
     if data.startswith("close:"):
         try:
             task_id = int(data.split(":", 1)[1])
@@ -1064,7 +1080,6 @@ def process_callback(callback: Dict):
         toast, success = handle_close_callback(task_id, username)
         answer_callback_query(callback_id, text=toast[:190])
         if success and message_id:
-            # Обновляем список после закрытия
             text, keyboard = build_my_tasks_view(username)
             edit_message(chat_id, message_id, text, reply_markup=keyboard)
         return
@@ -1072,11 +1087,60 @@ def process_callback(callback: Dict):
     answer_callback_query(callback_id, text="❓ Неизвестная кнопка.")
 
 
+# ======== ФИДБЕК ИЗ ОБЩЕГО ЧАТА (v3.1) ========
+
+def _handle_group_feedback(message: Dict, fb_type: str, fb_text: str):
+    """Приём идеи/бага из общего чата: запись во вкладку «Бэклог BL-6».
+
+    Единственное исключение из правила «в группе бот молчит».
+    Антифлуд общий с остальными командами. Запись логируется в аудит
+    (действие feedback) — попадает в вечерний дайджест.
+    """
+    chat_id = message.get('chat', {}).get('id')
+    from_user = message.get('from', {})
+    username = from_user.get('username', '')
+    user_id = from_user.get('id')
+    msg_id = message.get('message_id')
+
+    if not fb_text:
+        send_message(chat_id,
+                     "ℹ️ Пустое сообщение. Напишите так:\n"
+                     "<code>/идея ваш текст</code> или <code>/баг ваш текст</code>",
+                     reply_to=msg_id)
+        return
+
+    cfg = load_config()
+    role = resolve_role(username, cfg)
+    allowed, warning = flood.check(user_id, role, cfg["limits"])
+    if not allowed:
+        if warning:
+            send_message(chat_id, warning, reply_to=msg_id)
+        log(f"Антифлуд (фидбек): @{username} ({user_id}) заблокирован")
+        return
+
+    try:
+        num = feedback.add_feedback(username, fb_type, fb_text, log_fn=log)
+    except Exception as e:
+        log(f"⚠️ Ошибка записи фидбека: {e}")
+        send_message(chat_id,
+                     "❌ Не удалось записать. Попробуйте позже или передайте "
+                     "администратору лично.",
+                     reply_to=msg_id)
+        return
+
+    audit("feedback", num, f"{fb_type}: {fb_text[:100]}", username)
+    log(f"Фидбек #{num} ({fb_type}) от @{username}: {fb_text[:80]}")
+    kind = "идею" if fb_type == "Идея" else "баг"
+    send_message(chat_id,
+                 f"✅ Записал {kind} <b>#{num}</b>. Спасибо!\n"
+                 f"Администратор посмотрит и возьмёт в работу.",
+                 reply_to=msg_id)
+
+
 # ======== ОБРАБОТКА ОБНОВЛЕНИЙ ========
 
 def process_updates(updates: List[Dict]):
     for update in updates:
-        # --- inline-кнопки ---
         if 'callback_query' in update:
             try:
                 process_callback(update['callback_query'])
@@ -1095,8 +1159,14 @@ def process_updates(updates: List[Dict]):
         chat = message.get('chat', {})
         chat_id = chat.get('id')
 
-        # --- группа: бот молчит (v2.1). Группа получает только рассылки. ---
+        # --- группа: бот молчит, кроме команд сбора фидбека (v3.1) ---
         if chat.get('type') != 'private':
+            fb = feedback.parse_feedback_command(text, BOT_USERNAME)
+            if fb:
+                try:
+                    _handle_group_feedback(message, fb[0], fb[1])
+                except Exception as e:
+                    log(f"⚠️ Ошибка обработки фидбека: {e}")
             continue
 
         from_user = message.get('from', {})
@@ -1111,7 +1181,6 @@ def process_updates(updates: List[Dict]):
         if role in ("admin", "superadmin"):
             remember_admin_chat(username, chat_id)
 
-        # --- антифлуд ---
         allowed, warning = flood.check(user_id, role, cfg["limits"])
         if not allowed:
             if warning:
@@ -1119,7 +1188,7 @@ def process_updates(updates: List[Dict]):
             log(f"Антифлуд: @{username} ({user_id}) заблокирован")
             continue
 
-        # --- ожидающее подтверждение (да/отмена) — только админские сценарии ---
+        # --- ожидающее подтверждение ---
         state = _get_user_state(key)
         if state and role in ("admin", "superadmin"):
             _clear_user_state(key)
@@ -1129,10 +1198,9 @@ def process_updates(updates: List[Dict]):
                 elif state["state"] == "confirm_delete":
                     response = cmd_delete_execute(state["data"]["id"], username)
                 elif state["state"] == "confirm_llm":
-                    # Исполняем LLM-интерпретацию через обычный путь:
-                    # parse (проверки прав) → dispatch (аудит, кэш)
+                    # Парсим как user для внутреннего распознавания (доступ проверен ролью)
                     cmd2 = commands.parse(state["data"]["command_text"],
-                                          role=role, today=now_msk().date())
+                                          role="user", today=now_msk().date())
                     if not cmd2.ok:
                         response = with_footer(cmd2.error)
                     elif cmd2.name == "help":
@@ -1152,38 +1220,44 @@ def process_updates(updates: List[Dict]):
         elif state:
             _clear_user_state(key)
 
-        # --- разбор команды ---
+        # --- Для админов и суперадминов: сразу LLM, минуя канонические команды ---
+        if role in ("admin", "superadmin"):
+            command_text = llm.interpret_free_text(
+                text, now_msk().strftime("%d.%m.%Y"), cfg, log_fn=log)
+            if command_text:
+                check = commands.parse_canonical(command_text,
+                                                  today=now_msk().date())
+                if check.ok and check.name != "help":
+                    _set_user_state(key, "confirm_llm",
+                                    {"command_text": command_text})
+                    send_message(
+                        chat_id,
+                        f"🤖 <b>Понял так:</b> <code>{html.escape(command_text)}</code>\n\n"
+                        f"Выполнить? Напишите <b>да</b> (60 сек), "
+                        f"любой другой текст — отмена.",
+                        reply_to=message.get('message_id'))
+                else:
+                    send_message(chat_id, with_footer(
+                        "🤔 Не удалось интерпретировать запрос. Попробуйте переформулировать."))
+            elif role == "superadmin":
+                chat_answer = llm.chat_response(text, cfg, log_fn=log)
+                if chat_answer:
+                    send_message(chat_id, with_footer(chat_answer),
+                                 reply_to=message.get('message_id'))
+                else:
+                    send_message(chat_id, with_footer(
+                        "⏳ ИИ-ассистент временно перегружен (лимит запросов). "
+                        "Подождите 30–60 секунд и повторите."))
+            else:
+                send_message(chat_id, with_footer(
+                    "⏳ ИИ-ассистент временно перегружен (лимит запросов). "
+                    "Подождите 30–60 секунд и повторите."))
+            continue
+
+        # --- разбор команды (только для обычных пользователей) ---
         cmd = commands.parse(text, role=role, today=now_msk().date())
 
         if not cmd.ok:
-            # Маршрутизация нераспознанного текста (v2.2)
-            if commands.route_unrecognized(role) == "llm":
-                # Админ/суперадмин: свободная форма → Kimi → подтверждение
-                command_text = llm.interpret_free_text(
-                    text, now_msk().strftime("%d.%m.%Y"), log_fn=log)
-                if command_text:
-                    # Проверяем, что интерпретация вообще парсится и разрешена роли
-                    check = commands.parse(command_text, role=role,
-                                           today=now_msk().date())
-                    if check.ok and check.name != "help":
-                        _set_user_state(key, "confirm_llm",
-                                        {"command_text": command_text})
-                        send_message(
-                            chat_id,
-                            f"🤖 <b>Понял так:</b> <code>{html.escape(command_text)}</code>\n\n"
-                            f"Выполнить? Напишите <b>да</b> (60 сек), "
-                            f"любой другой текст — отмена.",
-                            reply_to=message.get('message_id'))
-                    else:
-                        send_message(chat_id, with_footer(cmd.error),
-                                     reply_to=message.get('message_id'),
-                                     reply_markup=main_keyboard())
-                else:
-                    send_message(chat_id, with_footer(cmd.error),
-                                 reply_to=message.get('message_id'),
-                                 reply_markup=main_keyboard())
-                continue
-            # Обычный пользователь: сразу приветствие + кнопки
             send_message(chat_id, greeting_text(first_name, role),
                          reply_to=message.get('message_id'),
                          reply_markup=main_keyboard())
@@ -1204,11 +1278,11 @@ def process_updates(updates: List[Dict]):
         send_message(chat_id, response, reply_to=message.get('message_id'))
 
 
-# ======== ОСНОВНОЙ ЦИКЛ (как в v1.0/v2.0) ========
+# ======== ОСНОВНОЙ ЦИКЛ ========
 
 def main_loop():
-    log("🤖 Бот v2.2 запущен. Личка для всех (кнопки), группа — только рассылки, "
-        "LLM-режим для админов, "
+    log("🤖 Бот v3.1 запущен. Личка для всех (кнопки), группа — рассылки + "
+        "сбор /идея /баг, LLM-режим для админов, переключение реестров, "
         f"дайджест в {load_config().get('digest_time', '20:47')} МСК.")
 
     threading.Thread(target=digest_loop, daemon=True).start()

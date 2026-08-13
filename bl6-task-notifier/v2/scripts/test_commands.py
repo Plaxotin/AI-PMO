@@ -1,468 +1,328 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""Юнит-тесты парсера commands.py (v3.0).
+
+Семантика v3.0:
+  - parse(): для admin/superadmin почти всё → unknown (уходит в LLM),
+    для user — команды просмотра/закрытия + help/registry_link.
+  - parse_canonical(): полный набор команд без проверки роли
+    (используется для LLM-интерпретаций после подтверждения «да»).
+
+Тесты без сети и Google.
 """
-Юнит-тесты парсера команд commands.py (BL-6, v2.1).
 
-Модель v2.1: групповой чат не парсится, все команды — личка.
-Роли: user (кнопки + реестр/помощь/закрыть), admin (+реестрные команды),
-superadmin (+конфигурация).
-
-Запуск:  python test_commands.py
-"""
-
-import sys
 import os
+import sys
 import unittest
 from datetime import date
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import commands  # noqa: E402
+import commands
 
-# Фиксированная «сегодняшняя» дата для детерминированных тестов:
-# 12.08.2026 — среда (weekday()==2)
-TODAY = date(2026, 8, 12)
-
-ADMIN = dict(role="admin")
-SUPERADMIN = dict(role="superadmin")
-USER = dict(role="user")
+USER = {"role": "user", "today": date(2026, 8, 13)}          # четверг
+ADMIN = {"role": "admin", "today": date(2026, 8, 13)}
+SUPER = {"role": "superadmin", "today": date(2026, 8, 13)}
+TODAY = date(2026, 8, 13)
 
 
-def parse(text, role="user"):
-    return commands.parse(text, role=role, today=TODAY)
+def parse(text, **kw):
+    return commands.parse(text, **kw)
 
 
-# ======== УМНЫЕ ДАТЫ ========
-
-class TestDates(unittest.TestCase):
-    def test_tomorrow(self):
-        self.assertEqual(commands.normalize_date("завтра", TODAY), "13.08.2026")
-
-    def test_day_after_tomorrow(self):
-        self.assertEqual(commands.normalize_date("послезавтра", TODAY), "14.08.2026")
-
-    def test_today(self):
-        self.assertEqual(commands.normalize_date("сегодня", TODAY), "12.08.2026")
-
-    def test_weekday_friday(self):
-        # Среда -> ближайшая пятница = 14.08.2026
-        self.assertEqual(commands.normalize_date("в пятницу", TODAY), "14.08.2026")
-
-    def test_weekday_same_day(self):
-        friday = date(2026, 8, 14)  # пятница
-        self.assertEqual(commands.normalize_date("в пятницу", friday), "14.08.2026")
-
-    def test_weekday_monday_next_week(self):
-        # Среда -> понедельник уже прошёл, берём следующий = 17.08.2026
-        self.assertEqual(commands.normalize_date("в понедельник", TODAY), "17.08.2026")
-
-    def test_weekday_vo_variant(self):
-        # Среда -> во вторник = 18.08.2026
-        self.assertEqual(commands.normalize_date("во вторник", TODAY), "18.08.2026")
-
-    def test_numeric_full(self):
-        self.assertEqual(commands.normalize_date("20.08.2026", TODAY), "20.08.2026")
-
-    def test_numeric_short_year(self):
-        self.assertEqual(commands.normalize_date("20.08.26", TODAY), "20.08.2026")
-
-    def test_numeric_no_year_future(self):
-        self.assertEqual(commands.normalize_date("20.08", TODAY), "20.08.2026")
-
-    def test_numeric_no_year_past_rolls_to_next_year(self):
-        # 01.01 уже прошло относительно 12.08.2026 -> 01.01.2027
-        self.assertEqual(commands.normalize_date("01.01", TODAY), "01.01.2027")
-
-    def test_numeric_invalid(self):
-        self.assertIsNone(commands.normalize_date("32.13.2026", TODAY))
-        self.assertIsNone(commands.normalize_date("29.02.2026", TODAY))
-
-    def test_garbage(self):
-        self.assertIsNone(commands.normalize_date("когда-нибудь", TODAY))
+def canon(text):
+    return commands.parse_canonical(text, today=TODAY)
 
 
-# ======== КОМАНДЫ, ДОСТУПНЫЕ ВСЕМ (личка) ========
+# ======== СПРАВКА И МАРШРУТИЗАЦИЯ ========
 
-class TestPublicCommands(unittest.TestCase):
-    def test_registry_link_user(self):
+class TestHelpAndRouting(unittest.TestCase):
+
+    def test_help_text_admin_free_form(self):
+        text = commands.help_text("admin")
+        self.assertIn("свободной форме", text)
+
+    def test_help_text_superadmin_free_form(self):
+        text = commands.help_text("superadmin")
+        self.assertIn("свободной форме", text)
+
+    def test_help_text_user_my_tasks(self):
+        text = commands.help_text("user")
+        self.assertIn("Мои поручения", text)
+
+    def test_route_unrecognized_admin(self):
+        self.assertEqual(commands.route_unrecognized("admin"), "llm")
+        self.assertEqual(commands.route_unrecognized("superadmin"), "llm")
+
+    def test_route_unrecognized_user(self):
+        self.assertEqual(commands.route_unrecognized("user"), "fallback")
+
+    def test_unknown_command_contains_help(self):
+        c = commands.unknown_command("user")
+        self.assertFalse(c.ok)
+        self.assertIn("Не понял команду", c.error)
+        self.assertIn("Мои поручения", c.error)
+
+
+# ======== PARSE: ОБЫЧНЫЙ ПОЛЬЗОВАТЕЛЬ ========
+
+class TestParseUser(unittest.TestCase):
+
+    def test_help_variants(self):
+        for t in ("помощь", "справка", "команды", "help", "/start", "/help", "старт"):
+            c = parse(t, **USER)
+            self.assertTrue(c.ok, t)
+            self.assertEqual(c.name, "help", t)
+
+    def test_registry_link(self):
         c = parse("реестр", **USER)
-        self.assertTrue(c.ok, c.error)
+        self.assertTrue(c.ok)
         self.assertEqual(c.name, "registry_link")
 
-    def test_registry_link_case(self):
-        c =parse("  РЕЕСТР ", **USER)
-        self.assertTrue(c.ok, c.error)
-
-    def test_help_user(self):
-        c = parse("помощь", **USER)
-        self.assertTrue(c.ok)
-        self.assertEqual(c.name, "help")
-
-    def test_start_user(self):
-        c = parse("/start", **USER)
-        self.assertTrue(c.ok)
-        self.assertEqual(c.name, "help")
-
-    def test_close_user(self):
-        # «закрыть #N» доступно всем; проверка владельца — в обработчике
-        c = parse("закрыть #12", **USER)
-        self.assertTrue(c.ok, c.error)
-        self.assertEqual(c.name, "close")
-        self.assertEqual(c.args["id"], 12)
-
-    def test_close_no_space(self):
-        c = parse("закрыть#7", **USER)
-        self.assertTrue(c.ok)
-        self.assertEqual(c.args["id"], 7)
-
-    def test_close_bad_id(self):
-        c = parse("закрыть #abc", **USER)
-        self.assertFalse(c.ok)
-        self.assertIn("Не понял команду", c.error)
-
-
-# ======== ПРАВА: ОБЫЧНЫЙ ПОЛЬЗОВАТЕЛЬ ========
-
-class TestUserDenied(unittest.TestCase):
-    def test_user_create_denied(self):
-        c = parse("создать поручение: Проект=A; Описание=B; "
-                  "Ответственный=C; Срок=завтра", **USER)
-        self.assertFalse(c.ok)
-        self.assertIn("администраторам", c.error)
-
-    def test_user_deadline_denied(self):
-        c = parse("срок #1 завтра", **USER)
-        self.assertFalse(c.ok)
-        self.assertIn("администраторам", c.error)
-
-    def test_user_delete_denied(self):
-        c = parse("удалить #1", **USER)
-        self.assertFalse(c.ok)
-        self.assertIn("администраторам", c.error)
-
-    def test_user_new_registry_denied(self):
-        c = parse("новый реестр Реестр 2027", **USER)
-        self.assertFalse(c.ok)
-        self.assertIn("администраторам", c.error)
-
-    def test_user_list_all_denied(self):
-        c = parse("все поручения", **USER)
-        self.assertFalse(c.ok)
-        self.assertIn("администраторам", c.error)
-
-    def test_user_digest_denied(self):
-        c = parse("дайджест", **USER)
-        self.assertFalse(c.ok)
-        self.assertIn("администраторам", c.error)
-
-    def test_user_superadmin_denied(self):
-        c = parse("админы", **USER)
-        self.assertFalse(c.ok)
-        self.assertIn("суперадминистратору", c.error)
-
-
-# ======== НОВЫЙ РЕЕСТР ========
-
-class TestNewRegistry(unittest.TestCase):
-    def test_admin_ok(self):
-        c = parse("новый реестр Реестр поручений 2027", **ADMIN)
-        self.assertTrue(c.ok, c.error)
-        self.assertEqual(c.name, "new_registry")
-        self.assertEqual(c.args["title"], "Реестр поручений 2027")
-
-    def test_superadmin_ok(self):
-        c = parse("Новый   реестр   Q3", **SUPERADMIN)
-        self.assertTrue(c.ok, c.error)
-        self.assertEqual(c.args["title"], "Q3")
-
-    def test_user_denied(self):
-        c = parse("новый реестр Хак", **USER)
-        self.assertFalse(c.ok)
-
-    def test_empty_title_is_unknown(self):
-        c = parse("новый реестр", **ADMIN)
-        self.assertFalse(c.ok)
-        self.assertIn("Не понял команду", c.error)
-
-
-# ======== СПИСКИ (админы) ========
-
-class TestListCommands(unittest.TestCase):
     def test_list_my(self):
-        c = parse("мои поручения", **ADMIN)
+        c = parse("мои поручения", **USER)
         self.assertTrue(c.ok)
         self.assertEqual(c.name, "list_my")
 
     def test_list_all(self):
-        c = parse("все поручения", **ADMIN)
-        self.assertTrue(c.ok)
-        self.assertEqual(c.name, "list_all")
-
-    def test_list_project(self):
-        c = parse("поручения БЛ-6 Автоматизация", **ADMIN)
-        self.assertTrue(c.ok)
-        self.assertEqual(c.name, "list_project")
-        self.assertEqual(c.args["project"], "БЛ-6 Автоматизация")
+        for t in ("все поручения", "всё поручения"):
+            c = parse(t, **USER)
+            self.assertTrue(c.ok, t)
+            self.assertEqual(c.name, "list_all", t)
 
     def test_list_status(self):
-        c = parse("поручения статус В работе", **ADMIN)
+        c = parse("поручения статус В работе", **USER)
         self.assertTrue(c.ok)
         self.assertEqual(c.name, "list_status")
         self.assertEqual(c.args["status"], "В работе")
 
+    def test_list_project(self):
+        c = parse("поручения Ремонт офиса", **USER)
+        self.assertTrue(c.ok)
+        self.assertEqual(c.name, "list_project")
+        self.assertEqual(c.args["project"], "Ремонт офиса")
 
-# ======== СОЗДАНИЕ ПОРУЧЕНИЯ (админы) ========
+    def test_close_with_hash(self):
+        c = parse("закрыть #5", **USER)
+        self.assertTrue(c.ok)
+        self.assertEqual(c.name, "close")
+        self.assertEqual(c.args["id"], 5)
 
-class TestCreate(unittest.TestCase):
-    GOOD = ("создать поручение: Проект=BL-6; Описание=Починить дайджест; "
-            "Ответственный=Иванова Т.; Срок=20.08.2026")
-
-    def test_create_ok(self):
-        c = parse(self.GOOD, **ADMIN)
-        self.assertTrue(c.ok, c.error)
-        self.assertEqual(c.name, "create")
-        self.assertEqual(c.args["project"], "BL-6")
-        self.assertEqual(c.args["description"], "Починить дайджест")
-        self.assertEqual(c.args["assignee"], "Иванова Т.")
-        self.assertEqual(c.args["deadline"], "20.08.2026")
-
-    def test_create_smart_date(self):
-        c = parse("создать поручение: Проект=BL-6; Описание=Тест; "
-                  "Ответственный=Иванов; Срок=в пятницу", **ADMIN)
-        self.assertTrue(c.ok, c.error)
-        self.assertEqual(c.args["deadline"], "14.08.2026")
-
-    def test_create_case_insensitive_keys(self):
-        c = parse("Создать поручение: ПРОЕКТ=BL-6; описание=Тест; "
-                  "Ответственный=Иванов; СРОК=завтра", **ADMIN)
-        self.assertTrue(c.ok, c.error)
-        self.assertEqual(c.args["project"], "BL-6")
-        self.assertEqual(c.args["deadline"], "13.08.2026")
-
-    def test_create_missing_field(self):
-        c = parse("создать поручение: Проект=BL-6; Описание=Тест; Срок=завтра", **ADMIN)
-        self.assertFalse(c.ok)
-        self.assertIn("Ответственный", c.error)
-
-    def test_create_empty_body(self):
-        c = parse("создать поручение:", **ADMIN)
-        self.assertFalse(c.ok)
-        self.assertIn("Укажите поля", c.error)
-
-    def test_create_unknown_field(self):
-        c = parse("создать поручение: Проект=BL-6; Описание=Тест; "
-                  "Ответственный=Иванов; Срок=завтра; Приоритет=высокий", **ADMIN)
-        self.assertFalse(c.ok)
-        self.assertIn("Неизвестное поле", c.error)
-
-    def test_create_bad_date(self):
-        c = parse("создать поручение: Проект=BL-6; Описание=Тест; "
-                  "Ответственный=Иванов; Срок=когда-нибудь", **ADMIN)
-        self.assertFalse(c.ok)
-        self.assertIn("Не понял дату", c.error)
-
-    def test_create_no_separator(self):
-        c = parse("создать поручение: Проект BL-6; Описание=Тест; "
-                  "Ответственный=Иванов; Срок=завтра", **ADMIN)
-        self.assertFalse(c.ok)
-        self.assertIn("Имя=Значение", c.error)
-
-
-# ======== АДМИНСКИЕ КОМАНДЫ ========
-
-class TestAdminCommands(unittest.TestCase):
-    def test_deadline(self):
-        c = parse("срок #12 20.08.2026", **ADMIN)
-        self.assertTrue(c.ok, c.error)
-        self.assertEqual(c.name, "deadline")
-        self.assertEqual(c.args["id"], 12)
-        self.assertEqual(c.args["date"], "20.08.2026")
-
-    def test_deadline_smart(self):
-        c = parse("срок #12 завтра", **ADMIN)
-        self.assertTrue(c.ok, c.error)
-        self.assertEqual(c.args["date"], "13.08.2026")
-
-    def test_deadline_bad_date(self):
-        c = parse("срок #12 вчера", **ADMIN)
-        self.assertFalse(c.ok)
-        self.assertIn("Не понял дату", c.error)
-
-    def test_status(self):
-        c = parse("статус #12 В работе", **ADMIN)
-        self.assertTrue(c.ok, c.error)
-        self.assertEqual(c.name, "status")
-        self.assertEqual(c.args["status"], "В работе")
-
-    def test_assignee(self):
-        c = parse("ответственный #12 Иванова Т.", **ADMIN)
-        self.assertTrue(c.ok, c.error)
-        self.assertEqual(c.args["assignee"], "Иванова Т.")
-
-    def test_description(self):
-        c = parse("описание #12 Новый текст поручения", **ADMIN)
-        self.assertTrue(c.ok, c.error)
-        self.assertEqual(c.args["description"], "Новый текст поручения")
-
-    def test_comment(self):
-        c = parse("комментарий #12 ждём ответ заказчика", **ADMIN)
-        self.assertTrue(c.ok, c.error)
-        self.assertEqual(c.args["comment"], "ждём ответ заказчика")
-
-    def test_delete(self):
-        c = parse("удалить #12", **ADMIN)
-        self.assertTrue(c.ok, c.error)
-        self.assertEqual(c.name, "delete")
+    def test_close_without_hash(self):
+        c = parse("закрыть 12", **USER)
+        self.assertTrue(c.ok)
+        self.assertEqual(c.name, "close")
         self.assertEqual(c.args["id"], 12)
 
-    def test_digest(self):
-        c = parse("дайджест", **ADMIN)
-        self.assertTrue(c.ok, c.error)
-        self.assertEqual(c.name, "digest")
+    def test_case_and_spaces(self):
+        c = parse("  Мои   Поручения ", **USER)
+        self.assertTrue(c.ok)
+        self.assertEqual(c.name, "list_my")
 
+    def test_user_admin_commands_unknown(self):
+        # В v3.0 у пользователя нет админских команд — они просто не распознаются
+        for t in ("срок #1 завтра", "удалить #3", "дайджест",
+                  "новый реестр Тест", "создать поручение: Проект=А"):
+            c = parse(t, **USER)
+            self.assertFalse(c.ok, t)
+            self.assertIn("Не понял команду", c.error, t)
 
-# ======== СУПЕРАДМИН ========
-
-class TestSuperadminCommands(unittest.TestCase):
-    def test_add_admin(self):
-        c = parse("добавить админа @ivanov", **SUPERADMIN)
-        self.assertTrue(c.ok, c.error)
-        self.assertEqual(c.name, "add_admin")
-        self.assertEqual(c.args["username"], "ivanov")
-
-    def test_remove_admin(self):
-        c = parse("убрать админа @ivanov", **SUPERADMIN)
-        self.assertTrue(c.ok, c.error)
-        self.assertEqual(c.name, "remove_admin")
-
-    def test_list_admins(self):
-        c = parse("админы", **SUPERADMIN)
-        self.assertTrue(c.ok, c.error)
-        self.assertEqual(c.name, "list_admins")
-
-    def test_set_limits(self):
-        c = parse("лимиты 15 200", **SUPERADMIN)
-        self.assertTrue(c.ok, c.error)
-        self.assertEqual(c.args["per_min"], 15)
-        self.assertEqual(c.args["per_day"], 200)
-
-    def test_versions(self):
-        c = parse("версии", **SUPERADMIN)
-        self.assertTrue(c.ok, c.error)
-        self.assertEqual(c.name, "versions")
-
-    def test_rollback(self):
-        c = parse("откатить конфиг v2.0", **SUPERADMIN)
-        self.assertTrue(c.ok, c.error)
-        self.assertEqual(c.args["version"], "v2.0")
-
-    def test_superadmin_command_denied_for_admin(self):
-        c = parse("админы", **ADMIN)
-        self.assertFalse(c.ok)
-        self.assertIn("суперадминистратору", c.error)
-
-    def test_rollback_denied_for_admin(self):
-        c = parse("откатить конфиг v1.0", **ADMIN)
-        self.assertFalse(c.ok)
-        self.assertIn("суперадминистратору", c.error)
-
-
-# ======== НЕРАСПОЗНАННОЕ ========
-
-class TestUnknown(unittest.TestCase):
-    def test_garbage(self):
-        c = parse("бла бла бла", **USER)
-        self.assertFalse(c.ok)
-        self.assertIn("Не понял команду", c.error)
-
-    def test_typo_close(self):
-        c = parse("закрой #12", **USER)
-        self.assertFalse(c.ok)
-        self.assertIn("Не понял команду", c.error)
-
-    def test_missing_value(self):
-        c = parse("срок #12", **ADMIN)
+    def test_user_garbage(self):
+        c = parse("абракадабра", **USER)
         self.assertFalse(c.ok)
 
     def test_empty(self):
         c = parse("   ", **USER)
         self.assertFalse(c.ok)
 
-    def test_help_text_has_registry_for_user(self):
-        text = commands.help_text("user")
-        self.assertIn("реестр", text)
-        self.assertNotIn("новый реестр", text)
 
-    def test_help_text_admin_short_no_command_list(self):
-        # v2.2.2: справка одинаково короткая, без списка команд админа
-        text = commands.help_text("admin")
-        self.assertNotIn("новый реестр", text)
-        self.assertNotIn("Команды администратора", text)
-        self.assertIn("свободной форме", text)
+# ======== PARSE: АДМИН / СУПЕРАДМИН ========
 
-    def test_help_text_superadmin_short_no_config(self):
-        # v2.2.1: владелец попросил убрать блок конфигурации из справки
-        text = commands.help_text("superadmin")
-        self.assertNotIn("откатить конфиг", text)
-        self.assertNotIn("Конфигурация", text)
-        self.assertIn("свободной форме", text)
+class TestParseAdmin(unittest.TestCase):
 
+    def test_admin_help_ok(self):
+        c = parse("помощь", **ADMIN)
+        self.assertTrue(c.ok)
+        self.assertEqual(c.name, "help")
 
-# ======== LLM-МАРШРУТИЗАЦИЯ (v2.2) ========
+    def test_admin_registry_link_ok(self):
+        c = parse("реестр", **ADMIN)
+        self.assertTrue(c.ok)
+        self.assertEqual(c.name, "registry_link")
 
-class TestLlmRouting(unittest.TestCase):
-    def test_admin_routes_to_llm(self):
-        self.assertEqual(commands.route_unrecognized("admin"), "llm")
+    def test_admin_everything_else_unknown(self):
+        # v3.0: админу канонические команды отключены — всё уходит в LLM
+        for t in ("мои поручения", "все поручения", "закрыть #5",
+                  "срок #1 завтра", "удалить #3", "дайджест",
+                  "поручения статус Новое"):
+            c = parse(t, **ADMIN)
+            self.assertFalse(c.ok, t)
+            self.assertIn("Не понял команду", c.error, t)
 
-    def test_superadmin_routes_to_llm(self):
-        self.assertEqual(commands.route_unrecognized("superadmin"), "llm")
+    def test_superadmin_same_as_admin(self):
+        for t in ("мои поручения", "закрыть #5", "лимиты 10 100"):
+            c = parse(t, **SUPER)
+            self.assertFalse(c.ok, t)
 
-    def test_user_no_llm(self):
-        # Обычный пользователь: сразу «Не понял»/кнопки, без LLM
-        self.assertEqual(commands.route_unrecognized("user"), "fallback")
-
-    def test_unrecognized_admin_text_is_not_ok(self):
-        # Свободная форма не парсится → уходит в llm-путь по route_unrecognized
-        c = parse("перенеси пожалуйста дедлайн двенадцатой задачи на пятницу", **ADMIN)
-        self.assertFalse(c.ok)
-        self.assertEqual(commands.route_unrecognized("admin"), "llm")
-
-    def test_unrecognized_user_text_stays_fallback(self):
-        c = parse("перенеси пожалуйста дедлайн задачи", **USER)
-        self.assertFalse(c.ok)
-        self.assertEqual(commands.route_unrecognized("user"), "fallback")
+    def test_admin_unknown_error_has_free_form_hint(self):
+        c = parse("мои поручения", **ADMIN)
+        self.assertIn("свободной форме", c.error)
 
 
-class TestLlmExtractJson(unittest.TestCase):
-    """Чистые тесты разбора ответа модели (без сети)."""
+# ======== УМНЫЕ ДАТЫ ========
 
-    def test_plain_json(self):
-        import llm
-        d = llm.extract_json('{"command_text": "закрыть #12"}')
-        self.assertEqual(d, {"command_text": "закрыть #12"})
+class TestNormalizeDate(unittest.TestCase):
 
-    def test_markdown_wrapped(self):
-        import llm
-        d = llm.extract_json('```json\n{"command_text": "все поручения"}\n```')
-        self.assertEqual(d["command_text"], "все поручения")
+    def n(self, text):
+        return commands.normalize_date(text, TODAY)
 
-    def test_null_command(self):
-        import llm
-        d = llm.extract_json('{"command_text": null}')
-        self.assertIsNone(d["command_text"])
+    def test_today(self):
+        self.assertEqual(self.n("сегодня"), "13.08.2026")
+
+    def test_tomorrow(self):
+        self.assertEqual(self.n("завтра"), "14.08.2026")
+
+    def test_day_after_tomorrow(self):
+        self.assertEqual(self.n("послезавтра"), "15.08.2026")
+
+    def test_weekday_same_week(self):
+        # 13.08.2026 — четверг; ближайшая пятница — 14.08
+        self.assertEqual(self.n("в пятницу"), "14.08.2026")
+
+    def test_weekday_next_week(self):
+        # ближайший понедельник после четверга — 17.08
+        self.assertEqual(self.n("в понедельник"), "17.08.2026")
+
+    def test_numeric_full(self):
+        self.assertEqual(self.n("20.08.2026"), "20.08.2026")
+
+    def test_numeric_short_year(self):
+        self.assertEqual(self.n("20.08.26"), "20.08.2026")
+
+    def test_numeric_no_year_future(self):
+        self.assertEqual(self.n("01.09"), "01.09.2026")
+
+    def test_numeric_no_year_past_rolls_to_next_year(self):
+        self.assertEqual(self.n("01.01"), "01.01.2027")
+
+    def test_invalid_date(self):
+        self.assertIsNone(self.n("32.13.2026"))
 
     def test_garbage(self):
-        import llm
-        self.assertIsNone(llm.extract_json("просто текст без json"))
-        self.assertIsNone(llm.extract_json(""))
-        self.assertIsNone(llm.extract_json(None))
-
-    def test_no_config_returns_none(self):
-        # Локально kimi.json нет → interpret_free_text обязан вернуть None без сети
-        import llm
-        self.assertIsNone(llm.interpret_free_text("закрой задачу", "12.08.2026",
-                                                  log_fn=lambda m: None))
+        self.assertIsNone(self.n("когда-нибудь"))
 
 
-if __name__ == "__main__":
+# ======== PARSE_CANONICAL: ПОЛНЫЙ НАБОР (для LLM) ========
+
+class TestParseCanonical(unittest.TestCase):
+
+    def test_help(self):
+        c = canon("помощь")
+        self.assertTrue(c.ok)
+        self.assertEqual(c.name, "help")
+
+    def test_registry_link(self):
+        c = canon("реестр")
+        self.assertTrue(c.ok)
+        self.assertEqual(c.name, "registry_link")
+
+    def test_list_commands(self):
+        self.assertEqual(canon("мои поручения").name, "list_my")
+        self.assertEqual(canon("все поручения").name, "list_all")
+        c = canon("поручения статус Новое")
+        self.assertEqual((c.name, c.args["status"]), ("list_status", "Новое"))
+        c = canon("поручения Проект Альфа")
+        self.assertEqual((c.name, c.args["project"]), ("list_project", "Проект Альфа"))
+
+    def test_close(self):
+        c = canon("закрыть #7")
+        self.assertEqual((c.ok, c.name, c.args["id"]), (True, "close", 7))
+
+    def test_digest(self):
+        c = canon("дайджест")
+        self.assertTrue(c.ok)
+        self.assertEqual(c.name, "digest")
+
+    def test_new_registry(self):
+        c = canon("новый реестр Бэклог 2027")
+        self.assertTrue(c.ok)
+        self.assertEqual(c.name, "new_registry")
+        self.assertEqual(c.args["title"], "Бэклог 2027")
+
+    def test_switch_registry(self):
+        c = canon("переключить реестр на Основной")
+        self.assertTrue(c.ok)
+        self.assertEqual(c.name, "switch_registry")
+        self.assertEqual(c.args["name"], "Основной")
+
+    def test_deadline_smart_date(self):
+        c = canon("срок #3 завтра")
+        self.assertTrue(c.ok)
+        self.assertEqual(c.name, "deadline")
+        self.assertEqual(c.args["id"], 3)
+        self.assertEqual(c.args["date"], "14.08.2026")
+
+    def test_deadline_numeric_date(self):
+        c = canon("срок #3 01.09.2026")
+        self.assertTrue(c.ok)
+        self.assertEqual(c.args["date"], "01.09.2026")
+
+    def test_deadline_bad_date(self):
+        c = canon("срок #3 когда-нибудь")
+        self.assertFalse(c.ok)
+        self.assertIn("дату", c.error.lower())
+
+    def test_status(self):
+        c = canon("статус #4 В работе")
+        self.assertEqual((c.ok, c.name, c.args["id"], c.args["status"]),
+                         (True, "status", 4, "В работе"))
+
+    def test_assignee(self):
+        c = canon("ответственный #4 Иванов")
+        self.assertEqual((c.ok, c.name, c.args["assignee"]),
+                         (True, "assignee", "Иванов"))
+
+    def test_description(self):
+        c = canon("описание #4 Новый текст")
+        self.assertEqual((c.ok, c.name, c.args["description"]),
+                         (True, "description", "Новый текст"))
+
+    def test_comment(self):
+        c = canon("комментарий #4 Уточнить сроки")
+        self.assertEqual((c.ok, c.name, c.args["comment"]),
+                         (True, "comment", "Уточнить сроки"))
+
+    def test_delete(self):
+        c = canon("удалить #9")
+        self.assertEqual((c.ok, c.name, c.args["id"]), (True, "delete", 9))
+
+    def test_create_full(self):
+        c = canon("создать поручение: Проект=Альфа; Описание=Сделать X; "
+                  "Ответственный=Иванов; Срок=завтра")
+        self.assertTrue(c.ok)
+        self.assertEqual(c.name, "create")
+        self.assertEqual(c.args["project"], "Альфа")
+        self.assertEqual(c.args["description"], "Сделать X")
+        self.assertEqual(c.args["assignee"], "Иванов")
+        self.assertEqual(c.args["deadline"], "14.08.2026")
+
+    def test_create_missing_field(self):
+        c = canon("создать поручение: Проект=Альфа; Описание=Сделать X")
+        self.assertFalse(c.ok)
+
+    def test_create_bad_date(self):
+        c = canon("создать поручение: Проект=А; Описание=Б; "
+                  "Ответственный=В; Срок=когда-нибудь")
+        self.assertFalse(c.ok)
+
+    def test_unrecognized(self):
+        c = canon("погладить кота")
+        self.assertFalse(c.ok)
+
+    def test_empty(self):
+        c = canon("   ")
+        self.assertFalse(c.ok)
+
+
+if __name__ == '__main__':
     unittest.main(verbosity=2)

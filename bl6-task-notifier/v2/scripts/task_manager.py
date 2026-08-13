@@ -30,6 +30,16 @@ def save_config(config: Dict):
     with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
 
+def get_active_registry() -> str:
+    """Возвращает spreadsheet_id активного реестра из config."""
+    config = load_config()
+    registries = config.get("registries", [])
+    for reg in registries:
+        if reg.get("active"):
+            return reg.get("id", "")
+    # fallback на старую схему
+    return config.get("spreadsheet_id", "")
+
 def get_gsheets_client():
     """Создаёт клиент Google Sheets."""
     try:
@@ -56,7 +66,17 @@ def get_or_create_spreadsheet(client, title: str = "Реестр поручен�
     """Получает или создаёт таблицу."""
     config = load_config()
     
-    if 'spreadsheet_id' in config:
+    # Проверяем через активный реестр (новая схема)
+    active_id = get_active_registry()
+    if active_id:
+        try:
+            spreadsheet = client.open_by_key(active_id)
+            print(f"[OK] Подключено к существующей таблице: {spreadsheet.title}")
+            return active_id
+        except Exception:
+            print("[ВНИМАНИЕ] Сохранённая таблица недоступна, создаю новую...")
+    elif 'spreadsheet_id' in config:
+        # fallback на старую схему
         try:
             spreadsheet = client.open_by_key(config['spreadsheet_id'])
             print(f"[OK] Подключено к существующей таблице: {spreadsheet.title}")
@@ -94,8 +114,7 @@ def get_or_create_spreadsheet(client, title: str = "Реестр поручен�
 
 def get_worksheet(client):
     """Получает лист с поручениями."""
-    config = load_config()
-    spreadsheet_id = config.get('spreadsheet_id')
+    spreadsheet_id = get_active_registry()
     
     if not spreadsheet_id:
         print("❌ Таблица не настроена. Запустите: python task_manager.py --init")
@@ -389,8 +408,7 @@ def check_deadlines(args):
     full_message = "<b>🤖 ПРОВЕРКА ПОРУЧЕНИЙ</b>\n\n" + "\n".join(messages)
     
     # Добавляем ссылку на исходник
-    config = load_config()
-    spreadsheet_id = config.get('spreadsheet_id')
+    spreadsheet_id = get_active_registry()
     if spreadsheet_id:
         full_message += f"\n\n📋 https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"
     
