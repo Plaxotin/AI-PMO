@@ -117,6 +117,7 @@ def get_active_registry() -> Dict:
     for r in cfg.get('registries', []):
         if r.get('active'):
             return r
+    # fallback на старую схему
     return {"id": cfg.get('spreadsheet_id', ''), "name": "Реестр"}
 
 
@@ -742,6 +743,18 @@ def cmd_new_registry(title: str, username: str) -> str:
                           "сервисному аккаунту вручную.")
 
         old_id = cfg.get('spreadsheet_id', '')
+        # v3.1 fix: добавляем новый реестр в список registries и делаем активным
+        registries = cfg.setdefault('registries', [])
+        # Сбрасываем active у всех существующих
+        for r in registries:
+            r['active'] = False
+        # Добавляем новый реестр как активный
+        registries.append({
+            'id': spreadsheet.id,
+            'name': title,
+            'active': True,
+        })
+        # Fallback для совместимости со старыми модулями
         cfg['prev_spreadsheet_id'] = old_id
         cfg['spreadsheet_id'] = spreadsheet.id
         save_config(cfg)
