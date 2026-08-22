@@ -225,7 +225,6 @@ def reply_main_keyboard(role: str = "user", admin_mode: bool = False) -> Dict:
                          {"text": "🔍 Проверить"}])
             rows.append([{"text": "📊 Дайджест"},
                          {"text": "📋 Реестры"}])
-            rows.append([{"text": "📋 Меню"}])
     return {"keyboard": rows, "resize_keyboard": True}
 
 
@@ -1656,7 +1655,8 @@ def process_updates(updates: List[Dict]):
             continue
         if (text_clean == "❌ Выйти" or text_clean == "Выйти") and role in ("admin", "superadmin"):
             _clear_user_state(key)
-            send_message(chat_id, "👋 <b>Режим администратора отключён.</b>\n\nНажмите 📋 <b>Меню</b>, чтобы вернуться в панель управления.")
+            send_message(chat_id, "👋 <b>Режим администратора отключён.</b>",
+                         reply_markup=reply_main_keyboard(role))
             continue
         if (text_clean == "/start" or text_clean == "/help" or text_clean == "привет" or text_clean == "начать") and role in ("admin", "superadmin"):
             send_message(chat_id, greeting_text(first_name, role),
