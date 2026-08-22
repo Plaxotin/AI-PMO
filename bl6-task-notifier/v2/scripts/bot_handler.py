@@ -508,22 +508,35 @@ _STATUS_EMOJI = {
 }
 
 
+def _format_description(desc: str, max_lines: int = 2) -> str:
+    """Ограничивает описание заданным числом строк, обрезая лишнее."""
+    if not desc:
+        return ""
+    lines = desc.split('\n')
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+        lines[-1] = lines[-1][:47] + "…" if len(lines[-1]) > 50 else lines[-1]
+    return '\n'.join(lines)
+
+
 def format_task_list(tasks: List[Dict], title: str) -> str:
     if not tasks:
         return f"📭 {title}\n\nПоручений не найдено."
 
-    lines = [f"<b>{title}</b> ({len(tasks)} шт.)\n"]
+    today = now_msk().strftime("%d.%m.%Y")
+    lines = [f"<b>{title}</b> ({len(tasks)} шт.)\n<i>Статус на {today}</i>\n"]
     for task in tasks:
         status_emoji = _STATUS_EMOJI.get(task.get('status', ''), "⚪")
+        desc = _format_description(task.get('description', ''), max_lines=2)
         lines.append(
-            f"<b>#{task.get('id', '?')}</b> {status_emoji} <b>{task.get('status', '?')}</b>  "
-            f"📅 {task.get('deadline', '?')}\n"
-            f"   📝 {html.escape(task.get('description', ''))}\n"
+            f"<b>{task.get('id', '?')}</b> {status_emoji} <b>{task.get('status', '?')}</b>  "
+            f"{task.get('deadline', '?')}\n"
+            f"   📝 {html.escape(desc)}\n"
             f"   📁 {html.escape(task.get('project') or 'Без проекта')}  "
-            f"👤 {html.escape(task.get('assignee', '?'))}  "
-            f"📣 {html.escape(task.get('author') or '?')}\n"
+            f"{html.escape(task.get('assignee', '?'))}  "
+            f"📣 {html.escape(task.get('author') or '?')}"
         )
-    return "\n".join(lines)
+    return "\n\n".join(lines)
 
 
 # ======== КНОПОЧНЫЙ СЦЕНАРИЙ ========
@@ -551,22 +564,24 @@ def build_my_tasks_view(username: str) -> Tuple[str, Optional[Dict]]:
     for t in tasks:
         desc = t.get('description', '')
         desc_short = desc[:40] + "…" if len(desc) > 40 else desc
-        buttons.append([{"text": f"✅ #{t['id']} {desc_short}",
+        buttons.append([{"text": f"✅ {t['id']} {desc_short}",
                          "callback_data": f"close:{t['id']}"}])
     buttons.append([{"text": "🔄 Обновить", "callback_data": "refresh"}])
 
+    today = now_msk().strftime("%d.%m.%Y")
     blocks = []
     for t in tasks:
         status_emoji = _STATUS_EMOJI.get(t.get('status', ''), "⚪")
+        desc = _format_description(t.get('description', ''), max_lines=2)
         blocks.append(
-            f"<b>#{t.get('id', '?')}</b> {status_emoji} <b>{t.get('status', '?')}</b>  "
-            f"📅 {t.get('deadline', '?')}\n"
-            f"📝 {html.escape(t.get('description', ''))}\n"
-            f"📁 {html.escape(t.get('project') or 'Без проекта')}  "
-            f"📣 {html.escape(t.get('author') or '?')}"
+            f"<b>{t.get('id', '?')}</b> {status_emoji} <b>{t.get('status', '?')}</b>  "
+            f"{t.get('deadline', '?')}\n"
+            f"📝 {html.escape(desc)}\n"
+            f"📁 {html.escape(t.get('project') or 'Без проекта')}"
         )
     text = with_footer(
-        f"📋 <b>Ваши открытые поручения</b> ({len(tasks)}) — {html.escape(assignee)}\n\n"
+        f"📋 <b>Ваши открытые поручения</b> ({len(tasks)}) — {html.escape(assignee)}\n"
+        f"<i>Статус на {today}</i>\n\n"
         + "\n\n".join(blocks)
         + "\n\nНажмите на поручение ниже, чтобы закрыть его."
     )
