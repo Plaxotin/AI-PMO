@@ -223,7 +223,9 @@ def reply_main_keyboard(role: str = "user", admin_mode: bool = False) -> Dict:
         else:
             rows.append([{"text": "📝 Редактировать реестр"},
                          {"text": "🔍 Проверить реестр"},
+                         {"text": "📊 Отправить дайджест"},
                          {"text": "📋 Выбрать реестр"}])
+            rows.append([{"text": "📋 Меню"}])
     return {"keyboard": rows, "resize_keyboard": True}
 
 
@@ -1632,6 +1634,11 @@ def process_updates(updates: List[Dict]):
                 f"🔗 {registry_link()}"
             ), reply_markup=admin_mode_keyboard())
             continue
+        if (text_clean == "📊 Отправить дайджест" or text_clean == "Отправить дайджест") and role in ("admin", "superadmin"):
+            response = cmd_digest()
+            send_message(chat_id, response)
+            continue
+
         if (text_clean == "🔍 Проверить реестр" or text_clean == "Проверить реестр") and role in ("admin", "superadmin"):
             # Защита от дублей: если аудит уже запущен для этого пользователя, пропускаем
             audit_state = _get_user_state(key)
@@ -1652,6 +1659,12 @@ def process_updates(updates: List[Dict]):
             send_message(chat_id, greeting_text(first_name, role),
                          reply_markup=reply_main_keyboard(role))
             continue
+        if (text_clean == "/start" or text_clean == "/help" or text_clean == "привет" or text_clean == "начать") and role in ("admin", "superadmin"):
+            send_message(chat_id, greeting_text(first_name, role),
+                         reply_to=message.get('message_id'),
+                         reply_markup=main_keyboard(role))
+            continue
+
         if text_clean == "📋 Выбрать реестр" and role in ("admin", "superadmin"):
             sel_text, sel_kb = build_registry_selector()
             send_message(chat_id, sel_text, reply_markup=sel_kb)
