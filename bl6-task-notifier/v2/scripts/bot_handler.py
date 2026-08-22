@@ -204,13 +204,12 @@ def answer_callback_query(callback_query_id: str, text: str = None):
 
 def main_keyboard(role: str = "user") -> Dict:
     kb = [
-        [{"text": "📋 Мои поручения", "callback_data": "my_tasks"}],
+        [{"text": "📋 Мои поручения", "callback_data": "my_tasks"}, {"text": "📊 Отправить дайджест", "callback_data": "send_digest"}],
         [{"text": "📂 Открыть реестр", "url": registry_link()}],
         [{"text": "📋 Выбрать реестр", "callback_data": "select_registry"}],
     ]
     if role in ("admin", "superadmin"):
         kb.append([{"text": "📝 Редактировать реестр", "callback_data": "admin_mode"}])
-        kb.append([{"text": "📊 Отправить дайджест", "callback_data": "send_digest"}])
     return {"inline_keyboard": kb}
 
 
