@@ -82,7 +82,12 @@ def help_text(role: str = "user") -> str:
                 "в свободной форме — я пойму, внесу правки и пришлю "
                 "подтверждение.")
     return ("📋 Кнопка <b>«Мои поручения»</b> — ваши открытые поручения "
-            "из реестра, закрытие в один тап.")
+            "из реестра, закрытие в один тап." + "\n\n"
+            "Также можно написать:\n"
+            "<code>мои поручения</code> — список ваших задач\n"
+            "<code>все поручения</code> — весь реестр\n"
+            "<code>дайджест</code> — проверка срочных дедлайнов\n"
+            "<code>закрыть 47</code> — закрыть поручение #47")
 
 
 def unknown_command(role: str = "user") -> ParsedCommand:
@@ -100,7 +105,7 @@ def route_unrecognized(role: str) -> str:
 # Все команды доступны только обычным пользователям.
 # Админы/суперадмины используют только LLM (свободная форма).
 _PUBLIC_COMMANDS = {"help", "registry_link", "list_my", "list_all",
-                    "list_project", "list_status", "close"}
+                    "list_project", "list_status", "close", "digest"}
 
 
 def _check_access(name: str, role: str) -> Optional[ParsedCommand]:
@@ -160,6 +165,15 @@ def parse(text: str, role: str = "user",
         return finish("list_project", {"project": m.group(1).strip()})
 
     # --- закрытие (только своё — проверка в обработчике) ---
+    m = re.match(r"^закрыть\s*#\s*(\d+)$", low) or re.match(r"^закрыть\s+(\d+)$", low)
+    if m:
+        return finish("close", {"id": int(m.group(1))})
+
+    # --- дайджест (доступен всем) ---
+    if low == "дайджест":
+        return finish("digest", {})
+
+    return unknown_command(role)
     m = re.match(r"^закрыть\s*#\s*(\d+)$", low) or re.match(r"^закрыть\s+(\d+)$", low)
     if m:
         return finish("close", {"id": int(m.group(1))})
