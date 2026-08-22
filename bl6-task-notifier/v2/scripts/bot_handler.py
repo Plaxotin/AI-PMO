@@ -529,14 +529,14 @@ def format_task_list(tasks: List[Dict], title: str) -> str:
         status_emoji = _STATUS_EMOJI.get(task.get('status', ''), "⚪")
         desc = _format_description(task.get('description', ''), max_lines=2)
         lines.append(
-            f"<b>{task.get('id', '?')}</b> {status_emoji} <b>{task.get('status', '?')}</b>  "
+            f"<b>#{task.get('id', '?')}:</b> {status_emoji} <b>{task.get('status', '?')}</b>  "
             f"{task.get('deadline', '?')}\n"
             f"   📝 {html.escape(desc)}\n"
             f"   📁 {html.escape(task.get('project') or 'Без проекта')}  "
             f"{html.escape(task.get('assignee', '?'))}  "
             f"📣 {html.escape(task.get('author') or '?')}"
         )
-    return "\n\n".join(lines)
+    return "\n".join(lines)
 
 
 # ======== КНОПОЧНЫЙ СЦЕНАРИЙ ========
@@ -564,7 +564,7 @@ def build_my_tasks_view(username: str) -> Tuple[str, Optional[Dict]]:
     for t in tasks:
         desc = t.get('description', '')
         desc_short = desc[:40] + "…" if len(desc) > 40 else desc
-        buttons.append([{"text": f"✅ {t['id']} {desc_short}",
+        buttons.append([{"text": f"✅ #{t['id']}: {desc_short}",
                          "callback_data": f"close:{t['id']}"}])
     buttons.append([{"text": "🔄 Обновить", "callback_data": "refresh"}])
 
@@ -574,7 +574,7 @@ def build_my_tasks_view(username: str) -> Tuple[str, Optional[Dict]]:
         status_emoji = _STATUS_EMOJI.get(t.get('status', ''), "⚪")
         desc = _format_description(t.get('description', ''), max_lines=2)
         blocks.append(
-            f"<b>{t.get('id', '?')}</b> {status_emoji} <b>{t.get('status', '?')}</b>  "
+            f"<b>#{t.get('id', '?')}:</b> {status_emoji} <b>{t.get('status', '?')}</b>  "
             f"{t.get('deadline', '?')}\n"
             f"📝 {html.escape(desc)}\n"
             f"📁 {html.escape(t.get('project') or 'Без проекта')}"

@@ -383,7 +383,7 @@ def check_deadlines(args):
             desc = html.escape(row[4][:50])
             assignee = format_assignee(row[5], user_mapping)
             deadline = html.escape(row[6])
-            messages.append(f"  <b>{row[0]}</b> {desc}\n      {assignee}  {deadline}")
+            messages.append(f"  <b>#{row[0]}:</b> {desc} {assignee}  {deadline}")
     
     if due_today:
         messages.append(f"\n<b>🔴 СРОК СЕГОДНЯ: {len(due_today)} поручений</b>")
@@ -391,7 +391,7 @@ def check_deadlines(args):
             desc = html.escape(row[4][:50])
             assignee = format_assignee(row[5], user_mapping)
             deadline = html.escape(row[6])
-            messages.append(f"  <b>{row[0]}</b> {desc}\n      {assignee}  {deadline}")
+            messages.append(f"  <b>#{row[0]}:</b> {desc} {assignee}  {deadline}")
     
     if due_tomorrow:
         messages.append(f"\n<b>📅 СРОК ЗАВТРА: {len(due_tomorrow)} поручений</b>")
@@ -399,13 +399,13 @@ def check_deadlines(args):
             desc = html.escape(row[4][:50])
             assignee = format_assignee(row[5], user_mapping)
             deadline = html.escape(row[6])
-            messages.append(f"  <b>{row[0]}</b> {desc}\n      {assignee}  {deadline}")
+            messages.append(f"  <b>#{row[0]}:</b> {desc} {assignee}  {deadline}")
     
     if not messages:
         print("Все поручения в норме, срочных нет")
         return
     
-    full_message = "<b>🤖 ПРОВЕРКА ПОРУЧЕНИЙ</b>\n\n" + "\n\n".join(messages)
+    full_message = "<b>🤖 ПРОВЕРКА ПОРУЧЕНИЙ</b>\n\n" + "\n".join(messages)
     
     # Добавляем ссылку на исходник
     spreadsheet_id = get_active_registry()
