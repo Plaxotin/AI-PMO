@@ -21,6 +21,7 @@
 
 import html
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -117,6 +118,7 @@ def get_active_registry() -> Dict:
     for r in cfg.get('registries', []):
         if r.get('active'):
             return r
+    # fallback на старую схему
     return {"id": cfg.get('spreadsheet_id', ''), "name": "Реестр"}
 
 
@@ -201,19 +203,33 @@ def answer_callback_query(callback_query_id: str, text: str = None):
 # ======== INLINE-КЛАВИАТУРЫ ========
 
 def main_keyboard(role: str = "user") -> Dict:
-    keyboard = [
+    kb = [
         [{"text": "📋 Мои поручения", "callback_data": "my_tasks"}],
         [{"text": "📂 Открыть реестр", "url": registry_link()}],
         [{"text": "📋 Выбрать реестр", "callback_data": "select_registry"}],
     ]
     if role in ("admin", "superadmin"):
-        keyboard.append([{"text": "📊 Отправить дайджест", "callback_data": "send_digest"}])
-    return {"inline_keyboard": keyboard}
-    return {"inline_keyboard": [
-        [{"text": "📋 Мои поручения", "callback_data": "my_tasks"}],
-        [{"text": "📂 Открыть реестр", "url": registry_link()}],
-        [{"text": "📋 Выбрать реестр", "callback_data": "select_registry"}],
-    ]}
+        kb.append([{"text": "📝 Редактировать реестр", "callback_data": "admin_mode"}])
+        kb.append([{"text": "📊 Отправить дайджест", "callback_data": "send_digest"}])
+    return {"inline_keyboard": kb}
+
+
+def reply_main_keyboard(role: str = "user", admin_mode: bool = False) -> Dict:
+    """Reply-клавиатура (постоянные кнопки под полем ввода)."""
+    rows = []
+    rows.append([{"text": "📋 Мои поручения"}])
+    if role in ("admin", "superadmin"):
+        if admin_mode:
+            rows.append([{"text": "❌ Выйти"}])
+        else:
+            rows.append([{"text": "📝 Редактировать реестр"},
+                         {"text": "🔍 Проверить реестр"},
+                         {"text": "📋 Выбрать реестр"}])
+    return {"keyboard": rows, "resize_keyboard": True}
+
+
+def admin_mode_keyboard() -> Dict:
+    return {"keyboard": [[{"text": "❌ Выйти"}]], "resize_keyboard": True}
 
 
 # ======== АНТИФЛУД ========
@@ -351,6 +367,68 @@ def load_user_mapping() -> Dict[str, str]:
         return {}
 
 
+def save_user_mapping(mapping: Dict[str, str]):
+    try:
+        with open(USER_MAPPING_PATH, 'w', encoding='utf-8') as f:
+            json.dump(mapping, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        log(f"⚠️ Ошибка сохранения user_mapping: {e}")
+
+
+def update_task_fields_in_sheet(task_id: str, fields: Dict[str, str]) -> bool:
+    """Обновляет поля задачи в Google Sheets.
+    fields: {'срок': '...', 'описание': '...', 'проект': '...'}
+    Возвращает True при успехе."""
+    try:
+        spreadsheet = _get_spreadsheet()
+        ws = spreadsheet.worksheet('Лист1')
+        values = ws.get_all_values()
+        row_idx = None
+        for i, row in enumerate(values[1:], start=2):
+            if row and row[0] == str(task_id):
+                row_idx = i
+                break
+        if not row_idx:
+            log(f"⚠️ Задача {task_id} не найдена в таблице")
+            return False
+
+        col_map = {
+            'срок': 7,
+            'описание': 5,
+            'проект': 4,  # колонка "Контрагент"
+        }
+        for field_name, value in fields.items():
+            col = col_map.get(field_name.lower())
+            if col:
+                ws.update_cell(row_idx, col, value)
+                log(f"📝 Обновлено: задача {task_id}, {field_name} = {value}")
+        return True
+    except Exception as e:
+        log(f"⚠️ Ошибка обновления задачи {task_id}: {e}")
+        return False
+
+
+
+def load_contacts_from_registry() -> Dict[str, str]:
+    """Читает вкладку «Контакты» из активного реестра.
+    Возвращает {имя_нижний_регистр: @логин}."""
+    try:
+        spreadsheet = _get_spreadsheet()
+        ws = spreadsheet.worksheet('Контакты')
+        rows = ws.get_all_values()
+        contacts = {}
+        for row in rows[1:]:  # пропускаем заголовок
+            if len(row) >= 2:
+                name = row[0].strip()
+                tg = row[1].strip()
+                if name and tg:
+                    contacts[name.lower()] = tg
+        return contacts
+    except Exception:
+        return {}
+
+
+
 def get_assignee_by_telegram(username: str) -> Optional[str]:
     mapping = load_user_mapping()
     username_clean = (username or "").lstrip('@').lower()
@@ -485,27 +563,53 @@ def get_group_chat_id() -> Optional[int]:
 
 # ======== СОСТОЯНИЯ ========
 _user_states: Dict[str, Dict] = {}
-CONFIRM_TIMEOUT = 60
+CONFIRM_TIMEOUT = 600
+USER_STATES_PATH = os.path.join(CREDS_DIR, 'user_states.json')
 
 
 def _state_key(chat_id, user_id) -> str:
     return f"{chat_id}:{user_id}"
 
 
+def load_user_states():
+    global _user_states
+    if os.path.exists(USER_STATES_PATH):
+        try:
+            with open(USER_STATES_PATH, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            now = time.time()
+            _user_states = {k: v for k, v in data.items() if now - v.get('ts', 0) < CONFIRM_TIMEOUT}
+            log(f"🔄 Загружено {len(_user_states)} активных состояний пользователей")
+        except Exception as e:
+            log(f"⚠️ Ошибка загрузки user_states: {e}")
+            _user_states = {}
+
+
+def save_user_states():
+    try:
+        with open(USER_STATES_PATH, 'w', encoding='utf-8') as f:
+            json.dump(_user_states, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        log(f"⚠️ Ошибка сохранения user_states: {e}")
+
+
 def _set_user_state(key: str, state: str, data: Dict = None):
     _user_states[key] = {"state": state, "data": data or {}, "ts": time.time()}
+    save_user_states()
 
 
 def _get_user_state(key: str) -> Optional[Dict]:
     st = _user_states.get(key)
     if st and time.time() - st.get("ts", 0) > CONFIRM_TIMEOUT:
         _user_states.pop(key, None)
+        save_user_states()
         return None
     return st
 
 
 def _clear_user_state(key: str):
     _user_states.pop(key, None)
+    save_user_states()
 
 
 # ======== ФОРМАТИРОВАНИЕ ========
@@ -536,6 +640,21 @@ def format_task_list(tasks: List[Dict], title: str) -> str:
 # ======== КНОПОЧНЫЙ СЦЕНАРИЙ ========
 
 def get_open_tasks_for(username: str) -> Tuple[Optional[str], List[Dict]]:
+    mapping = load_user_mapping()
+    username_clean = (username or "").lstrip('@').lower()
+    assignee_names = [name for name, tg in mapping.items()
+                      if str(tg).lstrip('@').lower() == username_clean]
+    if not assignee_names:
+        return None, []
+    tasks = []
+    for t in get_all_tasks():
+        if t.get('status') in ("Выполнено", "Отменено"):
+            continue
+        task_assignees = t.get('assignee', '').lower()
+        if any(name.lower() in task_assignees for name in assignee_names):
+            tasks.append(t)
+    display_name = min(assignee_names, key=len)
+    return display_name, tasks
     assignee = get_assignee_by_telegram(username)
     if not assignee:
         return None, []
@@ -589,7 +708,7 @@ def build_registry_selector() -> Tuple[str, Optional[Dict]]:
     for r in registries:
         mark = " ✅" if r.get('active') else ""
         lines.append(f"• {html.escape(r.get('name', 'Без названия'))}{mark}")
-        if not r.get('active'):
+        if True:
             buttons.append([{"text": f"📋 {r.get('name')}",
                              "callback_data": f"switch_registry:{r.get('name')}"}])
     return "\n".join(lines), {"inline_keyboard": buttons}
@@ -604,10 +723,29 @@ def handle_close_callback(task_id: int, username: str) -> Tuple[str, bool]:
     if not task:
         return f"❌ Поручение #{task_id} не найдено (уже удалено?).", False
 
-    if assignee.lower() not in task.get('assignee', '').lower():
+    task_assignees_raw = task.get('assignee', '').strip()
+    if not task_assignees_raw:
+        return f"❌ У поручения #{task_id} не указан ответственный.", False
+    task_assignees = [a.strip() for a in task_assignees_raw.split(',')]
+
+    # Проверка 1: имя из user_mapping совпадает с ответственным в реестре
+    is_match = any(assignee.lower() == ta.lower() for ta in task_assignees)
+    # Проверка 2: Telegram username пользователя совпадает с ответственным (если в реестре записан логин)
+    user_clean = username.lstrip('@').lower()
+    if not is_match:
+        is_match = any(user_clean == ta.lstrip('@').lower() for ta in task_assignees)
+    # Проверка 3: имя ответственного из реестра замаплено на текущего пользователя
+    if not is_match:
+        mapping = load_user_mapping()
+        for ta in task_assignees:
+            if ta in mapping and mapping[ta].lstrip('@').lower() == user_clean:
+                is_match = True
+                break
+
+    if not is_match:
         log(f"⚠️ @{username} попытался закрыть чужое поручение #{task_id} "
-            f"(ответственный: {task.get('assignee')})")
-        return f"❌ #{task_id} — не ваше поручение ({task.get('assignee')}).", False
+            f"(ответственный: {task_assignees_raw})")
+        return f"❌ #{task_id} — не ваше поручение ({task_assignees_raw}).", False
 
     if task.get('status') in ("Выполнено", "Отменено"):
         return f"ℹ️ Поручение #{task_id} уже закрыто.", False
@@ -750,6 +888,18 @@ def cmd_new_registry(title: str, username: str) -> str:
                           "сервисному аккаунту вручную.")
 
         old_id = cfg.get('spreadsheet_id', '')
+        # v3.1 fix: добавляем новый реестр в список registries и делаем активным
+        registries = cfg.setdefault('registries', [])
+        # Сбрасываем active у всех существующих
+        for r in registries:
+            r['active'] = False
+        # Добавляем новый реестр как активный
+        registries.append({
+            'id': spreadsheet.id,
+            'name': title,
+            'active': True,
+        })
+        # Fallback для совместимости со старыми модулями
         cfg['prev_spreadsheet_id'] = old_id
         cfg['spreadsheet_id'] = spreadsheet.id
         save_config(cfg)
@@ -932,20 +1082,20 @@ def digest_loop():
 
 def greeting_text(first_name: str, role: str) -> str:
     reg = get_active_registry()
-    reg_info = f"\n\n📋 Активный реестр: <b>{html.escape(reg.get('name', 'Неизвестно'))}</b>"
+    reg_link = registry_link()
+    reg_info = f"\n\n📋 Активный реестр: <b>{html.escape(reg.get('name', 'Неизвестно'))}</b>\n🔗 <a href='{reg_link}'>Открыть реестр</a>"
     if role in ("admin", "superadmin"):
         return (
             f"👋 <b>Привет, {html.escape(first_name or 'друг')}!</b>{reg_info}\n\n"
-            f"💬 Напишите мне любую задачу по изменению реестра поручений "
-            f"в свободной форме — я пойму, внесу правки и пришлю "
-            f"подтверждение.\n\n"
-            f"📋 Реестр: {registry_link()}"
+            f"💬 <b>Режим администратора</b> активен. Пишите любую задачу "
+            f"по изменению реестра поручений в свободной форме — я пойму, "
+            f"внесу правки и пришлю подтверждение.\n\n"
+            f"Или нажмите кнопку 📋 <b>Мои поручения</b> ниже."
         )
     return (
         f"👋 <b>Привет, {html.escape(first_name or 'друг')}!</b>{reg_info}\n\n"
         f"Я бот реестра поручений.\n\n"
-        f"📋 <b>Мои поручения</b> — ваши открытые задачи, закрытие в один тап\n\n"
-        f"📋 Реестр: {registry_link()}"
+        f"📋 <b>Мои поручения</b> — ваши открытые задачи, закрытие в один тап"
     )
 
 
@@ -1032,15 +1182,156 @@ def dispatch(cmd: "commands.ParsedCommand", username: str, first_name: str,
     return "🤔 Не понял команду."
 
 
+
+# ======== ПРОВЕРКА МАППИНГА ПРИ ВХОДЕ В ADMIN MODE ========
+
+def run_registry_audit(chat_id, key, username: str):
+    """Полная проверка реестра: маппинг (с учётом вкладки Контакты), пустые поля, орфография.
+    Показывает summary + inline-кнопку Исправить."""
+    tasks = get_all_tasks()
+    mapping = load_user_mapping()
+    contacts = load_contacts_from_registry()
+
+    issues = {"unmapped": [], "empty_fields": [], "spelling": [], "contacts_auto": []}
+    unmapped_map = {}  # name -> {task_id, description}
+
+    for task in tasks:
+        tid = task.get('id')
+        assignees_raw = task.get('assignee', '')
+        deadline = task.get('deadline', '').strip()
+        description = task.get('description', '').strip()
+        project = task.get('project', '').strip()
+
+        # --- незамапленные ---
+        if assignees_raw:
+            for name in assignees_raw.split(','):
+                name = name.strip()
+                if name and name not in mapping:
+                    if name not in unmapped_map:
+                        unmapped_map[name] = {"task_id": tid, "description": description[:60]}
+
+        # --- пустые поля ---
+        empty = []
+        if not deadline:
+            empty.append("срок")
+        if not description:
+            empty.append("описание")
+        if not project:
+            empty.append("проект")
+        if empty:
+            issues["empty_fields"].append({"id": tid, "fields": empty, "desc": description[:40]})
+
+        # --- орфография ---
+        if description:
+            suspicious = []
+            words = re.findall(r"[А-Яа-яA-Za-z]+", description)
+            for w in words:
+                lw = w.lower()
+                if re.search(r"(.)\1{2,}", lw):
+                    suspicious.append(w)
+            if suspicious:
+                issues["spelling"].append({"id": tid, "words": suspicious[:5], "desc": description[:40]})
+
+    # Разделяем unmapped: есть в Контактах vs нет
+    # (мягкое сопоставление: "Плахотин" ↔ "Плахотин Константин")
+    contacts_lower = {k: v for k, v in contacts.items()}
+    for name in sorted(unmapped_map.keys()):
+        info = unmapped_map[name]
+        name_lower = name.lower()
+        login = contacts_lower.get(name_lower)
+        if not login:
+            # Пробуем мягкое сопоставление: ищем контакт, который содержит name или name содержит контакт
+            for contact_name, contact_login in contacts_lower.items():
+                if name_lower in contact_name or contact_name in name_lower:
+                    login = contact_login
+                    break
+        if login:
+            issues["contacts_auto"].append({"name": name, "login": login})
+        else:
+            issues["unmapped"].append({"name": name, "task_id": info["task_id"], "description": info["description"]})
+
+    total = len(issues["unmapped"]) + len(issues["contacts_auto"]) + len(issues["empty_fields"]) + len(issues["spelling"])
+    if total == 0:
+        send_message(chat_id, "✅ <b>Проверка реестра завершена.</b>\n\nНарушений не найдено.")
+        return
+
+    lines = [f"🔍 <b>Проверка реестра</b> (найдено проблем: {total})\n"]
+    if issues["contacts_auto"]:
+        lines.append(f"<b>Найдены во вкладке «Контакты»</b> ({len(issues['contacts_auto'])}) — можно смэппить автоматически:")
+        for it in issues["contacts_auto"]:
+            lines.append(f"• {html.escape(it['name'])} → {html.escape(it['login'])}")
+        lines.append("")
+    if issues["unmapped"]:
+        lines.append(f"<b>Незамапленные (не в Контактах)</b> ({len(issues['unmapped'])}):")
+        for it in issues["unmapped"]:
+            lines.append(f"• {html.escape(it['name'])} (поручение <b>#{it['task_id']}</b>: {html.escape(it['description'])})")
+        lines.append("")
+    if issues["empty_fields"]:
+        lines.append(f"<b>Пустые поля</b> ({len(issues['empty_fields'])}):")
+        for it in issues["empty_fields"]:
+            lines.append(f"• ID {it['id']}: {', '.join(it['fields'])}")
+        lines.append("")
+    if issues["spelling"]:
+        lines.append(f"<b>Возможные опечатки</b> ({len(issues['spelling'])}):")
+        for it in issues["spelling"]:
+            words_str = ", ".join(it['words'])
+            lines.append(f"• ID {it['id']}: {html.escape(words_str)}")
+        lines.append("")
+
+    lines.append("Исправить найденные проблемы?")
+
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "🛠 Исправить", "callback_data": "fix_registry"},
+             {"text": "⏭ Пропустить", "callback_data": "skip_registry"}]
+        ]
+    }
+    _set_user_state(key, "audit_issues", {"issues": issues})
+    send_message(chat_id, "\n".join(lines), reply_markup=keyboard)
+
+
 # ======== ОБРАБОТКА CALLBACK ========
 
+_processed_callbacks = set()
+_MAX_CALLBACK_CACHE = 1000
+
 def process_callback(callback: Dict):
+    callback_id = callback.get('id')
+    # Защита от дублей callback
+    if callback_id in _processed_callbacks:
+        return
+    _processed_callbacks.add(callback_id)
+    if len(_processed_callbacks) > _MAX_CALLBACK_CACHE:
+        _processed_callbacks.clear()
+    data = callback.get('data', '')
+    message = callback.get('message', {})
+    chat = message.get('chat', {})
+    chat_id = chat.get('id')
+    message_id = message.get('message_id')
+
+    from_user = callback.get('from', {})
+    username = from_user.get('username', '')
+    user_id = from_user.get('id')
+    key = _state_key(chat_id, user_id)
+
+    cfg = load_config()
+    role = resolve_role(username, cfg)
+
+
+    allowed, warning = flood.check(user_id, role, cfg["limits"])
     callback_id = callback.get('id')
     data = callback.get('data', '')
     message = callback.get('message', {})
     chat = message.get('chat', {})
     chat_id = chat.get('id')
     message_id = message.get('message_id')
+
+    from_user = callback.get('from', {})
+    username = from_user.get('username', '')
+    user_id = from_user.get('id')
+    key = _state_key(chat_id, user_id)
+
+    cfg = load_config()
 
     from_user = callback.get('from', {})
     username = from_user.get('username', '')
@@ -1101,6 +1392,129 @@ def process_callback(callback: Dict):
         answer_callback_query(callback_id)
         return
 
+    if data == "fix_unmapped":
+        state = _get_user_state(key)
+        if state and state.get("state") == "audit_issues":
+            unmapped = state["data"]["unmapped"]
+            if unmapped:
+                _set_user_state(key, "collect_username", {
+                    "unmapped": unmapped,
+                    "current": unmapped[0],
+                    "index": 0,
+                    "collected": {}
+                })
+                send_message(chat_id, (
+                    f"🔧 <b>Исправление привязок</b>\n\n"
+                    f"Введите Telegram-логин для <b>{html.escape(unmapped[0])}</b>:\n"
+                    f"<code>@username</code>"
+                ))
+        answer_callback_query(callback_id)
+        return
+
+    if data == "skip_unmapped":
+        _set_user_state(key, "admin_mode")
+        send_message(chat_id, (
+            f"💬 <b>Режим администратора активен</b>\n\n"
+            f"Пишите любую задачу по изменению реестра поручений "
+            f"в свободной форме — я пойму, внесу правки и пришлю подтверждение.\n\n"
+            f"📋 Активный реестр: <b>{html.escape(get_active_registry().get('name', 'Неизвестно'))}</b>"
+        ), reply_markup=admin_mode_keyboard())
+        answer_callback_query(callback_id)
+        return
+
+    if data == "fix_registry":
+        state = _get_user_state(key)
+        if state and state.get("state") == "audit_issues":
+            issues = state["data"]["issues"]
+            contacts_auto = issues.get("contacts_auto", [])
+            unmapped = issues.get("unmapped", [])
+            empty_fields = issues.get("empty_fields", [])
+
+            # 1. Автомаппинг из Контактов
+            if contacts_auto:
+                mapping = load_user_mapping()
+                for it in contacts_auto:
+                    mapping[it["name"]] = it["login"]
+                save_user_mapping(mapping)
+                send_message(chat_id, (
+                    f"📇 <b>Автоматически смэпплено из «Контактов»:</b> {len(contacts_auto)}\n"
+                    + "\n".join(f"• {html.escape(c['name'])} → {html.escape(c['login'])}" for c in contacts_auto)
+                ))
+
+            # 2. Если есть ручные unmapped — начинаем пошаговый сбор
+            if unmapped:
+                first = unmapped[0]
+                _set_user_state(key, "collect_username", {
+                    "unmapped": unmapped,
+                    "current": first["name"],
+                    "index": 0,
+                    "collected": {},
+                    "next_empty_fields": empty_fields,
+                    "next_spelling": issues.get("spelling", [])
+                })
+                send_message(chat_id, (
+                    f"🔧 <b>Исправление привязок</b> ({1}/{len(unmapped)})\n\n"
+                    f"Ответственный: <b>{html.escape(first['name'])}</b>\n"
+                    f"Поручение <b>#{first['task_id']}</b>: {html.escape(first['description'])}\n\n"
+                    f"Введите Telegram-логин:\n"
+                    f"<code>@username</code>"
+                ))
+            # 3. Иначе если есть пустые поля — переходим к ним
+            elif empty_fields:
+                _set_user_state(key, "fix_empty_fields", {
+                    "items": empty_fields,
+                    "index": 0,
+                    "collected": [],
+                    "next_spelling": issues.get("spelling", [])
+                })
+                first = empty_fields[0]
+                send_message(chat_id, (
+                    f"📝 <b>Исправление пустых полей</b> ({1}/{len(empty_fields)})\n\n"
+                    f"Задача <b>ID {first['id']}</b>\n"
+                    f"Пустые поля: {', '.join(first['fields'])}\n\n"
+                    f"Введите значения через запятую в том же порядке."
+                ))
+            # 4. Иначе если есть опечатки — переходим к ним
+            elif issues.get("spelling"):
+                sp = issues["spelling"]
+                _set_user_state(key, "fix_spelling", {
+                    "items": sp,
+                    "index": 0,
+                    "collected": []
+                })
+                first = sp[0]
+                send_message(chat_id, (
+                    f"✏️ <b>Исправление опечаток</b> ({1}/{len(sp)})\n\n"
+                    f"Задача <b>ID {first['id']}</b>\n"
+                    f"Подозрительные слова: {', '.join(first['words'])}\n\n"
+                    f"Введите правильные варианты через запятую в том же порядке."
+                ))
+            else:
+                send_message(chat_id, "✅ Все проблемы исправлены или отсутствуют.")
+                _clear_user_state(key)
+        answer_callback_query(callback_id)
+        return
+
+    if data == "skip_registry":
+        _clear_user_state(key)
+        send_message(chat_id, "⏭ Проверка пропущена. Режим администратора не активирован.")
+        answer_callback_query(callback_id)
+        return
+
+    if data == "admin_mode":
+        if role in ("admin", "superadmin"):
+            send_message(chat_id, (
+                f"💬 <b>Режим администратора активен</b>\n\n"
+                f"Пишите любую задачу по изменению реестра поручений "
+                f"в свободной форме — я пойму, внесу правки и пришлю подтверждение.\n\n"
+                f"📋 Активный реестр: <b>{html.escape(get_active_registry().get('name', 'Неизвестно'))}</b>\n"
+                f"🔗 {registry_link()}"
+            ))
+        else:
+            send_message(chat_id, "🔒 Эта функция доступна только администраторам.")
+        answer_callback_query(callback_id)
+        return
+
     answer_callback_query(callback_id, text="❓ Неизвестная кнопка.")
 
 
@@ -1156,6 +1570,10 @@ def _handle_group_feedback(message: Dict, fb_type: str, fb_text: str):
 
 # ======== ОБРАБОТКА ОБНОВЛЕНИЙ ========
 
+_processed_messages = {}
+_MAX_MSG_CACHE = 1000
+_MSG_DEDUP_TTL = 5  # секунд
+
 def process_updates(updates: List[Dict]):
     for update in updates:
         if 'callback_query' in update:
@@ -1195,6 +1613,61 @@ def process_updates(updates: List[Dict]):
         cfg = load_config()
         role = resolve_role(username, cfg)
 
+        # --- обработка reply-кнопок ---
+        text_clean = text.strip()
+
+        if text_clean == "📋 Мои поручения" or text_clean == "Мои поручения":
+            view_text, view_kb = build_my_tasks_view(username)
+            if view_kb:
+                send_message(chat_id, view_text, reply_markup=view_kb)
+            else:
+                send_message(chat_id, view_text)
+            continue
+        if (text_clean == "📝 Редактировать реестр" or text_clean == "Редактировать реестр") and role in ("admin", "superadmin"):
+            _set_user_state(key, "admin_mode")
+            send_message(chat_id, (
+                f"💬 <b>Режим администратора активен</b>\n\n"
+                f"Пишите любую задачу по изменению реестра поручений "
+                f"в свободной форме — я пойму, внесу правки и пришлю подтверждение.\n\n"
+                f"📋 Активный реестр: <b>{html.escape(get_active_registry().get('name', 'Неизвестно'))}</b>\n"
+                f"🔗 {registry_link()}"
+            ), reply_markup=admin_mode_keyboard())
+            continue
+        if (text_clean == "🔍 Проверить реестр" or text_clean == "Проверить реестр") and role in ("admin", "superadmin"):
+            # Защита от дублей: если аудит уже запущен для этого пользователя, пропускаем
+            audit_state = _get_user_state(key)
+            if audit_state and audit_state.get("state") == "audit_in_progress":
+                send_message(chat_id, "⏳ Проверка реестра уже выполняется, подождите...")
+                continue
+            _set_user_state(key, "audit_in_progress")
+            try:
+                run_registry_audit(chat_id, key, username)
+            finally:
+                # Очищаем флаг аудита, если он еще установлен
+                current = _get_user_state(key)
+                if current and current.get("state") == "audit_in_progress":
+                    _clear_user_state(key)
+            continue
+        if (text_clean == "❌ Выйти" or text_clean == "Выйти") and role in ("admin", "superadmin"):
+            _clear_user_state(key)
+            send_message(chat_id, greeting_text(first_name, role),
+                         reply_markup=reply_main_keyboard(role))
+            continue
+        if text_clean == "📋 Выбрать реестр" and role in ("admin", "superadmin"):
+            sel_text, sel_kb = build_registry_selector()
+            send_message(chat_id, sel_text, reply_markup=sel_kb)
+            continue
+
+        # Защита от дублей сообщений (только для обычных сообщений, не reply-кнопок)
+        msg_dedup_key = f"{chat_id}:{user_id}:{text}"
+        now = time.time()
+        if msg_dedup_key in _processed_messages:
+            if now - _processed_messages[msg_dedup_key] < _MSG_DEDUP_TTL:
+                continue
+        _processed_messages[msg_dedup_key] = now
+        if len(_processed_messages) > _MAX_MSG_CACHE:
+            _processed_messages.clear()
+
         if role in ("admin", "superadmin"):
             remember_admin_chat(username, chat_id)
 
@@ -1205,29 +1678,236 @@ def process_updates(updates: List[Dict]):
             log(f"Антифлуд: @{username} ({user_id}) заблокирован")
             continue
 
+        # --- сбор логинов для незамапленных ---
+        state = _get_user_state(key)
+        if state and state.get("state") == "collect_username":
+            data = state["data"]
+            current_name = data["current"]
+            index = data["index"]
+            unmapped = data["unmapped"]
+            collected = data["collected"]
+            tg_login = text.strip().lstrip('@')
+            if tg_login:
+                collected[current_name] = tg_login
+            nxt = index + 1
+            if nxt < len(unmapped):
+                nxt_item = unmapped[nxt]
+                _set_user_state(key, "collect_username", {
+                    "unmapped": unmapped,
+                    "current": nxt_item["name"],
+                    "index": nxt,
+                    "collected": collected
+                })
+                send_message(chat_id, (
+                    f"🔧 <b>Исправление привязок</b> ({nxt+1}/{len(unmapped)})\n\n"
+                    f"Ответственный: <b>{html.escape(nxt_item['name'])}</b>\n"
+                    f"Поручение <b>#{nxt_item['task_id']}</b>: {html.escape(nxt_item['description'])}\n\n"
+                    f"Введите Telegram-логин:\n"
+                    f"<code>@username</code>"
+                ))
+            else:
+                lines = ["📋 <b>Собранные привязки:</b>\n"]
+                for name, login in collected.items():
+                    lines.append(f"• {html.escape(name)} → @{html.escape(login)}")
+                lines.append("\nВнести в реестр? Напишите <b>да</b> (60 сек), любой другой текст — отмена.")
+                next_empty = data.get("next_empty_fields", [])
+                next_spell = data.get("next_spelling", [])
+                _set_user_state(key, "confirm_registry_fix", {
+                    "collected": collected,
+                    "type": "mapping",
+                    "next_empty_fields": next_empty,
+                    "next_spelling": next_spell
+                })
+                send_message(chat_id, "\n".join(lines))
+            continue
+
+        # --- исправление пустых полей ---
+        state = _get_user_state(key)
+        if state and state.get("state") == "fix_empty_fields":
+            data = state["data"]
+            items = data["items"]
+            index = data["index"]
+            collected = data["collected"]
+            vals = [v.strip() for v in text.split(",")]
+            collected.append({"id": items[index]["id"], "values": vals})
+            nxt = index + 1
+            if nxt < len(items):
+                _set_user_state(key, "fix_empty_fields", {
+                    "items": items,
+                    "index": nxt,
+                    "collected": collected
+                })
+                it = items[nxt]
+                send_message(chat_id, (
+                    f"📝 <b>Исправление пустых полей</b> ({nxt+1}/{len(items)})\n\n"
+                    f"Задача <b>ID {it['id']}</b>\n"
+                    f"Пустые поля: {', '.join(it['fields'])}\n\n"
+                    f"Введите значения через запятую в том же порядке."
+                ))
+            else:
+                lines = ["📋 <b>Собранные правки:</b>\n"]
+                for c in collected:
+                    lines.append(f"• ID {c['id']}: {html.escape(', '.join(c['values']))}")
+                lines.append("\nВнести в реестр? Напишите <b>да</b> (60 сек), любой другой текст — отмена.")
+                next_spell = data.get("next_spelling", [])
+                _set_user_state(key, "confirm_registry_fix", {
+                    "collected": collected,
+                    "type": "empty_fields",
+                    "next_spelling": next_spell
+                })
+                send_message(chat_id, "\n".join(lines))
+            continue
+
+        # --- исправление опечаток ---
+        state = _get_user_state(key)
+        if state and state.get("state") == "fix_spelling":
+            data = state["data"]
+            items = data["items"]
+            index = data["index"]
+            collected = data["collected"]
+            vals = [v.strip() for v in text.split(",")]
+            collected.append({"id": items[index]["id"], "words": items[index]["words"], "values": vals})
+            nxt = index + 1
+            if nxt < len(items):
+                _set_user_state(key, "fix_spelling", {
+                    "items": items,
+                    "index": nxt,
+                    "collected": collected
+                })
+                it = items[nxt]
+                send_message(chat_id, (
+                    f"✏️ <b>Исправление опечаток</b> ({nxt+1}/{len(items)})\n\n"
+                    f"Задача <b>ID {it['id']}</b>\n"
+                    f"Подозрительные слова: {', '.join(it['words'])}\n\n"
+                    f"Введите правильные варианты через запятую в том же порядке."
+                ))
+            else:
+                lines = ["📋 <b>Собранные правки:</b>\n"]
+                for c in collected:
+                    lines.append(f"• ID {c['id']}: {html.escape(', '.join(c['values']))}")
+                lines.append("\nВнести в реестр? Напишите <b>да</b> (60 сек), любой другой текст — отмена.")
+                _set_user_state(key, "confirm_registry_fix", {"collected": collected, "type": "spelling"})
+                send_message(chat_id, "\n".join(lines))
+            continue
+
         # --- ожидающее подтверждение ---
         state = _get_user_state(key)
-        if state and role in ("admin", "superadmin"):
+        if state and state.get("state", "").startswith("confirm_") and role in ("admin", "superadmin"):
             _clear_user_state(key)
             if text.strip().lower() == "да":
                 if state["state"] == "confirm_create":
                     response = cmd_create_execute(state["data"], username, first_name)
+                    # Авто-выход из режима редактирования
+                    send_message(chat_id, response + "\n\n🔒 Режим редактирования отключен. Отправьте любое сообщение чтобы продолжить.",
+                                 reply_markup=reply_main_keyboard(role))
+                    continue
                 elif state["state"] == "confirm_delete":
                     response = cmd_delete_execute(state["data"]["id"], username)
-                elif state["state"] == "confirm_llm":
-                    # Парсим как user для внутреннего распознавания (доступ проверен ролью)
-                    cmd2 = commands.parse(state["data"]["command_text"],
-                                          role="user", today=now_msk().date())
-                    if not cmd2.ok:
-                        response = with_footer(cmd2.error)
-                    elif cmd2.name == "help":
-                        response = commands.help_text(role)
+                    # Авто-выход из режима редактирования
+                    send_message(chat_id, response + "\n\n🔒 Режим редактирования отключен. Отправьте любое сообщение чтобы продолжить.",
+                                 reply_markup=reply_main_keyboard(role))
+                    continue
+                # confirm_llm удален — команды выполняются сразу без промежуточного подтверждения
+                elif state["state"] == "confirm_registry_fix":
+                    data = state["data"]
+                    if data.get("type") == "mapping":
+                        mapping = load_user_mapping()
+                        for name, login in data["collected"].items():
+                            mapping[name] = login
+                        save_user_mapping(mapping)
+                        response = "✅ Привязки сохранены."
+                        # Автопереход к следующему этапу
+                        next_empty = data.get("next_empty_fields", [])
+                        next_spell = data.get("next_spelling", [])
+                        if next_empty:
+                            _set_user_state(key, "fix_empty_fields", {
+                                "items": next_empty,
+                                "index": 0,
+                                "collected": [],
+                                "next_spelling": next_spell
+                            })
+                            first = next_empty[0]
+                            send_message(chat_id, (
+                                f"📝 <b>Исправление пустых полей</b> ({1}/{len(next_empty)})\n\n"
+                                f"Задача <b>ID {first['id']}</b>\n"
+                                f"Пустые поля: {', '.join(first['fields'])}\n\n"
+                                f"Введите значения через запятую в том же порядке."
+                            ))
+                            continue
+                        elif next_spell:
+                            _set_user_state(key, "fix_spelling", {
+                                "items": next_spell,
+                                "index": 0,
+                                "collected": []
+                            })
+                            first = next_spell[0]
+                            send_message(chat_id, (
+                                f"✏️ <b>Исправление опечаток</b> ({1}/{len(next_spell)})\n\n"
+                                f"Задача <b>ID {first['id']}</b>\n"
+                                f"Подозрительные слова: {', '.join(first['words'])}\n\n"
+                                f"Введите правильные варианты через запятую в том же порядке."
+                            ))
+                            continue
+                    elif data.get("type") == "empty_fields":
+                        ok_count = 0
+                        fail_count = 0
+                        for item in data["collected"]:
+                            task_id = item["id"]
+                            vals = item["values"]
+                            fields = item.get("fields", [])
+                            update_dict = {}
+                            for i, field_name in enumerate(fields):
+                                if i < len(vals) and vals[i]:
+                                    update_dict[field_name] = vals[i]
+                            if update_dict:
+                                if update_task_fields_in_sheet(task_id, update_dict):
+                                    ok_count += 1
+                                else:
+                                    fail_count += 1
+                        response = f"✅ Пустые поля обновлены: {ok_count} задач."
+                        if fail_count:
+                            response += f"\n⚠️ Не удалось обновить: {fail_count} задач."
+                        # Автопереход к опечаткам
+                        next_spell = data.get("next_spelling", [])
+                        if next_spell:
+                            _set_user_state(key, "fix_spelling", {
+                                "items": next_spell,
+                                "index": 0,
+                                "collected": []
+                            })
+                            first = next_spell[0]
+                            send_message(chat_id, (
+                                f"✏️ <b>Исправление опечаток</b> ({1}/{len(next_spell)})\n\n"
+                                f"Задача <b>ID {first['id']}</b>\n"
+                                f"Подозрительные слова: {', '.join(first['words'])}\n\n"
+                                f"Введите правильные варианты через запятую в том же порядке."
+                            ))
+                            continue
+                    elif data.get("type") == "spelling":
+                        ok_count = 0
+                        fail_count = 0
+                        for item in data["collected"]:
+                            task_id = item["id"]
+                            words = item.get("words", [])
+                            vals = item.get("values", [])
+                            # Получаем текущее описание
+                            task = get_task_info(int(task_id))
+                            if task:
+                                desc = task.get("description", "")
+                                for i, word in enumerate(words):
+                                    if i < len(vals) and vals[i]:
+                                        desc = desc.replace(word, vals[i])
+                                if update_task_fields_in_sheet(task_id, {"описание": desc}):
+                                    ok_count += 1
+                                else:
+                                    fail_count += 1
+                            else:
+                                fail_count += 1
+                        response = f"✅ Описания исправлены: {ok_count} задач."
+                        if fail_count:
+                            response += f"\n⚠️ Не удалось обновить: {fail_count} задач."
                     else:
-                        try:
-                            response = dispatch(cmd2, username, first_name, chat_id, key)
-                        except Exception as e:
-                            log(f"⚠️ Ошибка выполнения LLM-команды {cmd2.name}: {e}")
-                            response = "❌ Внутренняя ошибка при выполнении команды."
+                        response = "❌ Неизвестный тип исправления, отменено."
                 else:
                     response = "❌ Неизвестное состояние, отменено."
             else:
@@ -1236,30 +1916,25 @@ def process_updates(updates: List[Dict]):
             continue
         elif state:
             _clear_user_state(key)
+            # После очистки неизвестного состояния отправляем приветствие, а не в LLM
+            send_message(chat_id, greeting_text(first_name, role),
+                         reply_markup=reply_main_keyboard(role))
+            continue
 
         # --- Для админов и суперадминов: сразу LLM, минуя канонические команды ---
         if role in ("admin", "superadmin"):
-            text_clean = text.strip().lower()
-            if text_clean in ('/start', '/help', 'привет', 'начать'):
-                send_message(chat_id, greeting_text(first_name, role),
-                             reply_to=message.get('message_id'),
-                             reply_markup=main_keyboard(role))
-                continue
-
             command_text = llm.interpret_free_text(
                 text, now_msk().strftime("%d.%m.%Y"), cfg, log_fn=log)
             if command_text:
                 check = commands.parse_canonical(command_text,
                                                   today=now_msk().date())
                 if check.ok and check.name != "help":
-                    _set_user_state(key, "confirm_llm",
-                                    {"command_text": command_text})
-                    send_message(
-                        chat_id,
-                        f"🤖 <b>Понял так:</b> <code>{html.escape(command_text)}</code>\n\n"
-                        f"Выполнить? Напишите <b>да</b> (60 сек), "
-                        f"любой другой текст — отмена.",
-                        reply_to=message.get('message_id'))
+                    try:
+                        response = dispatch(check, username, first_name, chat_id, key)
+                    except Exception as e:
+                        log(f"⚠️ Ошибка выполнения команды {check.name}: {e}")
+                        response = "❌ Внутренняя ошибка при выполнении команды."
+                    send_message(chat_id, response, reply_to=message.get('message_id'))
                 else:
                     send_message(chat_id, with_footer(
                         "🤔 Не удалось интерпретировать запрос. Попробуйте переформулировать."))
@@ -1269,9 +1944,9 @@ def process_updates(updates: List[Dict]):
                     send_message(chat_id, with_footer(chat_answer),
                                  reply_to=message.get('message_id'))
                 else:
-                    send_message(chat_id, with_footer(
-                        "⏳ ИИ-ассистент временно перегружен (лимит запросов). "
-                        "Подождите 30–60 секунд и повторите."))
+                    send_message(chat_id, greeting_text(first_name, role),
+                                 reply_to=message.get('message_id'),
+                                 reply_markup=reply_main_keyboard(role))
             else:
                 send_message(chat_id, with_footer(
                     "⏳ ИИ-ассистент временно перегружен (лимит запросов). "
@@ -1284,13 +1959,13 @@ def process_updates(updates: List[Dict]):
         if not cmd.ok:
             send_message(chat_id, greeting_text(first_name, role),
                          reply_to=message.get('message_id'),
-                         reply_markup=main_keyboard(role))
+                         reply_markup=reply_main_keyboard(role))
             continue
 
         if cmd.name == "help":
             send_message(chat_id, commands.help_text(role),
                          reply_to=message.get('message_id'),
-                         reply_markup=main_keyboard(role))
+                         reply_markup=reply_main_keyboard(role))
             continue
 
         try:
@@ -1308,6 +1983,7 @@ def main_loop():
     log("🤖 Бот v3.1 запущен. Личка для всех (кнопки), группа — рассылки + "
         "сбор /идея /баг, LLM-режим для админов, переключение реестров, "
         f"дайджест в {load_config().get('digest_time', '20:47')} МСК.")
+    load_user_states()
 
     threading.Thread(target=digest_loop, daemon=True).start()
 
