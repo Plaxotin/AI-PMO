@@ -117,7 +117,6 @@ def get_active_registry() -> Dict:
     for r in cfg.get('registries', []):
         if r.get('active'):
             return r
-    # fallback на старую схему
     return {"id": cfg.get('spreadsheet_id', ''), "name": "Реестр"}
 
 
@@ -201,7 +200,15 @@ def answer_callback_query(callback_query_id: str, text: str = None):
 
 # ======== INLINE-КЛАВИАТУРЫ ========
 
-def main_keyboard() -> Dict:
+def main_keyboard(role: str = "user") -> Dict:
+    keyboard = [
+        [{"text": "📋 Мои поручения", "callback_data": "my_tasks"}],
+        [{"text": "📂 Открыть реестр", "url": registry_link()}],
+        [{"text": "📋 Выбрать реестр", "callback_data": "select_registry"}],
+    ]
+    if role in ("admin", "superadmin"):
+        keyboard.append([{"text": "📊 Отправить дайджест", "callback_data": "send_digest"}])
+    return {"inline_keyboard": keyboard}
     return {"inline_keyboard": [
         [{"text": "📋 Мои поручения", "callback_data": "my_tasks"}],
         [{"text": "📂 Открыть реестр", "url": registry_link()}],
@@ -508,33 +515,20 @@ _STATUS_EMOJI = {
 }
 
 
-def _format_description(desc: str, max_lines: int = 2) -> str:
-    """Ограничивает описание заданным числом строк, обрезая лишнее."""
-    if not desc:
-        return ""
-    lines = desc.split('\n')
-    if len(lines) > max_lines:
-        lines = lines[:max_lines]
-        lines[-1] = lines[-1][:47] + "…" if len(lines[-1]) > 50 else lines[-1]
-    return '\n'.join(lines)
-
-
 def format_task_list(tasks: List[Dict], title: str) -> str:
     if not tasks:
         return f"📭 {title}\n\nПоручений не найдено."
 
-    today = now_msk().strftime("%d.%m.%Y")
-    lines = [f"<b>{title}</b> ({len(tasks)} шт.)\n<i>Статус на {today}</i>\n"]
+    lines = [f"<b>{title}</b> ({len(tasks)} шт.)\n"]
     for task in tasks:
         status_emoji = _STATUS_EMOJI.get(task.get('status', ''), "⚪")
-        desc = _format_description(task.get('description', ''), max_lines=2)
         lines.append(
-            f"<b>#{task.get('id', '?')}:</b> {status_emoji} <b>{task.get('status', '?')}</b>  "
-            f"{task.get('deadline', '?')}\n"
-            f"   📝 {html.escape(desc)}\n"
+            f"<b>#{task.get('id', '?')}</b> {status_emoji} <b>{task.get('status', '?')}</b>  "
+            f"📅 {task.get('deadline', '?')}\n"
+            f"   📝 {html.escape(task.get('description', ''))}\n"
             f"   📁 {html.escape(task.get('project') or 'Без проекта')}  "
-            f"{html.escape(task.get('assignee', '?'))}  "
-            f"📣 {html.escape(task.get('author') or '?')}"
+            f"👤 {html.escape(task.get('assignee', '?'))}  "
+            f"📣 {html.escape(task.get('author') or '?')}\n"
         )
     return "\n".join(lines)
 
@@ -564,24 +558,22 @@ def build_my_tasks_view(username: str) -> Tuple[str, Optional[Dict]]:
     for t in tasks:
         desc = t.get('description', '')
         desc_short = desc[:40] + "…" if len(desc) > 40 else desc
-        buttons.append([{"text": f"✅ #{t['id']}: {desc_short}",
+        buttons.append([{"text": f"✅ #{t['id']} {desc_short}",
                          "callback_data": f"close:{t['id']}"}])
     buttons.append([{"text": "🔄 Обновить", "callback_data": "refresh"}])
 
-    today = now_msk().strftime("%d.%m.%Y")
     blocks = []
     for t in tasks:
         status_emoji = _STATUS_EMOJI.get(t.get('status', ''), "⚪")
-        desc = _format_description(t.get('description', ''), max_lines=2)
         blocks.append(
-            f"<b>#{t.get('id', '?')}:</b> {status_emoji} <b>{t.get('status', '?')}</b>  "
-            f"{t.get('deadline', '?')}\n"
-            f"📝 {html.escape(desc)}\n"
-            f"📁 {html.escape(t.get('project') or 'Без проекта')}"
+            f"<b>#{t.get('id', '?')}</b> {status_emoji} <b>{t.get('status', '?')}</b>  "
+            f"📅 {t.get('deadline', '?')}\n"
+            f"📝 {html.escape(t.get('description', ''))}\n"
+            f"📁 {html.escape(t.get('project') or 'Без проекта')}  "
+            f"📣 {html.escape(t.get('author') or '?')}"
         )
     text = with_footer(
-        f"📋 <b>Ваши открытые поручения</b> ({len(tasks)}) — {html.escape(assignee)}\n"
-        f"<i>Статус на {today}</i>\n\n"
+        f"📋 <b>Ваши открытые поручения</b> ({len(tasks)}) — {html.escape(assignee)}\n\n"
         + "\n\n".join(blocks)
         + "\n\nНажмите на поручение ниже, чтобы закрыть его."
     )
@@ -758,18 +750,6 @@ def cmd_new_registry(title: str, username: str) -> str:
                           "сервисному аккаунту вручную.")
 
         old_id = cfg.get('spreadsheet_id', '')
-        # v3.1 fix: добавляем новый реестр в список registries и делаем активным
-        registries = cfg.setdefault('registries', [])
-        # Сбрасываем active у всех существующих
-        for r in registries:
-            r['active'] = False
-        # Добавляем новый реестр как активный
-        registries.append({
-            'id': spreadsheet.id,
-            'name': title,
-            'active': True,
-        })
-        # Fallback для совместимости со старыми модулями
         cfg['prev_spreadsheet_id'] = old_id
         cfg['spreadsheet_id'] = spreadsheet.id
         save_config(cfg)
@@ -1112,6 +1092,15 @@ def process_callback(callback: Dict):
             edit_message(chat_id, message_id, text, reply_markup=keyboard)
         return
 
+    if data == "send_digest":
+        if role not in ("admin", "superadmin"):
+            answer_callback_query(callback_id, text="❌ Только для администраторов.")
+            return
+        response = cmd_digest()
+        send_message(chat_id, response)
+        answer_callback_query(callback_id)
+        return
+
     answer_callback_query(callback_id, text="❓ Неизвестная кнопка.")
 
 
@@ -1250,6 +1239,13 @@ def process_updates(updates: List[Dict]):
 
         # --- Для админов и суперадминов: сразу LLM, минуя канонические команды ---
         if role in ("admin", "superadmin"):
+            text_clean = text.strip().lower()
+            if text_clean in ('/start', '/help', 'привет', 'начать'):
+                send_message(chat_id, greeting_text(first_name, role),
+                             reply_to=message.get('message_id'),
+                             reply_markup=main_keyboard(role))
+                continue
+
             command_text = llm.interpret_free_text(
                 text, now_msk().strftime("%d.%m.%Y"), cfg, log_fn=log)
             if command_text:
@@ -1288,13 +1284,13 @@ def process_updates(updates: List[Dict]):
         if not cmd.ok:
             send_message(chat_id, greeting_text(first_name, role),
                          reply_to=message.get('message_id'),
-                         reply_markup=main_keyboard())
+                         reply_markup=main_keyboard(role))
             continue
 
         if cmd.name == "help":
             send_message(chat_id, commands.help_text(role),
                          reply_to=message.get('message_id'),
-                         reply_markup=main_keyboard())
+                         reply_markup=main_keyboard(role))
             continue
 
         try:
