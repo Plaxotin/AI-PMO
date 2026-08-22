@@ -380,26 +380,32 @@ def check_deadlines(args):
     if overdue:
         messages.append(f"<b>⚠️ ПРОСРОЧЕНО: {len(overdue)} поручений</b>")
         for row in overdue:
-            desc = html.escape(row[4][:50])
+            desc = html.escape(row[4])
+            if len(desc) > 100:
+                desc = desc[:97] + "..."
             assignee = format_assignee(row[5], user_mapping)
             deadline = html.escape(row[6])
-            messages.append(f"  <b>#{row[0]}:</b> {desc} {assignee}  {deadline}")
+            messages.append(f"  <b>#{row[0]}:</b> {assignee} — {desc} ({deadline})")
     
     if due_today:
         messages.append(f"\n<b>🔴 СРОК СЕГОДНЯ: {len(due_today)} поручений</b>")
         for row in due_today:
-            desc = html.escape(row[4][:50])
+            desc = html.escape(row[4])
+            if len(desc) > 100:
+                desc = desc[:97] + "..."
             assignee = format_assignee(row[5], user_mapping)
             deadline = html.escape(row[6])
-            messages.append(f"  <b>#{row[0]}:</b> {desc} {assignee}  {deadline}")
+            messages.append(f"  <b>#{row[0]}:</b> {assignee} — {desc} ({deadline})")
     
     if due_tomorrow:
         messages.append(f"\n<b>📅 СРОК ЗАВТРА: {len(due_tomorrow)} поручений</b>")
         for row in due_tomorrow:
-            desc = html.escape(row[4][:50])
+            desc = html.escape(row[4])
+            if len(desc) > 100:
+                desc = desc[:97] + "..."
             assignee = format_assignee(row[5], user_mapping)
             deadline = html.escape(row[6])
-            messages.append(f"  <b>#{row[0]}:</b> {desc} {assignee}  {deadline}")
+            messages.append(f"  <b>#{row[0]}:</b> {assignee} — {desc} ({deadline})")
     
     if not messages:
         print("Все поручения в норме, срочных нет")
