@@ -1945,15 +1945,18 @@ def process_updates(updates: List[Dict]):
                     except Exception as e:
                         log(f"⚠️ Ошибка выполнения команды {check.name}: {e}")
                         response = "❌ Внутренняя ошибка при выполнении команды."
-                    send_message(chat_id, response, reply_to=message.get('message_id'))
+                    send_message(chat_id, response, reply_to=message.get('message_id'),
+                                 reply_markup=reply_main_keyboard(role))
                 else:
                     send_message(chat_id, with_footer(
-                        "🤔 Не удалось интерпретировать запрос. Попробуйте переформулировать."))
+                        "🤔 Не удалось интерпретировать запрос. Попробуйте переформулировать."),
+                        reply_markup=reply_main_keyboard(role))
             elif role == "superadmin":
                 chat_answer = llm.chat_response(text, cfg, log_fn=log)
                 if chat_answer:
                     send_message(chat_id, with_footer(chat_answer),
-                                 reply_to=message.get('message_id'))
+                                 reply_to=message.get('message_id'),
+                                 reply_markup=reply_main_keyboard(role))
                 else:
                     send_message(chat_id, greeting_text(first_name, role),
                                  reply_to=message.get('message_id'),
