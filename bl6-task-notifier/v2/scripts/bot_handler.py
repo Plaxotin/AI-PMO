@@ -1932,8 +1932,9 @@ def process_updates(updates: List[Dict]):
                          reply_markup=reply_main_keyboard(role))
             continue
 
-        # --- Для админов и суперадминов: сразу LLM, минуя канонические команды ---
-        if role in ("admin", "superadmin"):
+        # --- Для админов и суперадминов в режиме редактирования: LLM ---
+        state = _get_user_state(key)
+        if state and state.get("state") == "admin_mode" and role in ("admin", "superadmin"):
             command_text = llm.interpret_free_text(
                 text, now_msk().strftime("%d.%m.%Y"), cfg, log_fn=log)
             if command_text:
