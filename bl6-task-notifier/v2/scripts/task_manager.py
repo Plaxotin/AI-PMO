@@ -8,7 +8,10 @@ import html
 import os
 import sys
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+# Сервер в UTC, пользователи в МСК
+MSK = timezone(timedelta(hours=3))
 from typing import Optional, List, Dict
 
 # Пути к конфигурации
@@ -142,7 +145,7 @@ def add_task(args):
     worksheet = get_worksheet(client)
     
     task_id = get_next_id(worksheet)
-    today = datetime.now().strftime("%d.%m.%Y")
+    today = datetime.now(MSK).strftime("%d.%m.%Y")
     
     row = [
         task_id,
@@ -259,7 +262,7 @@ def update_task(args):
         
         # Если статус "Выполнено" или "Отменено", ставим дату закрытия
         if args.status in ["Выполнено", "Отменено"]:
-            today = datetime.now().strftime("%d.%m.%Y")
+            today = datetime.now(MSK).strftime("%d.%m.%Y")
             worksheet.update_cell(row_idx, 9, today)
             updates.append(f"Дата закрытия → {today}")
     
@@ -332,94 +335,150 @@ def format_assignee(name: str, mapping: Dict[str, str]) -> str:
     return html.escape(name)
 
 
+def generate_digest_advice(selected, today) -> Optional[str]:
+    """Короткое наблюдение/совет по дайджесту через Kimi API.
+    При любой ошибке возвращает None — дайджест уходит без совета."""
+    kimi_config = os.path.join(CREDS_DIR, 'kimi.json')
+    if not os.path.exists(kimi_config):
+        return None
+    try:
+        with open(kimi_config, 'r', encoding='utf-8') as f:
+            cfg = json.load(f)
+        if not cfg.get('api_key'):
+            return None
+        import requests
+    except Exception:
+        return None
+
+    task_lines = []
+    for d, row in selected:
+        days_over = (today.date() - d).days
+        task_lines.append(
+            f"#{row[0]}; проект={row[3] if len(row) > 3 else ''}; "
+            f"ответственный={row[5]}; срок={d.strftime('%d.%m.%Y')}; "
+            f"статус={row[7]}; просрочка_дней={days_over}; "
+            f"описание={row[4][:80]}"
+        )
+    prompt = (
+        "Ты — PMO-ассистент. Ниже открытые поручения из утреннего дайджеста "
+        f"(сегодня {today.strftime('%d.%m.%Y')}):\n" + "\n".join(task_lines) +
+        "\n\nДай ОДНО короткое наблюдение или совет для руководителя "
+        "(1-2 предложения, до 250 символов): концентрация просрочек на человеке "
+        "или проекте, перегруз исполнителя, ближайшие дедлайны. Пиши по-русски, "
+        "конкретно, опираясь на цифры из списка. Начни с подходящего эмодзи "
+        "(⚠️ если есть проблема, 💡 если совет, ✅ если всё под контролем). "
+        "Верни только текст наблюдения, без заголовков и пояснений."
+    )
+    payload = {
+        "model": cfg.get('model', 'moonshot-v1-8k'),
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.3,
+        "max_tokens": 200,
+    }
+    try:
+        base_url = cfg.get('base_url', 'https://api.moonshot.ai/v1').rstrip('/')
+        resp = requests.post(
+            f"{base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {cfg['api_key']}",
+                     "Content-Type": "application/json"},
+            json=payload,
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            print(f"⚠️ Kimi API вернул {resp.status_code}, дайджест без совета",
+                  file=sys.stderr)
+            return None
+        advice = (resp.json().get('choices') or [{}])[0] \
+                         .get('message', {}).get('content', '').strip()
+        advice = advice.strip().strip('*"«»').strip()
+        return advice or None
+    except Exception as e:
+        print(f"⚠️ Ошибка LLM-совета: {e}", file=sys.stderr)
+        return None
+
+
 def check_deadlines(args):
-    """Проверяет сроки и отправляет уведомления."""
+    """Дайджест: все открытые поручения со сроком не позднее 14 дней
+    от текущей даты, отсортированные по сроку (ранние выше)."""
     client = get_gsheets_client()
     worksheet = get_worksheet(client)
-    
+
     values = worksheet.get_all_values()
-    
+
     if len(values) <= 1:
         print("Реестр пуст")
         return
-    
-    today = datetime.now()
-    tomorrow = today + timedelta(days=1)
-    
-    overdue = []
-    due_today = []
-    due_tomorrow = []
-    
+
+    today = datetime.now(MSK)
+    horizon = (today + timedelta(days=14)).date()
+
+    selected = []
+
     for i, row in enumerate(values[1:], start=2):
         if len(row) < 8:
             continue
-        
+
         status = row[7]
         if status in ["Выполнено", "Отменено"]:
             continue
-        
+
         try:
             deadline = datetime.strptime(row[6], "%d.%m.%Y")
         except (ValueError, IndexError):
             continue
-        
-        # Проверяем просрочку
-        if deadline.date() < today.date():
+
+        if deadline.date() > horizon:
+            continue
+
+        # Помечаем просроченные в реестре (только если статус ещё не проставлен)
+        if deadline.date() < today.date() and status != "Просрочено":
             worksheet.update_cell(i, 8, "Просрочено")
-            overdue.append(row)
-        elif deadline.date() == today.date():
-            due_today.append(row)
-        elif deadline.date() == tomorrow.date():
-            due_tomorrow.append(row)
-    
-    user_mapping = load_user_mapping()
-    
-    # Формируем сообщение
-    messages = []
-    
-    if overdue:
-        messages.append(f"<b>⚠️ ПРОСРОЧЕНО: {len(overdue)} поручений</b>")
-        for row in overdue:
-            desc = html.escape(row[4])
-            if len(desc) > 100:
-                desc = desc[:97] + "..."
-            assignee = format_assignee(row[5], user_mapping)
-            deadline = html.escape(row[6])
-            messages.append(f"  <b>#{row[0]}:</b> {assignee} — {desc}\n   📅 <b>{deadline}</b>")
-    
-    if due_today:
-        messages.append(f"\n<b>🔴 СРОК СЕГОДНЯ: {len(due_today)} поручений</b>")
-        for row in due_today:
-            desc = html.escape(row[4])
-            if len(desc) > 100:
-                desc = desc[:97] + "..."
-            assignee = format_assignee(row[5], user_mapping)
-            deadline = html.escape(row[6])
-            messages.append(f"  <b>#{row[0]}:</b> {assignee} — {desc}\n   📅 <b>{deadline}</b>")
-    
-    if due_tomorrow:
-        messages.append(f"\n<b>📅 СРОК ЗАВТРА: {len(due_tomorrow)} поручений</b>")
-        for row in due_tomorrow:
-            desc = html.escape(row[4])
-            if len(desc) > 100:
-                desc = desc[:97] + "..."
-            assignee = format_assignee(row[5], user_mapping)
-            deadline = html.escape(row[6])
-            messages.append(f"  <b>#{row[0]}:</b> {assignee} — {desc}\n   📅 <b>{deadline}</b>")
-    
-    if not messages:
-        print("Все поручения в норме, срочных нет")
+        selected.append((deadline.date(), row))
+
+    if not selected:
+        print(f"Открытых поручений со сроком до {horizon.strftime('%d.%m.%Y')} нет")
         return
-    
-    full_message = "<b>🤖 ПРОВЕРКА ПОРУЧЕНИЙ</b>\n\n" + "\n".join(messages)
-    
+
+    user_mapping = load_user_mapping()
+
+    # Сортировка по дате: самые ранние выше, самые поздние ниже
+    selected.sort(key=lambda x: x[0])
+
+    lines = [f"<b>🤖 ДАЙДЖЕСТ ПОРУЧЕНИЙ — {today.strftime('%d.%m.%Y')}</b>",
+             f"Открытые со сроком до {horizon.strftime('%d.%m.%Y')}: "
+             f"<b>{len(selected)}</b>\n"]
+    for d, row in selected:
+        desc = html.escape(row[4])
+        if len(desc) > 100:
+            desc = desc[:97] + "..."
+        assignee = format_assignee(row[5], user_mapping)
+        days_over = (today.date() - d).days
+        if days_over > 0:
+            suffix = f"просрочено на {days_over} дн."
+        elif days_over == 0:
+            suffix = "сегодня"
+        elif days_over == -1:
+            suffix = "завтра"
+        else:
+            suffix = f"через {-days_over} дн."
+        lines.append(f"  <b>#{row[0]}:</b> {assignee} — {desc}\n"
+                     f"   📅 <b>{d.strftime('%d.%m.%Y')}</b> ({suffix})")
+
+    full_message = "\n".join(lines)
+
+    # LLM-наблюдение — только для плановой рассылки (флаг --advice)
+    if getattr(args, 'advice', False):
+        advice = generate_digest_advice(selected, today)
+        if advice:
+            full_message += f"\n\n{html.escape(advice)}"
+
     # Добавляем ссылку на исходник
     spreadsheet_id = get_active_registry()
     if spreadsheet_id:
         full_message += f"\n\n📋 https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"
-    
+
     print(full_message)
-    
+
     # Отправляем в Telegram
     send_telegram(full_message)
 
@@ -550,6 +609,8 @@ def main():
     
     # check-deadlines
     check_parser = subparsers.add_parser('check-deadlines', help='Проверить сроки')
+    check_parser.add_argument('--advice', action='store_true',
+                              help='Добавить LLM-наблюдение (для плановой рассылки)')
     
     # delete
     delete_parser = subparsers.add_parser('delete', help='Удалить поручение')

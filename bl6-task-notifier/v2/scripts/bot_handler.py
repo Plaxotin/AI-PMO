@@ -79,8 +79,8 @@ def load_config() -> Dict:
                 cfg = json.load(f)
         except Exception as e:
             log(f"⚠️ Ошибка чтения config.json: {e}")
-    cfg.setdefault("superadmin", "plaxotin")
-    cfg.setdefault("admins", [cfg["superadmin"]])
+    cfg.setdefault("admins", [])
+    cfg.setdefault("admin_ids", [])
     limits = dict(DEFAULT_LIMITS)
     limits.update(cfg.get("limits") or {})
     cfg["limits"] = limits
@@ -95,15 +95,18 @@ def save_config(cfg: Dict):
         json.dump(cfg, f, ensure_ascii=False, indent=2)
 
 
-def resolve_role(username: str, cfg: Dict) -> str:
-    """Определяет роль по Telegram username (регистронезависимо)."""
+def resolve_role(username: str, cfg: Dict, user_id=None) -> str:
+    """Роль по Telegram username (регистронезависимо) или по user_id
+    (список admin_ids в конфиге — для пользователей без логина)."""
     uname = (username or "").lstrip('@').lower()
-    if not uname:
-        return "user"
-    if uname == str(cfg.get("superadmin", "")).lower():
-        return "superadmin"
-    if uname in [str(a).lower() for a in cfg.get("admins", [])]:
+    if uname and uname in [str(a).lower() for a in cfg.get("admins", [])]:
         return "admin"
+    if user_id is not None:
+        try:
+            if int(user_id) in [int(a) for a in cfg.get("admin_ids", [])]:
+                return "admin"
+        except (TypeError, ValueError):
+            pass
     return "user"
 
 
@@ -208,7 +211,7 @@ def main_keyboard(role: str = "user") -> Dict:
         [{"text": "📂 Открыть реестр", "url": registry_link()}],
         [{"text": "📋 Выбрать реестр", "callback_data": "select_registry"}],
     ]
-    if role in ("admin", "superadmin"):
+    if role == "admin":
         kb.append([{"text": "📝 Редактировать реестр", "callback_data": "admin_mode"}])
     return {"inline_keyboard": kb}
 
@@ -217,7 +220,7 @@ def reply_main_keyboard(role: str = "user", admin_mode: bool = False) -> Dict:
     """Reply-клавиатура (постоянные кнопки под полем ввода)."""
     rows = []
     rows.append([{"text": "📋 Мои поручения"}])
-    if role in ("admin", "superadmin"):
+    if role == "admin":
         if admin_mode:
             rows.append([{"text": "❌ Выйти"}])
         else:
@@ -230,6 +233,10 @@ def reply_main_keyboard(role: str = "user", admin_mode: bool = False) -> Dict:
 
 def admin_mode_keyboard() -> Dict:
     return {"keyboard": [[{"text": "❌ Выйти"}]], "resize_keyboard": True}
+
+
+def confirm_keyboard() -> Dict:
+    return {"keyboard": [[{"text": "✅ Да"}, {"text": "❌ Нет"}]], "resize_keyboard": True}
 
 
 # ======== АНТИФЛУД ========
@@ -255,7 +262,7 @@ class FloodControl:
             return False, warn
         self._global["count"] += 1
 
-        day_limit = limits["admin_per_day"] if role in ("admin", "superadmin") else limits["per_day"]
+        day_limit = limits["admin_per_day"] if role == "admin" else limits["per_day"]
         d = self._day.get(uid)
         if not d or d["date"] != today:
             d = {"date": today, "count": 0, "warned": False}
@@ -269,7 +276,7 @@ class FloodControl:
             return False, warn
         d["count"] += 1
 
-        if role not in ("admin", "superadmin"):
+        if role != "admin":
             m = self._minute.get(uid)
             if not m or now - m["window_start"] >= 60:
                 m = {"window_start": now, "count": 0, "warned": False}
@@ -429,11 +436,14 @@ def load_contacts_from_registry() -> Dict[str, str]:
 
 
 
-def get_assignee_by_telegram(username: str) -> Optional[str]:
+def get_assignee_by_telegram(username: str, user_id=None) -> Optional[str]:
     mapping = load_user_mapping()
     username_clean = (username or "").lstrip('@').lower()
     for name, tg in mapping.items():
-        if str(tg).lstrip('@').lower() == username_clean:
+        val = str(tg).lstrip('@').lower()
+        if username_clean and val == username_clean:
+            return name
+        if user_id is not None and val == f"id:{user_id}":
             return name
     return None
 
@@ -518,9 +528,10 @@ def find_recent_duplicate(project: str, description: str, minutes: int = 10) -> 
 
 # ======== ЧАТЫ АДМИНОВ ========
 
-def remember_admin_chat(username: str, chat_id):
-    if not username:
+def remember_admin_chat(username: str, chat_id, user_id=None):
+    if not username and user_id is None:
         return
+    username = username or f"id:{user_id}"
     data = {}
     if os.path.exists(ADMIN_CHATS_PATH):
         try:
@@ -544,8 +555,8 @@ def get_admin_chat_ids(cfg: Dict) -> List[int]:
             data = json.load(f)
     except Exception:
         data = {}
-    usernames = {str(cfg.get("superadmin", "")).lower()}
-    usernames.update(str(a).lower() for a in cfg.get("admins", []))
+    usernames = {str(a).lower() for a in cfg.get("admins", [])}
+    usernames.update(f"id:{a}" for a in cfg.get("admin_ids", []))
     chat_ids = []
     for uname in usernames:
         cid = data.get(uname)
@@ -639,11 +650,12 @@ def format_task_list(tasks: List[Dict], title: str) -> str:
 
 # ======== КНОПОЧНЫЙ СЦЕНАРИЙ ========
 
-def get_open_tasks_for(username: str) -> Tuple[Optional[str], List[Dict]]:
+def get_open_tasks_for(username: str, user_id=None) -> Tuple[Optional[str], List[Dict]]:
     mapping = load_user_mapping()
     username_clean = (username or "").lstrip('@').lower()
     assignee_names = [name for name, tg in mapping.items()
-                      if str(tg).lstrip('@').lower() == username_clean]
+                      if (username_clean and str(tg).lstrip('@').lower() == username_clean)
+                      or (user_id is not None and str(tg).lstrip('@').lower() == f"id:{user_id}")]
     if not assignee_names:
         return None, []
     tasks = []
@@ -655,17 +667,10 @@ def get_open_tasks_for(username: str) -> Tuple[Optional[str], List[Dict]]:
             tasks.append(t)
     display_name = min(assignee_names, key=len)
     return display_name, tasks
-    assignee = get_assignee_by_telegram(username)
-    if not assignee:
-        return None, []
-    tasks = [t for t in get_all_tasks()
-             if assignee.lower() in t.get('assignee', '').lower()
-             and t.get('status') not in ("Выполнено", "Отменено")]
-    return assignee, tasks
 
 
-def build_my_tasks_view(username: str) -> Tuple[str, Optional[Dict]]:
-    assignee, tasks = get_open_tasks_for(username)
+def build_my_tasks_view(username: str, user_id=None) -> Tuple[str, Optional[Dict]]:
+    assignee, tasks = get_open_tasks_for(username, user_id)
     if not assignee:
         return ("❓ Вы не найдены в реестре.\n"
                 "Обратитесь к администратору, чтобы добавить ваш Telegram "
@@ -714,8 +719,8 @@ def build_registry_selector() -> Tuple[str, Optional[Dict]]:
     return "\n".join(lines), {"inline_keyboard": buttons}
 
 
-def handle_close_callback(task_id: int, username: str) -> Tuple[str, bool]:
-    assignee = get_assignee_by_telegram(username)
+def handle_close_callback(task_id: int, username: str, user_id=None) -> Tuple[str, bool]:
+    assignee = get_assignee_by_telegram(username, user_id)
     if not assignee:
         return "❌ Вы не найдены в реестре, обратитесь к администратору.", False
 
@@ -738,7 +743,9 @@ def handle_close_callback(task_id: int, username: str) -> Tuple[str, bool]:
     if not is_match:
         mapping = load_user_mapping()
         for ta in task_assignees:
-            if ta in mapping and mapping[ta].lstrip('@').lower() == user_clean:
+            mv = str(mapping.get(ta, "")).lstrip('@').lower()
+            if (user_clean and mv == user_clean) or \
+               (user_id is not None and mv == f"id:{user_id}"):
                 is_match = True
                 break
 
@@ -761,12 +768,12 @@ def handle_close_callback(task_id: int, username: str) -> Tuple[str, bool]:
 
 # ======== ОБРАБОТЧИКИ КОМАНД ========
 
-def cmd_list_my(username: str) -> str:
-    assignee = get_assignee_by_telegram(username)
+def cmd_list_my(username: str, user_id=None) -> str:
+    assignee = get_assignee_by_telegram(username, user_id)
     if not assignee:
         return ("❓ Не удалось определить ваше имя в реестре.\n"
                 "Обратитесь к администратору (user_mapping.json).")
-    assignee_l, filtered = get_open_tasks_for(username)
+    assignee_l, filtered = get_open_tasks_for(username, user_id)
     return with_footer(format_task_list(filtered, f"📋 Мои поручения — {assignee}"))
 
 
@@ -786,8 +793,8 @@ def cmd_list_status(status: str) -> str:
     return with_footer(format_task_list(filtered, f"📋 Поручения со статусом «{status}»"))
 
 
-def cmd_close_task(task_id: int, username: str) -> str:
-    toast, success = handle_close_callback(task_id, username)
+def cmd_close_task(task_id: int, username: str, user_id=None) -> str:
+    toast, success = handle_close_callback(task_id, username, user_id)
     if success:
         return with_footer(toast)
     return toast
@@ -861,6 +868,8 @@ def cmd_delete_execute(task_id: int, username: str) -> str:
 
 
 def cmd_digest() -> str:
+    """Рассылка активных поручений: check-deadlines (просрочено/сегодня/завтра).
+    task_manager сам шлёт дайджест в общий чат, сюда возвращает текст."""
     success, output = run_task_manager('check-deadlines')
     return output.strip() if output.strip() else ("✅ Готово." if success else "❌ Ошибка check-deadlines")
 
@@ -950,8 +959,6 @@ def cmd_add_admin(cfg: Dict, username: str) -> str:
 
 def cmd_remove_admin(cfg: Dict, username: str) -> str:
     uname = username.lstrip('@').lower()
-    if uname == str(cfg.get("superadmin", "")).lower():
-        return "❌ Нельзя убрать суперадминистратора."
     admins = [str(a).lower() for a in cfg.get("admins", [])]
     if uname not in admins:
         return f"ℹ️ @{uname} и так не в списке админов."
@@ -961,7 +968,7 @@ def cmd_remove_admin(cfg: Dict, username: str) -> str:
 
 
 def cmd_list_admins(cfg: Dict) -> str:
-    lines = [f"👑 Суперадминистратор: @{cfg.get('superadmin', '?')}", "", "👥 Администраторы:"]
+    lines = ["👥 Администраторы:"]
     admins = cfg.get("admins", [])
     lines += [f"   • @{a}" for a in admins] if admins else ["   (пусто)"]
     return "\n".join(lines)
@@ -1084,13 +1091,16 @@ def greeting_text(first_name: str, role: str) -> str:
     reg = get_active_registry()
     reg_link = registry_link()
     reg_info = f"\n\n📋 Активный реестр: <b>{html.escape(reg.get('name', 'Неизвестно'))}</b>\n🔗 <a href='{reg_link}'>Открыть реестр</a>"
-    if role in ("admin", "superadmin"):
+    if role == "admin":
         return (
             f"👋 <b>Привет, {html.escape(first_name or 'друг')}!</b>{reg_info}\n\n"
-            f"💬 <b>Режим администратора</b> активен. Пишите любую задачу "
-            f"по изменению реестра поручений в свободной форме — я пойму, "
-            f"внесу правки и пришлю подтверждение.\n\n"
-            f"Или нажмите кнопку 📋 <b>Мои поручения</b> ниже."
+            "Вы администратор. Кнопки внизу:\n"
+            "📝 <b>Редактировать</b> — включить режим свободной формы: опишите "
+            "изменение реестра текстом, я внесу правки и пришлю подтверждение\n"
+            "🔍 <b>Проверить</b> — аудит реестра\n"
+            "📊 <b>Дайджест</b> — рассылка активных поручений из реестра\n"
+            "📋 <b>Реестры</b> — переключение активного реестра\n"
+            "📋 <b>Мои поручения</b> — ваши открытые задачи"
         )
     return (
         f"👋 <b>Привет, {html.escape(first_name or 'друг')}!</b>{reg_info}\n\n"
@@ -1102,7 +1112,7 @@ def greeting_text(first_name: str, role: str) -> str:
 # ======== DISPATCH ========
 
 def dispatch(cmd: "commands.ParsedCommand", username: str, first_name: str,
-             chat_id, key: str) -> str:
+             chat_id, key: str, user_id=None) -> str:
     """Выполняет распознанную команду и возвращает текст ответа."""
     cfg = load_config()
     name, args = cmd.name, cmd.args
@@ -1111,7 +1121,7 @@ def dispatch(cmd: "commands.ParsedCommand", username: str, first_name: str,
         return f"📋 Реестр поручений:\n{registry_link()}"
 
     if name == "list_my":
-        return cmd_list_my(username)
+        return cmd_list_my(username, user_id)
     if name == "list_all":
         return cmd_list_all()
     if name == "list_project":
@@ -1119,7 +1129,7 @@ def dispatch(cmd: "commands.ParsedCommand", username: str, first_name: str,
     if name == "list_status":
         return cmd_list_status(args["status"])
     if name == "close":
-        return cmd_close_task(args["id"], username)
+        return cmd_close_task(args["id"], username, user_id)
 
     if name == "create":
         dup = find_recent_duplicate(args["project"], args["description"])
@@ -1315,7 +1325,7 @@ def process_callback(callback: Dict):
     key = _state_key(chat_id, user_id)
 
     cfg = load_config()
-    role = resolve_role(username, cfg)
+    role = resolve_role(username, cfg, user_id)
 
 
     allowed, warning = flood.check(user_id, role, cfg["limits"])
@@ -1338,7 +1348,7 @@ def process_callback(callback: Dict):
     user_id = from_user.get('id')
 
     cfg = load_config()
-    role = resolve_role(username, cfg)
+    role = resolve_role(username, cfg, user_id)
 
     allowed, warning = flood.check(user_id, role, cfg["limits"])
     if not allowed:
@@ -1347,7 +1357,7 @@ def process_callback(callback: Dict):
         return
 
     if data in ("my_tasks", "close_menu", "refresh"):
-        text, keyboard = build_my_tasks_view(username)
+        text, keyboard = build_my_tasks_view(username, user_id)
         if message_id:
             ok = edit_message(chat_id, message_id, text, reply_markup=keyboard)
             if not ok:
@@ -1376,15 +1386,15 @@ def process_callback(callback: Dict):
         except ValueError:
             answer_callback_query(callback_id, text="❌ Некорректный номер.")
             return
-        toast, success = handle_close_callback(task_id, username)
+        toast, success = handle_close_callback(task_id, username, user_id)
         answer_callback_query(callback_id, text=toast[:190])
         if success and message_id:
-            text, keyboard = build_my_tasks_view(username)
+            text, keyboard = build_my_tasks_view(username, user_id)
             edit_message(chat_id, message_id, text, reply_markup=keyboard)
         return
 
     if data == "send_digest":
-        if role not in ("admin", "superadmin"):
+        if role != "admin":
             answer_callback_query(callback_id, text="❌ Только для администраторов.")
             return
         response = cmd_digest()
@@ -1502,7 +1512,7 @@ def process_callback(callback: Dict):
         return
 
     if data == "admin_mode":
-        if role in ("admin", "superadmin"):
+        if role == "admin":
             send_message(chat_id, (
                 f"💬 <b>Режим администратора активен</b>\n\n"
                 f"Пишите любую задачу по изменению реестра поручений "
@@ -1541,7 +1551,7 @@ def _handle_group_feedback(message: Dict, fb_type: str, fb_text: str):
         return
 
     cfg = load_config()
-    role = resolve_role(username, cfg)
+    role = resolve_role(username, cfg, user_id)
     allowed, warning = flood.check(user_id, role, cfg["limits"])
     if not allowed:
         if warning:
@@ -1578,7 +1588,10 @@ def process_updates(updates: List[Dict]):
     for update in updates:
         if 'callback_query' in update:
             try:
-                process_callback(update['callback_query'])
+                cb = update['callback_query']
+                log(f"📩 callback @{cb.get('from', {}).get('username', '?')}: "
+                    f"{cb.get('data', '')[:60]!r}")
+                process_callback(cb)
             except Exception as e:
                 log(f"⚠️ Ошибка обработки callback: {e}")
             continue
@@ -1590,6 +1603,9 @@ def process_updates(updates: List[Dict]):
         text = message.get('text', '')
         if not text:
             continue
+
+        log(f"📩 msg @{message.get('from', {}).get('username', '?')} "
+            f"uid={message.get('from', {}).get('id')}: {text[:70]!r}")
 
         chat = message.get('chat', {})
         chat_id = chat.get('id')
@@ -1611,19 +1627,20 @@ def process_updates(updates: List[Dict]):
         key = _state_key(chat_id, user_id)
 
         cfg = load_config()
-        role = resolve_role(username, cfg)
+        role = resolve_role(username, cfg, user_id)
 
         # --- обработка reply-кнопок ---
         text_clean = text.strip()
 
         if text_clean == "📋 Мои поручения" or text_clean == "Мои поручения":
-            view_text, view_kb = build_my_tasks_view(username)
+            view_text, view_kb = build_my_tasks_view(username, user_id)
             if view_kb:
                 send_message(chat_id, view_text, reply_markup=view_kb)
             else:
                 send_message(chat_id, view_text)
             continue
-        if (text_clean == "📝 Редактировать реестр" or text_clean == "Редактировать реестр") and role in ("admin", "superadmin"):
+        if text_clean in ("📝 Редактировать реестр", "Редактировать реестр",
+                          "📝 Редактировать", "Редактировать") and role == "admin":
             _set_user_state(key, "admin_mode")
             send_message(chat_id, (
                 f"💬 <b>Режим администратора активен</b>\n\n"
@@ -1633,12 +1650,14 @@ def process_updates(updates: List[Dict]):
                 f"🔗 {registry_link()}"
             ), reply_markup=admin_mode_keyboard())
             continue
-        if (text_clean == "📊 Отправить дайджест" or text_clean == "Отправить дайджест") and role in ("admin", "superadmin"):
+        if text_clean in ("📊 Отправить дайджест", "Отправить дайджест",
+                          "📊 Дайджест", "Дайджест") and role == "admin":
             response = cmd_digest()
             send_message(chat_id, response)
             continue
 
-        if (text_clean == "🔍 Проверить реестр" or text_clean == "Проверить реестр") and role in ("admin", "superadmin"):
+        if text_clean in ("🔍 Проверить реестр", "Проверить реестр",
+                          "🔍 Проверить", "Проверить") and role == "admin":
             # Защита от дублей: если аудит уже запущен для этого пользователя, пропускаем
             audit_state = _get_user_state(key)
             if audit_state and audit_state.get("state") == "audit_in_progress":
@@ -1653,18 +1672,19 @@ def process_updates(updates: List[Dict]):
                 if current and current.get("state") == "audit_in_progress":
                     _clear_user_state(key)
             continue
-        if (text_clean == "❌ Выйти" or text_clean == "Выйти") and role in ("admin", "superadmin"):
+        if (text_clean == "❌ Выйти" or text_clean == "Выйти") and role == "admin":
             _clear_user_state(key)
             send_message(chat_id, "👋 <b>Режим администратора отключён.</b>",
                          reply_markup=reply_main_keyboard(role))
             continue
-        if (text_clean == "/start" or text_clean == "/help" or text_clean == "привет" or text_clean == "начать") and role in ("admin", "superadmin"):
+        if (text_clean == "/start" or text_clean == "/help" or text_clean == "привет" or text_clean == "начать") and role == "admin":
             send_message(chat_id, greeting_text(first_name, role),
                          reply_to=message.get('message_id'),
                          reply_markup=main_keyboard(role))
             continue
 
-        if text_clean == "📋 Выбрать реестр" and role in ("admin", "superadmin"):
+        if text_clean in ("📋 Выбрать реестр", "Выбрать реестр",
+                          "📋 Реестры", "Реестры") and role == "admin":
             sel_text, sel_kb = build_registry_selector()
             send_message(chat_id, sel_text, reply_markup=sel_kb)
             continue
@@ -1679,8 +1699,8 @@ def process_updates(updates: List[Dict]):
         if len(_processed_messages) > _MAX_MSG_CACHE:
             _processed_messages.clear()
 
-        if role in ("admin", "superadmin"):
-            remember_admin_chat(username, chat_id)
+        if role == "admin":
+            remember_admin_chat(username, chat_id, user_id)
 
         allowed, warning = flood.check(user_id, role, cfg["limits"])
         if not allowed:
@@ -1803,9 +1823,9 @@ def process_updates(updates: List[Dict]):
 
         # --- ожидающее подтверждение ---
         state = _get_user_state(key)
-        if state and state.get("state", "").startswith("confirm_") and role in ("admin", "superadmin"):
+        if state and state.get("state", "").startswith("confirm_") and role == "admin":
             _clear_user_state(key)
-            if text.strip().lower() == "да":
+            if text.strip().lower() in ("да", "✅ да", "д", "yes"):
                 if state["state"] == "confirm_create":
                     response = cmd_create_execute(state["data"], username, first_name)
                     # Авто-выход из режима редактирования
@@ -1925,47 +1945,91 @@ def process_updates(updates: List[Dict]):
                 response = "❌ Отменено."
             send_message(chat_id, response, reply_to=message.get('message_id'))
             continue
-        elif state:
-            _clear_user_state(key)
-            # После очистки неизвестного состояния отправляем приветствие, а не в LLM
-            send_message(chat_id, greeting_text(first_name, role),
-                         reply_markup=reply_main_keyboard(role))
+        elif state and state.get("state") == "admin_mode_confirm":
+            data = state.get("data", {})
+            if text_clean.lower() in ("✅ да", "да", "yes", "д"):
+                check = commands.parse_canonical(data.get("command_text", ""),
+                                                  today=now_msk().date())
+                if check.ok and check.name != "help":
+                    try:
+                        response = dispatch(check, username, first_name, chat_id, key, user_id)
+                    except Exception as e:
+                        log(f"⚠️ Ошибка выполнения команды {check.name}: {e}")
+                        response = "❌ Внутренняя ошибка при выполнении команды."
+                    # Если dispatch поставил следующее подтверждение (confirm_create/
+                    # confirm_delete) — задача ещё НЕ выполнена: режим админа
+                    # сохраняется, состояние не трогаем
+                    nxt = _get_user_state(key)
+                    if nxt and nxt.get("state", "") != "admin_mode_confirm" \
+                            and nxt.get("state", "").startswith("confirm_"):
+                        send_message(chat_id, response,
+                                     reply_to=message.get('message_id'),
+                                     reply_markup=confirm_keyboard())
+                        continue
+                    # Ошибка выполнения — задача не выполнена: остаёмся в режиме админа
+                    if response.startswith("❌"):
+                        _set_user_state(key, "admin_mode")
+                        send_message(chat_id, response,
+                                     reply_to=message.get('message_id'),
+                                     reply_markup=admin_mode_keyboard())
+                        continue
+                    # Задача выполнена — только теперь отключаем режим админа
+                    send_message(chat_id,
+                        f"{response}\n\n"
+                        "🔒 <b>Режим администратора отключён.</b>\n"
+                        "Возвращаю стандартное меню управления.",
+                        reply_to=message.get('message_id'),
+                        reply_markup=reply_main_keyboard(role))
+                    _clear_user_state(key)
+                else:
+                    _set_user_state(key, "admin_mode")
+                    send_message(chat_id,
+                        "❌ Команда больше не актуальна. Попробуйте снова.",
+                        reply_to=message.get('message_id'),
+                        reply_markup=admin_mode_keyboard())
+            elif text_clean.lower() in ("❌ нет", "нет", "no", "н"):
+                _set_user_state(key, "admin_mode")
+                send_message(chat_id,
+                    "🔄 Хорошо, давайте уточним.\n\n"
+                    "Опишите задачу по изменению реестра в свободной форме.",
+                    reply_to=message.get('message_id'),
+                    reply_markup=admin_mode_keyboard())
+            else:
+                send_message(chat_id, "❓ Нажмите <b>✅ Да</b> или <b>❌ Нет</b>.",
+                             reply_markup=confirm_keyboard())
             continue
 
-        # --- Для админов и суперадминов в режиме редактирования: LLM ---
-        state = _get_user_state(key)
-        if state and state.get("state") == "admin_mode" and role in ("admin", "superadmin"):
+        elif state and state.get("state") == "admin_mode" and role == "admin":
             command_text = llm.interpret_free_text(
                 text, now_msk().strftime("%d.%m.%Y"), cfg, log_fn=log)
             if command_text:
                 check = commands.parse_canonical(command_text,
                                                   today=now_msk().date())
                 if check.ok and check.name != "help":
-                    try:
-                        response = dispatch(check, username, first_name, chat_id, key)
-                    except Exception as e:
-                        log(f"⚠️ Ошибка выполнения команды {check.name}: {e}")
-                        response = "❌ Внутренняя ошибка при выполнении команды."
-                    send_message(chat_id, response, reply_to=message.get('message_id'),
-                                 reply_markup=reply_main_keyboard(role))
+                    _set_user_state(key, "admin_mode_confirm", {
+                        "command_text": command_text
+                    })
+                    send_message(chat_id,
+                        "📝 <b>Я понял задачу так:</b>\n"
+                        f"<code>{html.escape(command_text)}</code>\n\n"
+                        "Всё верно?",
+                        reply_to=message.get('message_id'),
+                        reply_markup=confirm_keyboard())
                 else:
                     send_message(chat_id, with_footer(
                         "🤔 Не удалось интерпретировать запрос. Попробуйте переформулировать."),
-                        reply_markup=reply_main_keyboard(role))
-            elif role == "superadmin":
-                chat_answer = llm.chat_response(text, cfg, log_fn=log)
-                if chat_answer:
-                    send_message(chat_id, with_footer(chat_answer),
-                                 reply_to=message.get('message_id'),
-                                 reply_markup=reply_main_keyboard(role))
-                else:
-                    send_message(chat_id, greeting_text(first_name, role),
-                                 reply_to=message.get('message_id'),
-                                 reply_markup=reply_main_keyboard(role))
+                        reply_markup=admin_mode_keyboard())
             else:
                 send_message(chat_id, with_footer(
-                    "⏳ ИИ-ассистент временно перегружен (лимит запросов). "
-                    "Подождите 30–60 секунд и повторите."))
+                    "🤔 Не удалось интерпретировать запрос. Попробуйте переформулировать."),
+                    reply_markup=admin_mode_keyboard())
+            continue
+
+        elif state:
+            _clear_user_state(key)
+            # После очистки неизвестного состояния отправляем приветствие, а не в LLM
+            send_message(chat_id, greeting_text(first_name, role),
+                         reply_markup=reply_main_keyboard(role))
             continue
 
         # --- разбор команды (только для обычных пользователей) ---
@@ -1984,7 +2048,7 @@ def process_updates(updates: List[Dict]):
             continue
 
         try:
-            response = dispatch(cmd, username, first_name, chat_id, key)
+            response = dispatch(cmd, username, first_name, chat_id, key, user_id)
         except Exception as e:
             log(f"⚠️ Ошибка выполнения команды {cmd.name}: {e}")
             response = "❌ Внутренняя ошибка при выполнении команды."
