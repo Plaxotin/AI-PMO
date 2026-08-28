@@ -11,7 +11,7 @@
   - Личка — для всех: обычным пользователям приветствие + inline-кнопки
     «📋 Мои поручения» (закрытие в один тап), «📂 Открыть реестр»,
     «📋 Выбрать реестр».
-  - Админы/суперадмин: ТОЛЬКО свободная форма через LLM (канонические
+  - Админы: ТОЛЬКО свободная форма через LLM (канонические
     команды полностью отключены).
   - Два реестра с возможностью переключения через inline-кнопки.
 
@@ -947,94 +947,6 @@ def cmd_switch_registry(name: str, username: str) -> str:
     return f"❌ Реестр «<b>{html.escape(name)}</b>» не найден."
 
 
-def cmd_add_admin(cfg: Dict, username: str) -> str:
-    uname = username.lstrip('@').lower()
-    admins = [str(a).lower() for a in cfg.get("admins", [])]
-    if uname in admins:
-        return f"ℹ️ @{uname} уже в списке админов."
-    cfg.setdefault("admins", []).append(uname)
-    save_config(cfg)
-    return f"✅ @{uname} добавлен в администраторы."
-
-
-def cmd_remove_admin(cfg: Dict, username: str) -> str:
-    uname = username.lstrip('@').lower()
-    admins = [str(a).lower() for a in cfg.get("admins", [])]
-    if uname not in admins:
-        return f"ℹ️ @{uname} и так не в списке админов."
-    cfg["admins"] = [a for a in cfg.get("admins", []) if str(a).lower() != uname]
-    save_config(cfg)
-    return f"✅ @{uname} убран из администраторов."
-
-
-def cmd_list_admins(cfg: Dict) -> str:
-    lines = ["👥 Администраторы:"]
-    admins = cfg.get("admins", [])
-    lines += [f"   • @{a}" for a in admins] if admins else ["   (пусто)"]
-    return "\n".join(lines)
-
-
-def cmd_set_limits(cfg: Dict, per_min: int, per_day: int) -> str:
-    cfg.setdefault("limits", dict(DEFAULT_LIMITS))
-    cfg["limits"]["per_min"] = per_min
-    cfg["limits"]["per_day"] = per_day
-    save_config(cfg)
-    return f"✅ Лимиты обновлены: {per_min} команд/мин, {per_day} команд/день."
-
-
-def cmd_versions() -> str:
-    if not os.path.isdir(VERSIONS_DIR):
-        return "📂 Каталог versions/ ещё не создан."
-    current = ""
-    current_file = os.path.join(VERSIONS_DIR, "CURRENT")
-    if os.path.exists(current_file):
-        with open(current_file, 'r', encoding='utf-8') as f:
-            current = f.read().strip()
-    versions = sorted(d for d in os.listdir(VERSIONS_DIR)
-                      if os.path.isdir(os.path.join(VERSIONS_DIR, d)))
-    lines = ["🗂 <b>Версии конфигурации:</b>"]
-    for v in versions:
-        mark = " ← текущая" if v == current else ""
-        lines.append(f"   • <code>{v}</code>{mark}")
-    lines.append("\nОткат: <code>откатить конфиг &lt;версия&gt;</code>")
-    return "\n".join(lines)
-
-
-def cmd_rollback(version: str) -> str:
-    src = os.path.join(VERSIONS_DIR, version)
-    if not os.path.isdir(src):
-        return f"❌ Версия <code>{html.escape(version)}</code> не найдена. Смотрите «версии»."
-    try:
-        src_scripts = os.path.join(src, "scripts")
-        if os.path.isdir(src_scripts):
-            for fname in os.listdir(src_scripts):
-                if fname.endswith(".py"):
-                    shutil.copy2(os.path.join(src_scripts, fname),
-                                 os.path.join(SCRIPT_DIR, fname))
-        for fname in ("config.json", "user_mapping.json"):
-            candidates = [os.path.join(src, ".credentials", fname),
-                          os.path.join(src, fname)]
-            for fpath in candidates:
-                if os.path.exists(fpath):
-                    shutil.copy2(fpath, os.path.join(CREDS_DIR, fname))
-                    break
-        current_file = os.path.join(VERSIONS_DIR, "CURRENT")
-        with open(current_file, 'w', encoding='utf-8') as f:
-            f.write(version)
-    except Exception as e:
-        return f"❌ Ошибка отката: {html.escape(str(e))}"
-
-    log(f"Откат конфигурации на {version}, перезапуск сервиса")
-
-    def _restart():
-        time.sleep(2)
-        subprocess.run(["systemctl", "restart", "plaxotin-task-bot"], timeout=30)
-
-    threading.Thread(target=_restart, daemon=True).start()
-    return (f"✅ Конфигурация откачена на <code>{html.escape(version)}</code>.\n"
-            f"🔄 Перезапускаю сервис (пара секунд)…")
-
-
 # ======== ВЕЧЕРНИЙ ДАЙДЖЕСТ ========
 
 def build_evening_digest() -> Optional[str]:
@@ -1175,19 +1087,6 @@ def dispatch(cmd: "commands.ParsedCommand", username: str, first_name: str,
         return cmd_new_registry(args["title"], username)
     if name == "switch_registry":
         return cmd_switch_registry(args["name"], username)
-
-    if name == "add_admin":
-        return cmd_add_admin(cfg, args["username"])
-    if name == "remove_admin":
-        return cmd_remove_admin(cfg, args["username"])
-    if name == "list_admins":
-        return cmd_list_admins(cfg)
-    if name == "set_limits":
-        return cmd_set_limits(cfg, args["per_min"], args["per_day"])
-    if name == "versions":
-        return cmd_versions()
-    if name == "rollback":
-        return cmd_rollback(args["version"])
 
     return "🤔 Не понял команду."
 

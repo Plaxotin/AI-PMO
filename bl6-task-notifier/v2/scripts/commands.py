@@ -4,7 +4,7 @@
 Парсер текстовых команд бота @Plaxotin_task_bot (BL-6, v3.0).
 
 v3.0:
-  - Для админов/суперадминов: ТОЛЬКО свободная форма через LLM.
+  - Для админов: ТОЛЬКО свободная форма через LLM.
     Канонические команды полностью отключены (кроме help/registry_link).
   - Для обычных пользователей: оставлены команды просмотра и закрытия
     своих поручений (list_my, list_all, list_project, list_status, close, help, registry_link).
@@ -77,17 +77,12 @@ def normalize_date(text: str, today: Optional[date] = None) -> Optional[str]:
 
 
 def help_text(role: str = "user") -> str:
-    if role in ("admin", "superadmin"):
+    if role == "admin":
         return ("💬 Напишите мне любую задачу по изменению реестра поручений "
                 "в свободной форме — я пойму, внесу правки и пришлю "
                 "подтверждение.")
     return ("📋 Кнопка <b>«Мои поручения»</b> — ваши открытые поручения "
-            "из реестра, закрытие в один тап." + "\n\n"
-            "Также можно написать:\n"
-            "<code>мои поручения</code> — список ваших задач\n"
-            "<code>все поручения</code> — весь реестр\n"
-            "<code>дайджест</code> — проверка срочных дедлайнов\n"
-            "<code>закрыть 47</code> — закрыть поручение #47")
+            "из реестра, закрытие в один тап.")
 
 
 def unknown_command(role: str = "user") -> ParsedCommand:
@@ -98,14 +93,14 @@ def unknown_command(role: str = "user") -> ParsedCommand:
 
 
 def route_unrecognized(role: str) -> str:
-    return "llm" if role in ("admin", "superadmin") else "fallback"
+    return "llm" if role == "admin" else "fallback"
 
 
 # ======== ДОСТУП ========
 # Все команды доступны только обычным пользователям.
-# Админы/суперадмины используют только LLM (свободная форма).
+# Админы используют только LLM (свободная форма).
 _PUBLIC_COMMANDS = {"help", "registry_link", "list_my", "list_all",
-                    "list_project", "list_status", "close", "digest"}
+                    "list_project", "list_status", "close"}
 
 
 def _check_access(name: str, role: str) -> Optional[ParsedCommand]:
@@ -122,7 +117,7 @@ def parse(text: str, role: str = "user",
           today: Optional[date] = None) -> ParsedCommand:
     """Разбирает текст команды (v3.0).
 
-    Для admin/superadmin: почти ничего не распознаём (только help/registry_link),
+    Для admin: почти ничего не распознаём (только help/registry_link),
     всё остальное → unknown → LLM.
     Для user: стандартный набор команд просмотра/закрытия.
     """
@@ -146,8 +141,8 @@ def parse(text: str, role: str = "user",
     if low == "реестр":
         return finish("registry_link", {})
 
-    # --- Для админов и суперадминов: всё остальное → unknown → LLM ---
-    if role in ("admin", "superadmin"):
+    # --- Для админов: всё остальное → unknown → LLM ---
+    if role == "admin":
         return unknown_command(role)
 
     # --- просмотр (только обычным пользователям) ---
@@ -165,15 +160,6 @@ def parse(text: str, role: str = "user",
         return finish("list_project", {"project": m.group(1).strip()})
 
     # --- закрытие (только своё — проверка в обработчике) ---
-    m = re.match(r"^закрыть\s*#\s*(\d+)$", low) or re.match(r"^закрыть\s+(\d+)$", low)
-    if m:
-        return finish("close", {"id": int(m.group(1))})
-
-    # --- дайджест (доступен всем) ---
-    if low == "дайджест":
-        return finish("digest", {})
-
-    return unknown_command(role)
     m = re.match(r"^закрыть\s*#\s*(\d+)$", low) or re.match(r"^закрыть\s+(\d+)$", low)
     if m:
         return finish("close", {"id": int(m.group(1))})

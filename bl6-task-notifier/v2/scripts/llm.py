@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-LLM-режим свободной формы (BL-6, v3.0) — админы/суперадмин, только личка.
+LLM-режим свободной формы (BL-6, v3.0) — админы, только личка.
 
 Переводит свободную просьбу в КАНОНИЧЕСКУЮ текстовую команду бота.
 Дальше канонический текст проходит обычный путь: parse → подтверждение «да» → dispatch.
@@ -29,6 +29,9 @@ SYSTEM_PROMPT = """Ты — транслятор просьб в команды 
 Доступные реестры:
 {registries}
 
+Активный реестр: {active_registry}
+Пользователь: {username}
+
 Переведи просьбу пользователя в ОДНУ каноническую команду бота.
 Допустимые команды (строго в этих форматах):
 - создать поручение: Проект=<проект>; Описание=<описание>; Ответственный=<имя>; Срок=<дата>
@@ -48,9 +51,22 @@ SYSTEM_PROMPT = """Ты — транслятор просьб в команды 
 - новый реестр <название>
 - переключить реестр на <название реестра>
 
-Ответь СТРОГО одним JSON-объектом без пояснений и markdown:
+ПРАВИЛА ДЛЯ СОЗДАНИЯ ПОРУЧЕНИЯ:
+• Если пользователь просит создать поручение, но не указывает все поля — используй УМОЛЧАНИЯ:
+  - Проект = активный реестр (см. выше)
+  - Ответственный = имя пользователя (см. выше)
+  - Срок = завтра
+  - Описание = краткая суть запроса
+• Если пользователь говорит "тестовое поручение" — используй описание "Тестовое поручение", проект = активный реестр, ответственный = пользователь, срок = завтра.
+
+ВАЖНО:
+• Если пользователь задаёт ВОПРОС (содержит '?' или слова 'как', 'что', 'почему', 'какие', 'сколько', 'где', 'когда', 'кто'), а не просит выполнить действие — верни {{"command_text": null}}.
+• Если просьба не подходит ни под одну команду выше — верни {{"command_text": null}}.
+• Отвечай СТРОГО одним JSON-объектом без пояснений и markdown.
+
+Формат ответа:
 {{"command_text": "<каноническая команда>"}}
-или, если просьбу нельзя свести к команде:
+или:
 {{"command_text": null}}"""
 
 
@@ -96,7 +112,7 @@ def _format_registries(cfg: dict) -> str:
     return "\n".join(lines)
 
 
-def interpret_free_text(text: str, today_str: str, cfg: dict, log_fn=print) -> Optional[str]:
+def interpret_free_text(text: str, today_str: str, cfg: dict, username: str = "", log_fn=print) -> Optional[str]:
     cfg_kimi = load_kimi_config()
     if not cfg_kimi:
         log_fn("⚠️ kimi.json не настроен, LLM-режим недоступен")
@@ -109,10 +125,15 @@ def interpret_free_text(text: str, today_str: str, cfg: dict, log_fn=print) -> O
 
     base_url = cfg_kimi.get('base_url', 'https://api.moonshot.ai/v1').rstrip('/')
     registries_text = _format_registries(cfg)
+    active_registry = cfg.get('registries', [{'name': cfg.get('spreadsheet_id', 'Реестр')}])[0].get('name', 'Реестр')
+    for r in cfg.get('registries', []):
+        if r.get('active'):
+            active_registry = r.get('name', 'Реестр')
+            break
     payload = {
         "model": cfg_kimi.get('model', 'moonshot-v1-8k'),
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT.format(today=today_str, registries=registries_text)},
+            {"role": "system", "content": SYSTEM_PROMPT.format(today=today_str, registries=registries_text, active_registry=active_registry, username=username)},
             {"role": "user", "content": text},
         ],
         "temperature": TEMPERATURE,
@@ -143,95 +164,3 @@ def interpret_free_text(text: str, today_str: str, cfg: dict, log_fn=print) -> O
     if not command_text or not isinstance(command_text, str):
         return None
     return command_text.strip()
-
-
-CHAT_PROMPT = """Ты — ассистент Telegram-бота «Task notifier» (@Plaxotin_task_bot).
-Ты помогаешь суперадминистратору управлять ботом и реестром поручений.
-
-Текущая конфигурация бота:
-- Версия: v3.0
-- Реестры: {registries}
-- Активный реестр: {active_registry}
-- Суперадмин: {superadmin}
-- Администраторы: {admins}
-- Лимиты: {limits}
-- Время дайджеста: {digest_time}
-- Владелец: {owner_email}
-
-Возможности бота:
-• Автоматическая рассылка дайджеста в группу Telegram каждый день в указанное время
-• Управление реестром поручений через Google Sheets
-• Inline-кнопки для обычных пользователей
-• LLM-режим свободной формы для администраторов
-• Аудит-лог всех изменений
-• Переключение между несколькими реестрами
-
-Отвечай кратко, по существу, на русском языке. Если не знаешь ответ — честно скажи.
-"""
-
-
-def chat_response(user_text: str, cfg: dict, log_fn=print) -> str:
-    """Свободный диалог с LLM (для суперадмина). Возвращает текст ответа или пустую строку."""
-    cfg_kimi = load_kimi_config()
-    if not cfg_kimi:
-        log_fn("⚠️ kimi.json не настроен, чат недоступен")
-        return ""
-    try:
-        import requests
-    except ImportError:
-        log_fn("⚠️ requests не установлен, чат недоступен")
-        return ""
-
-    base_url = cfg_kimi.get('base_url', 'https://api.moonshot.ai/v1').rstrip('/')
-    model = cfg_kimi.get('model', 'moonshot-v1-8k')
-
-    active = None
-    for r in cfg.get('registries', []):
-        if r.get('active'):
-            active = r.get('name', 'Неизвестно')
-            break
-    if not active:
-        active = cfg.get('spreadsheet_id', 'Неизвестно')
-
-    reg_list = "\n".join(
-        f"- {r.get('name', 'Без названия')}{' (активный)' if r.get('active') else ''}"
-        for r in cfg.get('registries', [])
-    ) or "- Один реестр (старая схема)"
-
-    system_msg = CHAT_PROMPT.format(
-        registries=reg_list,
-        active_registry=active,
-        superadmin=cfg.get('superadmin', 'plaxotin'),
-        admins=", ".join(str(a) for a in cfg.get('admins', [])),
-        limits=str(cfg.get('limits', {})),
-        digest_time=cfg.get('digest_time', '20:47'),
-        owner_email=cfg.get('owner_email', '—'),
-    )
-
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system_msg},
-            {"role": "user", "content": user_text},
-        ],
-        "temperature": 0.3,
-        "max_tokens": 2000,
-    }
-
-    try:
-        resp = requests.post(
-            f"{base_url}/chat/completions",
-            headers={"Authorization": f"Bearer {cfg_kimi['api_key']}",
-                     "Content-Type": "application/json"},
-            json=payload,
-            timeout=TIMEOUT,
-        )
-        if resp.status_code != 200:
-            log_fn(f"⚠️ Kimi API вернул {resp.status_code}: {resp.text[:150]}")
-            return ""
-        data = resp.json()
-        content = data.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
-        return content
-    except Exception as e:
-        log_fn(f"⚠️ Ошибка чата с Kimi: {e}")
-        return ""
