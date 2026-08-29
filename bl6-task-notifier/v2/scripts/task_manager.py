@@ -93,8 +93,8 @@ def get_or_create_spreadsheet(client, title: str = "Реестр поручен�
     
     # Заголовки
     headers = [
-        "ID", "Дата создания", "Автор/Источник", "Проект", 
-        "Описание", "Ответственный", "Срок", "Статус", 
+        "ID", "Дата создания", "Автор/Источник", "Контрагент",
+        "Описание", "Ответственный", "Срок", "Статус",
         "Дата закрытия", "Комментарий"
     ]
     worksheet.update(range_name='A1:J1', values=[headers])
@@ -115,105 +115,198 @@ def get_or_create_spreadsheet(client, title: str = "Реестр поручен�
     
     return spreadsheet_id
 
+# ======== МАППИНГ КОЛОНОК ПО ЗАГОЛОВКАМ ========
+# Привязка полей к колонкам по ИМЕНАМ заголовков (порядок не важен).
+# ВНИМАНИЕ: дубль этого словаря есть в bot_handler.py — держать синхронно.
+COLUMN_SYNONYMS = {
+    "id":          ["ID", "№"],
+    "created":     ["Дата создания", "Data sozdaniya"],
+    "author":      ["Автор/Источник", "Avtor/Istochnik", "Автор", "Источник"],
+    "contragent":  ["Контрагент", "Компания", "КА"],
+    "description": ["Описание", "Opisanie"],
+    "assignee":    ["Ответственный", "Otvetstvenniy"],
+    "deadline":    ["Срок", "Srok", "Srok korr", "Srok plan"],
+    "status":      ["Статус", "Status"],
+    "closed":      ["Дата закрытия", "Data zakrytiya"],
+    "comment":     ["Комментарий", "Kommentariy"],
+}
+REQUIRED_FIELDS = ["id", "description", "assignee", "deadline", "status"]
+FIELD_LABELS = {
+    "id": "ID", "created": "Дата создания", "author": "Автор/Источник",
+    "contragent": "Контрагент", "description": "Описание",
+    "assignee": "Ответственный", "deadline": "Срок", "status": "Статус",
+    "closed": "Дата закрытия", "comment": "Комментарий",
+}
+
+
+def get_col_map(worksheet) -> Dict[str, int]:
+    """Карта «поле → индекс колонки (0-based)» по заголовкам первой строки.
+
+    Срок: если есть обе колонки «Srok plan»/«Srok korr», то deadline = korr
+    (куда пишем правки), а deadline_fallback = plan (откуда читаем, если korr
+    пуст). Иначе deadline — единственная найденная колонка срока."""
+    headers = [h.strip().lower() for h in worksheet.row_values(1)]
+    col_map: Dict[str, int] = {}
+    for field, names in COLUMN_SYNONYMS.items():
+        for name in names:
+            key = name.strip().lower()
+            if key in headers:
+                col_map[field] = headers.index(key)
+                break
+    if "srok plan" in headers and "srok korr" in headers:
+        col_map["deadline"] = headers.index("srok korr")
+        col_map["deadline_fallback"] = headers.index("srok plan")
+    return col_map
+
+
+def field_val(row, col_map: Dict[str, int], field: str) -> str:
+    """Значение поля из строки по карте колонок. Для срока: korr, иначе plan."""
+    idx = col_map.get(field)
+    val = row[idx].strip() if idx is not None and len(row) > idx else ""
+    if field == "deadline" and not val:
+        alt = col_map.get("deadline_fallback")
+        if alt is not None and len(row) > alt:
+            val = row[alt].strip()
+    return val
+
+
+def check_required_fields(col_map: Dict[str, int]) -> Optional[str]:
+    """Сообщение об ошибке, если обязательные колонки не найдены."""
+    missing = [FIELD_LABELS[f] for f in REQUIRED_FIELDS if f not in col_map]
+    if missing:
+        return ("❌ В реестре не найдены обязательные колонки: "
+                + ", ".join(missing)
+                + ". Проверьте заголовки первой строки.")
+    return None
+
+
+def deadline_write_col(col_map: Dict[str, int], for_update: bool) -> Optional[int]:
+    """Колонка (1-based) для записи срока: правка → korr, создание → plan."""
+    if for_update:
+        idx = col_map.get("deadline")
+    else:
+        idx = col_map.get("deadline_fallback", col_map.get("deadline"))
+    return idx + 1 if idx is not None else None
+
+
 def get_worksheet(client):
     """Получает лист с поручениями."""
     spreadsheet_id = get_active_registry()
-    
+
     if not spreadsheet_id:
         print("❌ Таблица не настроена. Запустите: python task_manager.py --init")
         sys.exit(1)
-    
+
     spreadsheet = client.open_by_key(spreadsheet_id)
     return spreadsheet.sheet1
 
-def get_next_id(worksheet) -> int:
+def get_next_id(worksheet, col_map: Dict[str, int]) -> int:
     """Получает следующий ID поручения."""
     values = worksheet.get_all_values()
     if len(values) <= 1:
         return 1
-    
+
+    id_idx = col_map.get("id", 0)
     ids = []
     for row in values[1:]:
-        if row and row[0].isdigit():
-            ids.append(int(row[0]))
-    
+        if len(row) > id_idx and row[id_idx].strip().isdigit():
+            ids.append(int(row[id_idx].strip()))
+
     return max(ids) + 1 if ids else 1
 
 def add_task(args):
     """Добавляет новое поручение."""
     client = get_gsheets_client()
     worksheet = get_worksheet(client)
-    
-    task_id = get_next_id(worksheet)
+    col_map = get_col_map(worksheet)
+    err = check_required_fields(col_map)
+    if err:
+        print(err)
+        return
+
+    task_id = get_next_id(worksheet, col_map)
     today = datetime.now(MSK).strftime("%d.%m.%Y")
-    
-    row = [
-        task_id,
-        today,
-        args.author,
-        args.project,
-        args.description,
-        args.assignee,
-        args.deadline,
-        args.status or "Новое",
-        "",
-        args.comment or ""
-    ]
-    
+
+    ncols = max(len(worksheet.row_values(1)), max(col_map.values()) + 1)
+    row = [""] * ncols
+
+    def put(field, value):
+        idx = col_map.get(field)
+        if idx is not None:
+            row[idx] = value
+
+    put("id", str(task_id))
+    put("created", today)
+    put("author", args.author)
+    put("contragent", args.contragent)
+    put("description", args.description)
+    put("assignee", args.assignee)
+    # Срок при создании — в плановую колонку (Srok plan, если есть)
+    dl_idx = col_map.get("deadline_fallback", col_map.get("deadline"))
+    if dl_idx is not None:
+        row[dl_idx] = args.deadline
+    put("status", args.status or "Новое")
+    put("closed", "")
+    put("comment", args.comment or "")
+
     worksheet.append_row(row)
-    
+
     print(f"Поручение #{task_id} добавлено")
-    print(f"   Контрагент: {args.project}")
+    print(f"   Контрагент: {args.contragent}")
     print(f"   Ответственный: {args.assignee}")
     print(f"   Срок: {args.deadline}")
-    print(f"   Статус: {row[7]}")
+    print(f"   Статус: {args.status or 'Новое'}")
 
 def list_tasks(args):
     """Выводит список поручений."""
     client = get_gsheets_client()
     worksheet = get_worksheet(client)
-    
+    col_map = get_col_map(worksheet)
+    err = check_required_fields(col_map)
+    if err:
+        print(err)
+        return
+
     values = worksheet.get_all_values()
-    
+
     if len(values) <= 1:
         print("📭 Реестр пуст")
         return
-    
-    headers = values[0]
+
     rows = values[1:]
-    
+
     # Фильтрация
     filtered = rows
-    
+
     if args.status:
         statuses = [s.strip() for s in args.status.split(',')]
-        filtered = [r for r in filtered if len(r) > 7 and r[7] in statuses]
-    
-    if args.project:
-        filtered = [r for r in filtered if len(r) > 3 and args.project.lower() in r[3].lower()]
-    
+        filtered = [r for r in filtered if field_val(r, col_map, "status") in statuses]
+
+    if args.contragent:
+        filtered = [r for r in filtered
+                    if args.contragent.lower() in field_val(r, col_map, "contragent").lower()]
+
     if args.assignee:
-        filtered = [r for r in filtered if len(r) > 5 and args.assignee.lower() in r[5].lower()]
-    
+        filtered = [r for r in filtered
+                    if args.assignee.lower() in field_val(r, col_map, "assignee").lower()]
+
     if not filtered:
         print("Поручения не найдены")
         return
 
     # Полный машиночитаемый вывод без обрезки (для бота)
     if getattr(args, 'json', False):
-        def cell(row, i):
-            return row[i] if len(row) > i else ""
         data = [{
-            "id": cell(r, 0),
-            "created": cell(r, 1),
-            "author": cell(r, 2),
-            "project": cell(r, 3),
-            "description": cell(r, 4),
-            "assignee": cell(r, 5),
-            "deadline": cell(r, 6),
-            "status": cell(r, 7),
-            "closed": cell(r, 8),
-            "comment": cell(r, 9),
+            "id": field_val(r, col_map, "id"),
+            "created": field_val(r, col_map, "created"),
+            "author": field_val(r, col_map, "author"),
+            "contragent": field_val(r, col_map, "contragent"),
+            "description": field_val(r, col_map, "description"),
+            "assignee": field_val(r, col_map, "assignee"),
+            "deadline": field_val(r, col_map, "deadline"),
+            "status": field_val(r, col_map, "status"),
+            "closed": field_val(r, col_map, "closed"),
+            "comment": field_val(r, col_map, "comment"),
         } for r in filtered]
         print(json.dumps(data, ensure_ascii=False))
         return
@@ -221,66 +314,83 @@ def list_tasks(args):
     print(f"\nНайдено поручений: {len(filtered)}\n")
     print(f"{'ID':<5} {'Статус':<12} {'Срок':<12} {'Контрагент':<20} {'Ответственный':<20} {'Описание'}")
     print("-" * 100)
-    
+
     for row in filtered:
-        task_id = row[0] if len(row) > 0 else "?"
-        status = row[7] if len(row) > 7 else "?"
-        deadline = row[6] if len(row) > 6 else "?"
-        project = row[3] if len(row) > 3 else "?"
-        assignee = row[5] if len(row) > 5 else "?"
-        desc = row[4] if len(row) > 4 else "?"
-        
+        task_id = field_val(row, col_map, "id") or "?"
+        status = field_val(row, col_map, "status") or "?"
+        deadline = field_val(row, col_map, "deadline") or "?"
+        contragent = field_val(row, col_map, "contragent") or "?"
+        assignee = field_val(row, col_map, "assignee") or "?"
+        desc = field_val(row, col_map, "description") or "?"
+
         # Обрезаем длинные строки
-        project = (project[:17] + '...') if len(project) > 20 else project
+        contragent = (contragent[:17] + '...') if len(contragent) > 20 else contragent
         assignee = (assignee[:17] + '...') if len(assignee) > 20 else assignee
         desc = (desc[:37] + '...') if len(desc) > 40 else desc
-        
-        print(f"{task_id:<5} {status:<12} {deadline:<12} {project:<20} {assignee:<20} {desc}")
+
+        print(f"{task_id:<5} {status:<12} {deadline:<12} {contragent:<20} {assignee:<20} {desc}")
 
 def update_task(args):
     """Обновляет поручение."""
     client = get_gsheets_client()
     worksheet = get_worksheet(client)
-    
+    col_map = get_col_map(worksheet)
+    err = check_required_fields(col_map)
+    if err:
+        print(err)
+        return
+
     values = worksheet.get_all_values()
-    
+
     row_idx = None
     for i, row in enumerate(values[1:], start=2):
-        if row and row[0] == str(args.id):
+        if field_val(row, col_map, "id") == str(args.id):
             row_idx = i
             break
-    
+
     if not row_idx:
         print(f"❌ Поручение #{args.id} не найдено")
         return
-    
+
+    def write(field, value, for_update=True):
+        if field == "deadline":
+            col = deadline_write_col(col_map, for_update)
+        else:
+            idx = col_map.get(field)
+            col = idx + 1 if idx is not None else None
+        if col:
+            worksheet.update_cell(row_idx, col, value)
+            return True
+        return False
+
     updates = []
-    
+
     if args.status:
-        worksheet.update_cell(row_idx, 8, args.status)
-        updates.append(f"Статус → {args.status}")
-        
+        if write("status", args.status):
+            updates.append(f"Статус → {args.status}")
+
         # Если статус "Выполнено" или "Отменено", ставим дату закрытия
         if args.status in ["Выполнено", "Отменено"]:
             today = datetime.now(MSK).strftime("%d.%m.%Y")
-            worksheet.update_cell(row_idx, 9, today)
-            updates.append(f"Дата закрытия → {today}")
-    
+            if write("closed", today):
+                updates.append(f"Дата закрытия → {today}")
+
     if args.comment:
-        worksheet.update_cell(row_idx, 10, args.comment)
-        updates.append(f"Комментарий обновлён")
-    
+        if write("comment", args.comment):
+            updates.append(f"Комментарий обновлён")
+
     if args.deadline:
-        worksheet.update_cell(row_idx, 7, args.deadline)
-        updates.append(f"Срок → {args.deadline}")
+        # Правка срока — в колонку корректировки (Srok korr, если есть)
+        if write("deadline", args.deadline, for_update=True):
+            updates.append(f"Срок → {args.deadline}")
 
     if args.assignee:
-        worksheet.update_cell(row_idx, 6, args.assignee)
-        updates.append(f"Ответственный → {args.assignee}")
+        if write("assignee", args.assignee):
+            updates.append(f"Ответственный → {args.assignee}")
 
     if args.description:
-        worksheet.update_cell(row_idx, 5, args.description)
-        updates.append(f"Описание обновлено")
+        if write("description", args.description):
+            updates.append(f"Описание обновлено")
 
     if updates:
         print(f"✅ Поручение #{args.id} обновлено:")
@@ -293,12 +403,13 @@ def delete_task(args):
     """Удаляет поручение."""
     client = get_gsheets_client()
     worksheet = get_worksheet(client)
-    
+    col_map = get_col_map(worksheet)
+
     values = worksheet.get_all_values()
-    
+
     row_idx = None
     for i, row in enumerate(values[1:], start=2):
-        if row and row[0] == str(args.id):
+        if field_val(row, col_map, "id") == str(args.id):
             row_idx = i
             break
     
@@ -335,7 +446,7 @@ def format_assignee(name: str, mapping: Dict[str, str]) -> str:
     return html.escape(name)
 
 
-def generate_digest_advice(selected, today) -> Optional[str]:
+def generate_digest_advice(selected, today, col_map) -> Optional[str]:
     """Короткое наблюдение/совет по дайджесту через Kimi API.
     При любой ошибке возвращает None — дайджест уходит без совета."""
     kimi_config = os.path.join(CREDS_DIR, 'kimi.json')
@@ -354,17 +465,20 @@ def generate_digest_advice(selected, today) -> Optional[str]:
     for d, row in selected:
         days_over = (today.date() - d).days
         task_lines.append(
-            f"#{row[0]}; проект={row[3] if len(row) > 3 else ''}; "
-            f"ответственный={row[5]}; срок={d.strftime('%d.%m.%Y')}; "
-            f"статус={row[7]}; просрочка_дней={days_over}; "
-            f"описание={row[4][:80]}"
+            f"#{field_val(row, col_map, 'id')}; "
+            f"контрагент={field_val(row, col_map, 'contragent')}; "
+            f"ответственный={field_val(row, col_map, 'assignee')}; "
+            f"срок={d.strftime('%d.%m.%Y')}; "
+            f"статус={field_val(row, col_map, 'status')}; "
+            f"просрочка_дней={days_over}; "
+            f"описание={field_val(row, col_map, 'description')[:80]}"
         )
     prompt = (
         "Ты — PMO-ассистент. Ниже открытые поручения из утреннего дайджеста "
         f"(сегодня {today.strftime('%d.%m.%Y')}):\n" + "\n".join(task_lines) +
         "\n\nДай ОДНО короткое наблюдение или совет для руководителя "
         "(1-2 предложения, до 250 символов): концентрация просрочек на человеке "
-        "или проекте, перегруз исполнителя, ближайшие дедлайны. Пиши по-русски, "
+        "или контрагенте, перегруз исполнителя, ближайшие дедлайны. Пиши по-русски, "
         "конкретно, опираясь на цифры из списка. Начни с подходящего эмодзи "
         "(⚠️ если есть проблема, 💡 если совет, ✅ если всё под контролем). "
         "Верни только текст наблюдения, без заголовков и пояснений."
@@ -402,6 +516,11 @@ def check_deadlines(args):
     от текущей даты, отсортированные по сроку (ранние выше)."""
     client = get_gsheets_client()
     worksheet = get_worksheet(client)
+    col_map = get_col_map(worksheet)
+    err = check_required_fields(col_map)
+    if err:
+        print(err)
+        return
 
     values = worksheet.get_all_values()
 
@@ -415,15 +534,13 @@ def check_deadlines(args):
     selected = []
 
     for i, row in enumerate(values[1:], start=2):
-        if len(row) < 8:
-            continue
-
-        status = row[7]
+        status = field_val(row, col_map, "status")
         if status in ["Выполнено", "Отменено"]:
             continue
 
+        deadline_str = field_val(row, col_map, "deadline")
         try:
-            deadline = datetime.strptime(row[6], "%d.%m.%Y")
+            deadline = datetime.strptime(deadline_str, "%d.%m.%Y")
         except (ValueError, IndexError):
             continue
 
@@ -432,7 +549,14 @@ def check_deadlines(args):
 
         # Помечаем просроченные в реестре (только если статус ещё не проставлен)
         if deadline.date() < today.date() and status != "Просрочено":
-            worksheet.update_cell(i, 8, "Просрочено")
+            status_col = col_map.get("status")
+            if status_col is not None:
+                try:
+                    worksheet.update_cell(i, status_col + 1, "Просрочено")
+                except Exception as e:
+                    # Нет прав на запись — дайджест всё равно должен уйти
+                    print(f"⚠️ Не удалось пометить просрочку (строка {i}): {e}",
+                          file=sys.stderr)
         selected.append((deadline.date(), row))
 
     if not selected:
@@ -448,10 +572,11 @@ def check_deadlines(args):
              f"Открытые со сроком до {horizon.strftime('%d.%m.%Y')}: "
              f"<b>{len(selected)}</b>\n"]
     for d, row in selected:
-        desc = html.escape(row[4])
+        desc = html.escape(field_val(row, col_map, "description"))
         if len(desc) > 100:
             desc = desc[:97] + "..."
-        assignee = format_assignee(row[5], user_mapping)
+        assignee = format_assignee(field_val(row, col_map, "assignee"),
+                                   user_mapping)
         days_over = (today.date() - d).days
         if days_over > 0:
             suffix = f"просрочено на {days_over} дн."
@@ -461,14 +586,14 @@ def check_deadlines(args):
             suffix = "завтра"
         else:
             suffix = f"через {-days_over} дн."
-        lines.append(f"  <b>#{row[0]}:</b> {assignee} — {desc}\n"
+        lines.append(f"  <b>#{field_val(row, col_map, 'id')}:</b> {assignee} — {desc}\n"
                      f"   📅 <b>{d.strftime('%d.%m.%Y')}</b> ({suffix})")
 
     full_message = "\n".join(lines)
 
     # LLM-наблюдение — только для плановой рассылки (флаг --advice)
     if getattr(args, 'advice', False):
-        advice = generate_digest_advice(selected, today)
+        advice = generate_digest_advice(selected, today, col_map)
         if advice:
             full_message += f"\n\n{html.escape(advice)}"
 
@@ -583,7 +708,7 @@ def main():
     # add
     add_parser = subparsers.add_parser('add', help='Добавить поручение')
     add_parser.add_argument('--author', required=True, help='Автор/источник')
-    add_parser.add_argument('--project', required=True, help='Проект')
+    add_parser.add_argument('--contragent', required=True, help='Контрагент')
     add_parser.add_argument('--description', required=True, help='Описание')
     add_parser.add_argument('--assignee', required=True, help='Ответственный')
     add_parser.add_argument('--deadline', required=True, help='Срок (ДД.ММ.ГГГГ)')
@@ -593,7 +718,7 @@ def main():
     # list
     list_parser = subparsers.add_parser('list', help='Список поручений')
     list_parser.add_argument('--status', help='Фильтр по статусу (через запятую)')
-    list_parser.add_argument('--project', help='Фильтр по проекту')
+    list_parser.add_argument('--contragent', help='Фильтр по контрагенту')
     list_parser.add_argument('--assignee', help='Фильтр по ответственному')
     list_parser.add_argument('--json', action='store_true',
                              help='Полный JSON-вывод без обрезки (для бота)')

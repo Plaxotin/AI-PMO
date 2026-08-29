@@ -269,17 +269,18 @@ def parse_canonical(text: str, today: Optional[date] = None) -> ParsedCommand:
             if "=" in part:
                 k, v = part.split("=", 1)
                 parts[k.strip().lower()] = v.strip()
-        project = parts.get("проект", "")
+        contragent = (parts.get("контрагент") or parts.get("компания")
+                      or parts.get("ка") or "")
         description = parts.get("описание", "")
         assignee = parts.get("ответственный", "")
         deadline_str = parts.get("срок", "")
-        if not project or not description or not assignee or not deadline_str:
+        if not contragent or not description or not assignee or not deadline_str:
             return ParsedCommand(ok=False, error="❌ Неполные данные для создания поручения.")
         date_str = normalize_date(deadline_str, today)
         if not date_str:
             return ParsedCommand(ok=False, error=f"❌ Не удалось распознать дату: {deadline_str}")
         return finish("create", {
-            "project": project,
+            "contragent": contragent,
             "description": description,
             "assignee": assignee,
             "deadline": date_str,

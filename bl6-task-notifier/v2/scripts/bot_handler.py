@@ -48,7 +48,7 @@ VERSIONS_DIR = os.path.join(SKILL_DIR, 'versions')
 BOT_USERNAME = "Plaxotin_task_bot"
 MSK = timezone(timedelta(hours=3))  # сервер в UTC, пользователи в МСК
 
-TASK_HEADERS = ["ID", "Дата создания", "Автор/Источник", "Проект", "Описание",
+TASK_HEADERS = ["ID", "Дата создания", "Автор/Источник", "Контрагент", "Описание",
                 "Ответственный", "Срок", "Статус", "Дата закрытия", "Комментарий"]
 
 try:
@@ -348,7 +348,7 @@ def get_all_tasks(force: bool = False) -> List[Dict]:
                     'id': parts[0],
                     'status': parts[1],
                     'deadline': parts[2],
-                    'project': parts[3],
+                    'contragent': parts[3],
                     'assignee': parts[4],
                     'description': parts[5] if len(parts) > 5 else ''
                 })
@@ -384,28 +384,38 @@ def save_user_mapping(mapping: Dict[str, str]):
 
 def update_task_fields_in_sheet(task_id: str, fields: Dict[str, str]) -> bool:
     """Обновляет поля задачи в Google Sheets.
-    fields: {'срок': '...', 'описание': '...', 'проект': '...'}
-    Возвращает True при успехе."""
+    fields: {'срок': '...', 'описание': '...', 'контрагент': '...'}
+    Колонки ищутся по заголовкам (порядок не важен). Возвращает True при успехе."""
+    # Синонимы — дубль COLUMN_SYNONYMS из task_manager.py, держать синхронно
+    field_headers = {
+        'срок': ["срок", "srok", "srok korr", "srok plan"],
+        'описание': ["описание", "opisanie"],
+        'контрагент': ["контрагент", "компания", "ка"],
+    }
     try:
         spreadsheet = _get_spreadsheet()
-        ws = spreadsheet.worksheet('Лист1')
+        ws = spreadsheet.sheet1
+        headers = [h.strip().lower() for h in ws.row_values(1)]
+
+        def find_col(names):
+            for n in names:
+                if n in headers:
+                    return headers.index(n) + 1  # 1-based
+            return None
+
         values = ws.get_all_values()
+        id_col = find_col(["id", "№"])
         row_idx = None
         for i, row in enumerate(values[1:], start=2):
-            if row and row[0] == str(task_id):
+            if id_col and len(row) >= id_col and row[id_col - 1].strip() == str(task_id):
                 row_idx = i
                 break
         if not row_idx:
             log(f"⚠️ Задача {task_id} не найдена в таблице")
             return False
 
-        col_map = {
-            'срок': 7,
-            'описание': 5,
-            'проект': 4,  # колонка "Контрагент"
-        }
         for field_name, value in fields.items():
-            col = col_map.get(field_name.lower())
+            col = find_col(field_headers.get(field_name.lower(), []))
             if col:
                 ws.update_cell(row_idx, col, value)
                 log(f"📝 Обновлено: задача {task_id}, {field_name} = {value}")
@@ -520,7 +530,7 @@ def find_recent_duplicate(project: str, description: str, minutes: int = 10) -> 
         if ts < cutoff:
             break
         parts = dict(p.split("=", 1) for p in (row[4] or "").split(" | ") if "=" in p)
-        if (parts.get("Проект", "").strip().lower() == project.strip().lower()
+        if (parts.get("Контрагент", parts.get("Проект", "")).strip().lower() == project.strip().lower()
                 and parts.get("Описание", "").strip().lower() == description.strip().lower()):
             return row
     return None
@@ -641,7 +651,7 @@ def format_task_list(tasks: List[Dict], title: str) -> str:
             f"<b>#{task.get('id', '?')}</b> {status_emoji} <b>{task.get('status', '?')}</b>  "
             f"📅 {task.get('deadline', '?')}\n"
             f"   📝 {html.escape(task.get('description', ''))}\n"
-            f"   📁 {html.escape(task.get('project') or 'Без проекта')}  "
+            f"   📁 {html.escape(task.get('contragent') or 'Без контрагента')}  "
             f"👤 {html.escape(task.get('assignee', '?'))}  "
             f"📣 {html.escape(task.get('author') or '?')}\n"
         )
@@ -693,7 +703,7 @@ def build_my_tasks_view(username: str, user_id=None) -> Tuple[str, Optional[Dict
             f"<b>#{t.get('id', '?')}</b> {status_emoji} <b>{t.get('status', '?')}</b>  "
             f"📅 {t.get('deadline', '?')}\n"
             f"📝 {html.escape(t.get('description', ''))}\n"
-            f"📁 {html.escape(t.get('project') or 'Без проекта')}  "
+            f"📁 {html.escape(t.get('contragent') or 'Без контрагента')}  "
             f"📣 {html.escape(t.get('author') or '?')}"
         )
     text = with_footer(
@@ -783,8 +793,8 @@ def cmd_list_all() -> str:
 
 def cmd_list_project(project: str) -> str:
     filtered = [t for t in get_all_tasks()
-                if project.lower() in t.get('project', '').lower()]
-    return with_footer(format_task_list(filtered, f"📋 Поручения проекта «{project}»"))
+                if project.lower() in t.get('contragent', '').lower()]
+    return with_footer(format_task_list(filtered, f"📋 Поручения контрагента «{project}»"))
 
 
 def cmd_list_status(status: str) -> str:
@@ -803,7 +813,7 @@ def cmd_close_task(task_id: int, username: str, user_id=None) -> str:
 def cmd_create_preview(args: Dict, username: str) -> str:
     return with_footer(
         "📝 <b>Проверьте новое поручение:</b>\n\n"
-        f"   📁 Проект: {html.escape(args['project'])}\n"
+        f"   📁 Контрагент: {html.escape(args['contragent'])}\n"
         f"   📝 Описание: {html.escape(args['description'])}\n"
         f"   👤 Ответственный: {html.escape(args['assignee'])}\n"
         f"   📅 Срок: <b>{args['deadline']}</b>\n"
@@ -817,7 +827,7 @@ def cmd_create_execute(args: Dict, username: str, first_name: str) -> str:
     success, output = run_task_manager(
         'add',
         '--author', author,
-        '--project', args['project'],
+        '--contragent', args['contragent'],
         '--description', args['description'],
         '--assignee', args['assignee'],
         '--deadline', args['deadline'],
@@ -830,12 +840,12 @@ def cmd_create_execute(args: Dict, username: str, first_name: str) -> str:
             if token.startswith('#') and token[1:].isdigit():
                 new_id = token[1:]
         audit("create", new_id or "?",
-              f"Проект={args['project']} | Описание={args['description']} | "
+              f"Контрагент={args['contragent']} | Описание={args['description']} | "
               f"Ответственный={args['assignee']} | Срок={args['deadline']}",
               username)
         return with_footer(
             f"✅ Поручение <b>#{new_id or '?'}</b> создано!\n\n"
-            f"   📁 {html.escape(args['project'])}\n"
+            f"   📁 {html.escape(args['contragent'])}\n"
             f"   📝 {html.escape(args['description'])}\n"
             f"   👤 {html.escape(args['assignee'])}  📅 {args['deadline']}")
     return f"❌ Не удалось создать поручение.\n<code>{html.escape(output[:300])}</code>"
@@ -983,16 +993,35 @@ def cmd_connect_registry(title: str, url_or_id: str, username: str) -> str:
                 f"<code>{html.escape(_service_account_email())}</code>\n\n"
                 f"<code>{html.escape(str(e)[:150])}</code>")
 
-    # Проверяем заголовки по шаблону реестра
-    header_note = ""
+    # Проверяем чтение заголовков и наличие обязательных колонок
+    # (синонимы — дубль COLUMN_SYNONYMS из task_manager.py, держать синхронно)
+    synonyms = {
+        "ID": ["id", "№"],
+        "Описание": ["описание", "opisanie"],
+        "Ответственный": ["ответственный", "otvetstvenniy"],
+        "Срок": ["срок", "srok", "srok korr", "srok plan"],
+        "Статус": ["статус", "status"],
+    }
+    notes = ""
     try:
-        head = [h.strip() for h in spreadsheet.sheet1.row_values(1)[:10]]
-        if head != TASK_HEADERS:
-            header_note = ("⚠️ Заголовки отличаются от шаблона реестра. "
-                           "Бот работает по позициям колонок A–J — проверьте порядок.\n\n")
+        ws = spreadsheet.sheet1
+        head = [h.strip().lower() for h in ws.row_values(1)]
+        missing = [label for label, names in synonyms.items()
+                   if not any(n in head for n in names)]
+        if missing:
+            notes += ("⚠️ Не найдены обязательные колонки: "
+                      + ", ".join(missing) + ".\n\n")
     except Exception as e:
         return (f"❌ Таблица открылась, но не читается: "
                 f"<code>{html.escape(str(e)[:150])}</code>")
+
+    # Проверяем доступ на запись (перезаписываем A1 тем же значением)
+    try:
+        ws.update_acell('A1', ws.acell('A1').value or "")
+    except Exception:
+        notes += ("⚠️ Нет прав на запись — бот сможет только читать реестр. "
+                  "Выдайте сервисному аккаунту права «Редактор»:\n"
+                  f"<code>{html.escape(_service_account_email())}</code>\n\n")
 
     for r in registries:
         r['active'] = False
@@ -1005,7 +1034,7 @@ def cmd_connect_registry(title: str, url_or_id: str, username: str) -> str:
     log(f"Подключён существующий реестр «{title}»: {sid}")
 
     return (f"✅ Реестр «<b>{html.escape(title)}</b>» подключён и активен!\n\n"
-            f"{header_note}"
+            f"{notes}"
             f"📋 https://docs.google.com/spreadsheets/d/{sid}/edit")
 
 
@@ -1107,11 +1136,11 @@ def dispatch(cmd: "commands.ParsedCommand", username: str, first_name: str,
         return cmd_close_task(args["id"], username, user_id)
 
     if name == "create":
-        dup = find_recent_duplicate(args["project"], args["description"])
+        dup = find_recent_duplicate(args["contragent"], args["description"])
         if dup:
             return (f"⚠️ Похоже, такое поручение уже создавалось недавно "
                     f"(#{dup[3]}, {dup[0]}, {dup[1]}).\n"
-                    f"Проект и описание совпадают — дубль не создаю. "
+                    f"Контрагент и описание совпадают — дубль не создаю. "
                     f"Если это другое поручение, измените описание.")
         _set_user_state(key, "confirm_create", args)
         return cmd_create_preview(args, username)
@@ -1174,7 +1203,7 @@ def run_registry_audit(chat_id, key, username: str):
         assignees_raw = task.get('assignee', '')
         deadline = task.get('deadline', '').strip()
         description = task.get('description', '').strip()
-        project = task.get('project', '').strip()
+        project = task.get('contragent', '').strip()
 
         # --- незамапленные ---
         if assignees_raw:
@@ -1191,7 +1220,7 @@ def run_registry_audit(chat_id, key, username: str):
         if not description:
             empty.append("описание")
         if not project:
-            empty.append("проект")
+            empty.append("контрагент")
         if empty:
             issues["empty_fields"].append({"id": tid, "fields": empty, "desc": description[:40]})
 
