@@ -1206,10 +1206,12 @@ def run_registry_audit(chat_id, key, username: str):
         project = task.get('contragent', '').strip()
 
         # --- незамапленные ---
+        # Считаем замапленным, если имя содержит любой ключ user_mapping
+        # (как в дайджесте: «Денис» покрывает «Денис Ц.»)
         if assignees_raw:
             for name in assignees_raw.split(','):
                 name = name.strip()
-                if name and name not in mapping:
+                if name and not any(k and k.lower() in name.lower() for k in mapping):
                     if name not in unmapped_map:
                         unmapped_map[name] = {"task_id": tid, "description": description[:60]}
 

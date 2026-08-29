@@ -446,7 +446,7 @@ def format_assignee(name: str, mapping: Dict[str, str]) -> str:
     return html.escape(name)
 
 
-def generate_digest_advice(selected, today, col_map) -> Optional[str]:
+def generate_digest_advice(selected, today, col_map, no_deadline=None) -> Optional[str]:
     """Короткое наблюдение/совет по дайджесту через Kimi API.
     При любой ошибке возвращает None — дайджест уходит без совета."""
     kimi_config = os.path.join(CREDS_DIR, 'kimi.json')
@@ -473,12 +473,21 @@ def generate_digest_advice(selected, today, col_map) -> Optional[str]:
             f"просрочка_дней={days_over}; "
             f"описание={field_val(row, col_map, 'description')[:80]}"
         )
+    for row in (no_deadline or []):
+        task_lines.append(
+            f"#{field_val(row, col_map, 'id')}; "
+            f"контрагент={field_val(row, col_map, 'contragent')}; "
+            f"ответственный={field_val(row, col_map, 'assignee')}; "
+            f"срок=НЕ ЗАДАН; статус={field_val(row, col_map, 'status')}; "
+            f"описание={field_val(row, col_map, 'description')[:80]}"
+        )
     prompt = (
         "Ты — PMO-ассистент. Ниже открытые поручения из утреннего дайджеста "
         f"(сегодня {today.strftime('%d.%m.%Y')}):\n" + "\n".join(task_lines) +
         "\n\nДай ОДНО короткое наблюдение или совет для руководителя "
         "(1-2 предложения, до 250 символов): концентрация просрочек на человеке "
-        "или контрагенте, перегруз исполнителя, ближайшие дедлайны. Пиши по-русски, "
+        "или контрагенте, перегруз исполнителя, ближайшие дедлайны, поручения "
+        "без срока. Пиши по-русски, "
         "конкретно, опираясь на цифры из списка. Начни с подходящего эмодзи "
         "(⚠️ если есть проблема, 💡 если совет, ✅ если всё под контролем). "
         "Верни только текст наблюдения, без заголовков и пояснений."
@@ -532,6 +541,7 @@ def check_deadlines(args):
     horizon = (today + timedelta(days=14)).date()
 
     selected = []
+    no_deadline = []
 
     for i, row in enumerate(values[1:], start=2):
         status = field_val(row, col_map, "status")
@@ -542,6 +552,12 @@ def check_deadlines(args):
         try:
             deadline = datetime.strptime(deadline_str, "%d.%m.%Y")
         except (ValueError, IndexError):
+            # Открытое поручение без срока — отдельный блок дайджеста.
+            # Пустые строки (только ID, без описания и ответственного) пропускаем.
+            if (field_val(row, col_map, "id")
+                    and (field_val(row, col_map, "description")
+                         or field_val(row, col_map, "assignee"))):
+                no_deadline.append(row)
             continue
 
         if deadline.date() > horizon:
@@ -559,7 +575,7 @@ def check_deadlines(args):
                           file=sys.stderr)
         selected.append((deadline.date(), row))
 
-    if not selected:
+    if not selected and not no_deadline:
         print(f"Открытых поручений со сроком до {horizon.strftime('%d.%m.%Y')} нет")
         return
 
@@ -589,11 +605,22 @@ def check_deadlines(args):
         lines.append(f"  <b>#{field_val(row, col_map, 'id')}:</b> {assignee} — {desc}\n"
                      f"   📅 <b>{d.strftime('%d.%m.%Y')}</b> ({suffix})")
 
+    if no_deadline:
+        lines.append(f"\n⚠️ <b>Без срока: {len(no_deadline)} шт.</b>")
+        for row in no_deadline:
+            desc = html.escape(field_val(row, col_map, "description"))
+            if len(desc) > 100:
+                desc = desc[:97] + "..."
+            assignee_nd = format_assignee(field_val(row, col_map, "assignee"),
+                                          user_mapping)
+            lines.append(f"  <b>#{field_val(row, col_map, 'id')}:</b> "
+                         f"{assignee_nd} — {desc}")
+
     full_message = "\n".join(lines)
 
     # LLM-наблюдение — только для плановой рассылки (флаг --advice)
     if getattr(args, 'advice', False):
-        advice = generate_digest_advice(selected, today, col_map)
+        advice = generate_digest_advice(selected, today, col_map, no_deadline)
         if advice:
             full_message += f"\n\n{html.escape(advice)}"
 
