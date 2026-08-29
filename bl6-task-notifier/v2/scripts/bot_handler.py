@@ -947,6 +947,68 @@ def cmd_switch_registry(name: str, username: str) -> str:
     return f"❌ Реестр «<b>{html.escape(name)}</b>» не найден."
 
 
+def _service_account_email() -> str:
+    try:
+        with open(os.path.join(CREDS_DIR, 'gsheets-service-account.json'),
+                  'r', encoding='utf-8') as f:
+            return json.load(f).get('client_email', '')
+    except Exception:
+        return ''
+
+
+def cmd_connect_registry(title: str, url_or_id: str, username: str) -> str:
+    """Подключает существующую Google-таблицу как реестр и делает активной."""
+    m = re.search(r"/d/([a-zA-Z0-9_-]{20,})", url_or_id)
+    sid = m.group(1) if m else url_or_id.strip()
+    if not re.fullmatch(r"[a-zA-Z0-9_-]{20,}", sid):
+        return ("❌ Не удалось распознать ID таблицы. Пришлите ссылку вида:\n"
+                "<code>https://docs.google.com/spreadsheets/d/&lt;ID&gt;/edit</code>")
+
+    cfg = load_config()
+    registries = cfg.setdefault('registries', [])
+    for r in registries:
+        if r.get('id') == sid:
+            return (f"ℹ️ Эта таблица уже подключена как реестр "
+                    f"«<b>{html.escape(r.get('name', ''))}</b>».")
+    if any(r.get('name') == title for r in registries):
+        return (f"❌ Реестр с названием «<b>{html.escape(title)}</b>» уже есть. "
+                f"Выберите другое название.")
+
+    try:
+        client = _gsheets_client()
+        spreadsheet = client.open_by_key(sid)
+    except Exception as e:
+        return (f"❌ Нет доступа к таблице. Откройте доступ (редактор) "
+                f"сервисному аккаунту и повторите:\n"
+                f"<code>{html.escape(_service_account_email())}</code>\n\n"
+                f"<code>{html.escape(str(e)[:150])}</code>")
+
+    # Проверяем заголовки по шаблону реестра
+    header_note = ""
+    try:
+        head = [h.strip() for h in spreadsheet.sheet1.row_values(1)[:10]]
+        if head != TASK_HEADERS:
+            header_note = ("⚠️ Заголовки отличаются от шаблона реестра. "
+                           "Бот работает по позициям колонок A–J — проверьте порядок.\n\n")
+    except Exception as e:
+        return (f"❌ Таблица открылась, но не читается: "
+                f"<code>{html.escape(str(e)[:150])}</code>")
+
+    for r in registries:
+        r['active'] = False
+    registries.append({'id': sid, 'name': title, 'active': True})
+    cfg['spreadsheet_id'] = sid
+    save_config(cfg)
+    invalidate_cache()
+
+    audit("connect_registry", "-", f"Подключён реестр «{title}» (id {sid})", username)
+    log(f"Подключён существующий реестр «{title}»: {sid}")
+
+    return (f"✅ Реестр «<b>{html.escape(title)}</b>» подключён и активен!\n\n"
+            f"{header_note}"
+            f"📋 https://docs.google.com/spreadsheets/d/{sid}/edit")
+
+
 # ======== ВЕЧЕРНИЙ ДАЙДЖЕСТ ========
 
 def build_evening_digest() -> Optional[str]:
@@ -955,7 +1017,8 @@ def build_evening_digest() -> Optional[str]:
     if not entries:
         return None
     action_emoji = {"create": "➕", "close": "✅", "update": "✏️", "delete": "🗑",
-                    "new_registry": "🆕", "switch_registry": "🔄", "feedback": "💡"}
+                    "new_registry": "🆕", "switch_registry": "🔄", "feedback": "💡",
+                    "connect_registry": "🔗"}
     lines = [f"📊 <b>Изменения реестра за {today}</b> ({len(entries)})\n"]
     for row in entries:
         row = list(row) + [""] * (5 - len(row))
@@ -1087,6 +1150,8 @@ def dispatch(cmd: "commands.ParsedCommand", username: str, first_name: str,
         return cmd_new_registry(args["title"], username)
     if name == "switch_registry":
         return cmd_switch_registry(args["name"], username)
+    if name == "connect_registry":
+        return cmd_connect_registry(args["title"], args["url"], username)
 
     return "🤔 Не понял команду."
 

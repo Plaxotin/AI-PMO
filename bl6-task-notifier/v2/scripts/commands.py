@@ -211,6 +211,13 @@ def parse_canonical(text: str, today: Optional[date] = None) -> ParsedCommand:
     if low == "дайджест":
         return finish("digest", {})
 
+    # --- подключить реестр ---
+    m = re.match(r"^подключить\s+реестр\s+(.+?)\s+(https?://\S+|[A-Za-z0-9_-]{20,})$",
+                 norm, flags=re.IGNORECASE)
+    if m:
+        return finish("connect_registry",
+                      {"title": m.group(1).strip(), "url": m.group(2).strip()})
+
     # --- новый реестр ---
     m = re.match(r"^новый\s+реестр\s+(.+)$", norm, flags=re.IGNORECASE)
     if m:
