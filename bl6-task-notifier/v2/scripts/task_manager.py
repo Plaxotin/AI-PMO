@@ -634,42 +634,66 @@ def check_deadlines(args):
     # Отправляем в Telegram
     send_telegram(full_message)
 
+def _get_chat_title(token: str, chat_id) -> str:
+    """Название чата по chat_id (getChat). При ошибке — сам chat_id."""
+    try:
+        import requests
+        r = requests.get(f"https://api.telegram.org/bot{token}/getChat",
+                         params={'chat_id': chat_id}, timeout=10)
+        if r.status_code == 200:
+            res = r.json().get('result', {})
+            return res.get('title') or res.get('username') or str(chat_id)
+    except Exception:
+        pass
+    return str(chat_id)
+
+
 def send_telegram(message: str):
-    """Отправляет сообщение в Telegram, разбивая на части при необходимости."""
+    """Отправляет сообщение в Telegram, разбивая на части при необходимости.
+    Поддерживает несколько чатов: chat_ids (список) или chat_id (один)."""
     telegram_config = os.path.join(CREDS_DIR, 'telegram.json')
-    
+
     if not os.path.exists(telegram_config):
         print("\n⚠️  Telegram не настроен. Пропускаю отправку.")
         return
-    
+
     try:
         import requests
-        
+
         with open(telegram_config, 'r', encoding='utf-8') as f:
             config = json.load(f)
-        
+
+        chat_ids = config.get('chat_ids') or []
+        if not chat_ids and config.get('chat_id'):
+            chat_ids = [config['chat_id']]
+        if not chat_ids:
+            print("\n⚠️  В telegram.json не задан chat_id. Пропускаю отправку.")
+            return
+
         url = f"https://api.telegram.org/bot{config['bot_token']}/sendMessage"
-        
+
         # Разбиваем сообщение на части (лимит Telegram ~4096, берём 3800 с запасом)
         MAX_LEN = 3800
         parts = _split_message(message, MAX_LEN)
-        
-        for i, part in enumerate(parts):
-            payload = {
-                'chat_id': config['chat_id'],
-                'text': part,
-                'parse_mode': 'HTML',
-                'disable_web_page_preview': True
-            }
-            
-            response = requests.post(url, json=payload, timeout=30)
-            
-            if response.status_code == 200:
-                print(f"\nУведомление часть {i+1}/{len(parts)} отправлено в Telegram")
-            else:
-                print(f"\nОшибка отправки части {i+1} в Telegram: {response.status_code}")
-                print(f"Ответ: {response.text[:200]}")
-            
+
+        for chat_id in chat_ids:
+            title = _get_chat_title(config['bot_token'], chat_id)
+            for i, part in enumerate(parts):
+                payload = {
+                    'chat_id': chat_id,
+                    'text': part,
+                    'parse_mode': 'HTML',
+                    'disable_web_page_preview': True
+                }
+
+                response = requests.post(url, json=payload, timeout=30)
+
+                if response.status_code == 200:
+                    print(f"\nУведомление часть {i+1}/{len(parts)} отправлено в чат «{title}»")
+                else:
+                    print(f"\nОшибка отправки части {i+1} в чат «{title}»: {response.status_code}")
+                    print(f"Ответ: {response.text[:200]}")
+
     except ImportError:
         print("\nУстановите requests: pip install requests")
     except Exception as e:

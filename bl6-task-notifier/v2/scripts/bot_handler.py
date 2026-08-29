@@ -1600,7 +1600,8 @@ def process_updates(updates: List[Dict]):
             continue
 
         log(f"📩 msg @{message.get('from', {}).get('username', '?')} "
-            f"uid={message.get('from', {}).get('id')}: {text[:70]!r}")
+            f"uid={message.get('from', {}).get('id')} "
+            f"chat={message.get('chat', {}).get('id')}: {text[:70]!r}")
 
         chat = message.get('chat', {})
         chat_id = chat.get('id')
