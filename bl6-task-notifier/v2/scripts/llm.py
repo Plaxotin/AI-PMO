@@ -19,8 +19,9 @@ CREDS_DIR = os.path.join(SCRIPT_DIR, '..', '.credentials')
 KIMI_CONFIG = os.path.join(CREDS_DIR, 'kimi.json')
 
 TIMEOUT = 60
-MAX_TOKENS = 1000
-TEMPERATURE = 0.1
+# kimi-k2.x — «думающие» модели: reasoning тоже расходует max_tokens,
+# поэтому запас должен покрывать и размышления, и ответ.
+MAX_TOKENS = 4000
 
 SYSTEM_PROMPT = """Ты — транслятор просьб в команды Telegram-бота реестра поручений.
 
@@ -132,12 +133,12 @@ def interpret_free_text(text: str, today_str: str, cfg: dict, username: str = ""
             active_registry = r.get('name', 'Реестр')
             break
     payload = {
-        "model": cfg_kimi.get('model', 'moonshot-v1-8k'),
+        "model": cfg_kimi.get('model', 'kimi-k2.6'),
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT.format(today=today_str, registries=registries_text, active_registry=active_registry, username=username)},
             {"role": "user", "content": text},
         ],
-        "temperature": TEMPERATURE,
+        # temperature не передаём: kimi-k2.x принимает только temperature=1
         "max_tokens": MAX_TOKENS,
     }
     try:

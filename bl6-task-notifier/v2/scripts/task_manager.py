@@ -493,10 +493,12 @@ def generate_digest_advice(selected, today, col_map, no_deadline=None) -> Option
         "Верни только текст наблюдения, без заголовков и пояснений."
     )
     payload = {
-        "model": cfg.get('model', 'moonshot-v1-8k'),
+        "model": cfg.get('model', 'kimi-k2.6'),
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.3,
-        "max_tokens": 200,
+        # temperature не передаём: kimi-k2.x принимает только temperature=1.
+        # max_tokens с большим запасом: reasoning этих моделей тоже ест лимит
+        # (на 20+ поручениях reasoning ~1800 токенов).
+        "max_tokens": 8000,
     }
     try:
         base_url = cfg.get('base_url', 'https://api.moonshot.ai/v1').rstrip('/')
@@ -505,7 +507,7 @@ def generate_digest_advice(selected, today, col_map, no_deadline=None) -> Option
             headers={"Authorization": f"Bearer {cfg['api_key']}",
                      "Content-Type": "application/json"},
             json=payload,
-            timeout=30,
+            timeout=120,
         )
         if resp.status_code != 200:
             print(f"⚠️ Kimi API вернул {resp.status_code}, дайджест без совета",
