@@ -421,6 +421,15 @@ def save_user_mapping(mapping: Dict[str, str]):
         log(f"⚠️ Ошибка сохранения user_mapping: {e}")
 
 
+def normalize_login(login: str) -> str:
+    """Логин к каноническому виду: @username или id:<uid>.
+    Пользователь может ввести логин без @ — добавляем."""
+    lg = (login or "").strip()
+    if lg and not lg.startswith('@') and not lg.startswith('id:'):
+        lg = '@' + lg
+    return lg
+
+
 def update_task_fields_in_sheet(task_id: str, fields: Dict[str, str]) -> bool:
     """Обновляет поля задачи в Google Sheets.
     fields: {'срок': '...', 'описание': '...', 'контрагент': '...'}
@@ -1581,7 +1590,7 @@ def process_callback(callback: Dict):
             if contacts_auto:
                 mapping = load_user_mapping()
                 for it in contacts_auto:
-                    mapping[it["name"]] = it["login"]
+                    mapping[it["name"]] = normalize_login(it["login"])
                 save_user_mapping(mapping)
                 send_message(chat_id, (
                     f"📇 <b>Автоматически смэпплено из «Контактов»:</b> {len(contacts_auto)}\n"
@@ -1951,7 +1960,7 @@ def process_updates(updates: List[Dict]):
                     if data.get("type") == "mapping":
                         mapping = load_user_mapping()
                         for name, login in data["collected"].items():
-                            mapping[name] = login
+                            mapping[name] = normalize_login(login)
                         save_user_mapping(mapping)
                         response = "✅ Привязки сохранены."
                         # Автопереход к следующему этапу
