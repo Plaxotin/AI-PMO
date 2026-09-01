@@ -522,9 +522,24 @@ def generate_digest_advice(selected, today, col_map, no_deadline=None) -> Option
         return None
 
 
+def scheduled_digest_enabled() -> bool:
+    """Флаг плановых дайджестов в telegram.json (по умолчанию включены).
+    Управляется из бота: кнопка «Авто-дайджесты» в меню рассылки."""
+    try:
+        with open(os.path.join(CREDS_DIR, 'telegram.json'), 'r', encoding='utf-8') as f:
+            return bool(json.load(f).get('digest_schedule_enabled', True))
+    except Exception:
+        return True
+
+
 def check_deadlines(args):
     """Дайджест: все открытые поручения со сроком не позднее 14 дней
     от текущей даты, отсортированные по сроку (ранние выше)."""
+    # Плановый запуск (флаг --advice ставит только systemd-таймер) —
+    # админ мог отключить рассылку из бота.
+    if getattr(args, 'advice', False) and not scheduled_digest_enabled():
+        print("⏸ Плановый дайджест отключён администратором, пропускаю отправку")
+        return
     client = get_gsheets_client()
     worksheet = get_worksheet(client)
     col_map = get_col_map(worksheet)

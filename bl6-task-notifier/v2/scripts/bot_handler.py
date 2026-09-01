@@ -235,8 +235,27 @@ def admin_mode_keyboard() -> Dict:
     return {"keyboard": [[{"text": "❌ Выйти"}]], "resize_keyboard": True}
 
 
+def scheduled_digest_enabled() -> bool:
+    """Флаг плановых дайджестов в telegram.json (по умолчанию включены)."""
+    try:
+        return bool(load_telegram_config().get('digest_schedule_enabled', True))
+    except Exception:
+        return True
+
+
+def toggle_scheduled_digest() -> bool:
+    """Переключает флаг плановых дайджестов, возвращает новое значение."""
+    cfg = load_telegram_config()
+    new_val = not bool(cfg.get('digest_schedule_enabled', True))
+    cfg['digest_schedule_enabled'] = new_val
+    with open(TELEGRAM_CONFIG, 'w', encoding='utf-8') as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+    return new_val
+
+
 def digest_chat_keyboard() -> Dict:
-    """Инлайн-клавиатура выбора чатов для рассылки дайджеста."""
+    """Инлайн-клавиатура выбора чатов для рассылки дайджеста
+    + переключатель плановых дайджестов."""
     cfg = load_telegram_config()
     chat_ids = cfg.get('chat_ids') or []
     if not chat_ids and cfg.get('chat_id'):
@@ -249,6 +268,9 @@ def digest_chat_keyboard() -> Dict:
         rows.append([{"text": f"📣 {title}", "callback_data": f"dg_chat:{cid}"}])
     rows.append([{"text": "📣 Во все чаты", "callback_data": "dg_chat:all"}])
     rows.append([{"text": "🙋 Только мне", "callback_data": "dg_chat:me"}])
+    auto = "✅ вкл" if scheduled_digest_enabled() else "⛔ выкл"
+    rows.append([{"text": f"⏰ Авто-дайджесты: {auto}",
+                  "callback_data": "dg_auto:toggle"}])
     return {"inline_keyboard": rows}
 
 
@@ -1093,6 +1115,10 @@ def digest_loop():
             if (t.strftime("%H:%M") == digest_time
                     and last_sent_date != t.strftime("%d.%m.%Y")):
                 last_sent_date = t.strftime("%d.%m.%Y")
+                if not scheduled_digest_enabled():
+                    log("Вечерний дайджест пропущен: плановые дайджесты отключены")
+                    time.sleep(30)
+                    continue
                 text = build_evening_digest()
                 if text:
                     chat_ids = get_admin_chat_ids(load_config())
@@ -1471,6 +1497,21 @@ def process_callback(callback: Dict):
         send_message(chat_id, "📊 <b>Куда разослать дайджест?</b>",
                      reply_markup=digest_chat_keyboard())
         answer_callback_query(callback_id)
+        return
+
+    if data == "dg_auto:toggle":
+        if role != "admin":
+            answer_callback_query(callback_id, text="❌ Только для администраторов.")
+            return
+        new_val = toggle_scheduled_digest()
+        state_txt = "✅ включены" if new_val else "⛔ выключены"
+        answer_callback_query(callback_id, text=f"⏰ Авто-дайджесты {state_txt}")
+        log(f"Плановые дайджесты {state_txt} (переключил @{username})")
+        send_message(chat_id,
+                     f"⏰ <b>Плановые дайджесты {state_txt}.</b>\n"
+                     f"(утренний пн–пт 9:17 и вечерний 20:47 МСК)\n\n"
+                     f"📊 Куда разослать дайджест?",
+                     reply_markup=digest_chat_keyboard())
         return
 
     if data.startswith("dg_chat:"):
