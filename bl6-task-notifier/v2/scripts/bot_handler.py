@@ -235,6 +235,23 @@ def admin_mode_keyboard() -> Dict:
     return {"keyboard": [[{"text": "❌ Выйти"}]], "resize_keyboard": True}
 
 
+def digest_chat_keyboard() -> Dict:
+    """Инлайн-клавиатура выбора чатов для рассылки дайджеста."""
+    cfg = load_telegram_config()
+    chat_ids = cfg.get('chat_ids') or []
+    if not chat_ids and cfg.get('chat_id'):
+        chat_ids = [cfg['chat_id']]
+    rows = []
+    for cid in chat_ids:
+        resp = tg_api('getChat', {'chat_id': cid}) or {}
+        res = resp.get('result') or {}
+        title = res.get('title') or res.get('username') or str(cid)
+        rows.append([{"text": f"📣 {title}", "callback_data": f"dg_chat:{cid}"}])
+    rows.append([{"text": "📣 Во все чаты", "callback_data": "dg_chat:all"}])
+    rows.append([{"text": "🙋 Только мне", "callback_data": "dg_chat:me"}])
+    return {"inline_keyboard": rows}
+
+
 def confirm_keyboard() -> Dict:
     return {"keyboard": [[{"text": "✅ Да"}, {"text": "❌ Нет"}]], "resize_keyboard": True}
 
@@ -877,10 +894,14 @@ def cmd_delete_execute(task_id: int, username: str) -> str:
     return f"❌ Не удалось удалить #{task_id}.\n<code>{html.escape(output[:200])}</code>"
 
 
-def cmd_digest() -> str:
+def cmd_digest(chats: str = None) -> str:
     """Рассылка активных поручений: check-deadlines (просрочено/сегодня/завтра).
-    task_manager сам шлёт дайджест в общий чат, сюда возвращает текст."""
-    success, output = run_task_manager('check-deadlines')
+    task_manager сам шлёт дайджест в общий чат, сюда возвращает текст.
+    chats — необязательный список chat_id через запятую (куда слать)."""
+    args = ['check-deadlines']
+    if chats:
+        args += ['--chats', chats]
+    success, output = run_task_manager(*args)
     return output.strip() if output.strip() else ("✅ Готово." if success else "❌ Ошибка check-deadlines")
 
 
@@ -1443,7 +1464,23 @@ def process_callback(callback: Dict):
         if role != "admin":
             answer_callback_query(callback_id, text="❌ Только для администраторов.")
             return
-        response = cmd_digest()
+        send_message(chat_id, "📊 <b>Куда разослать дайджест?</b>",
+                     reply_markup=digest_chat_keyboard())
+        answer_callback_query(callback_id)
+        return
+
+    if data.startswith("dg_chat:"):
+        if role != "admin":
+            answer_callback_query(callback_id, text="❌ Только для администраторов.")
+            return
+        target = data.split(":", 1)[1]
+        if target == "all":
+            response = cmd_digest()
+        elif target == "me":
+            # Личка админа: chat_id диалога с ботом
+            response = cmd_digest(chats=str(chat_id))
+        else:
+            response = cmd_digest(chats=target)
         send_message(chat_id, response)
         answer_callback_query(callback_id)
         return
@@ -1701,8 +1738,8 @@ def process_updates(updates: List[Dict]):
             continue
         if text_clean in ("📊 Отправить дайджест", "Отправить дайджест",
                           "📊 Дайджест", "Дайджест") and role == "admin":
-            response = cmd_digest()
-            send_message(chat_id, response)
+            send_message(chat_id, "📊 <b>Куда разослать дайджест?</b>",
+                         reply_markup=digest_chat_keyboard())
             continue
 
         if text_clean in ("🔍 Проверить реестр", "Проверить реестр",

@@ -633,8 +633,11 @@ def check_deadlines(args):
 
     print(full_message)
 
-    # Отправляем в Telegram
-    send_telegram(full_message)
+    # Отправляем в Telegram (--chats ограничивает получателей)
+    chats_override = None
+    if getattr(args, 'chats', None):
+        chats_override = [int(x) for x in str(args.chats).split(',') if x.strip()]
+    send_telegram(full_message, chat_ids=chats_override)
 
 def _get_chat_title(token: str, chat_id) -> str:
     """Название чата по chat_id (getChat). При ошибке — сам chat_id."""
@@ -650,9 +653,10 @@ def _get_chat_title(token: str, chat_id) -> str:
     return str(chat_id)
 
 
-def send_telegram(message: str):
+def send_telegram(message: str, chat_ids=None):
     """Отправляет сообщение в Telegram, разбивая на части при необходимости.
-    Поддерживает несколько чатов: chat_ids (список) или chat_id (один)."""
+    Поддерживает несколько чатов: chat_ids (список) или chat_id (один).
+    chat_ids — необязательный override получателей (иначе из telegram.json)."""
     telegram_config = os.path.join(CREDS_DIR, 'telegram.json')
 
     if not os.path.exists(telegram_config):
@@ -665,9 +669,10 @@ def send_telegram(message: str):
         with open(telegram_config, 'r', encoding='utf-8') as f:
             config = json.load(f)
 
-        chat_ids = config.get('chat_ids') or []
-        if not chat_ids and config.get('chat_id'):
-            chat_ids = [config['chat_id']]
+        if chat_ids is None:
+            chat_ids = config.get('chat_ids') or []
+            if not chat_ids and config.get('chat_id'):
+                chat_ids = [config['chat_id']]
         if not chat_ids:
             print("\n⚠️  В telegram.json не задан chat_id. Пропускаю отправку.")
             return
@@ -789,6 +794,8 @@ def main():
     check_parser = subparsers.add_parser('check-deadlines', help='Проверить сроки')
     check_parser.add_argument('--advice', action='store_true',
                               help='Добавить LLM-наблюдение (для плановой рассылки)')
+    check_parser.add_argument('--chats',
+                              help='chat_id получателей через запятую (по умолчанию — все из telegram.json)')
     
     # delete
     delete_parser = subparsers.add_parser('delete', help='Удалить поручение')
