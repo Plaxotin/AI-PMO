@@ -1297,6 +1297,57 @@ def run_registry_audit(chat_id, key, username: str):
 
 # ======== ОБРАБОТКА CALLBACK ========
 
+def _binding_prompt(item: Dict, n: int, total: int):
+    """Текст шага сбора логина + кнопка «Пропустить»
+    (на случай, если логина нет или админ его не знает)."""
+    kb = {"inline_keyboard": [
+        [{"text": "⏭ Пропустить", "callback_data": "skip_binding"}]
+    ]}
+    text = (
+        f"🔧 <b>Исправление привязок</b> ({n}/{total})\n\n"
+        f"Ответственный: <b>{html.escape(item['name'])}</b>\n"
+        f"Поручение <b>#{item['task_id']}</b>: {html.escape(item['description'])}\n\n"
+        f"Введите Telegram-логин:\n"
+        f"<code>@username</code>\n\n"
+        f"Если логина нет или он неизвестен — нажмите «Пропустить»."
+    )
+    return text, kb
+
+
+def _advance_collect_username(chat_id, key, data: Dict):
+    """Переход к следующему незамапленному ответственному
+    или, если все обработаны, к подтверждению собранных привязок."""
+    unmapped = data["unmapped"]
+    collected = data["collected"]
+    nxt = data["index"] + 1
+    if nxt < len(unmapped):
+        nxt_item = unmapped[nxt]
+        _set_user_state(key, "collect_username", {
+            "unmapped": unmapped,
+            "current": nxt_item["name"],
+            "index": nxt,
+            "collected": collected,
+            "next_empty_fields": data.get("next_empty_fields", []),
+            "next_spelling": data.get("next_spelling", [])
+        })
+        text, kb = _binding_prompt(nxt_item, nxt + 1, len(unmapped))
+        send_message(chat_id, text, reply_markup=kb)
+    else:
+        lines = ["📋 <b>Собранные привязки:</b>\n"]
+        if collected:
+            for name, login in collected.items():
+                lines.append(f"• {html.escape(name)} → @{html.escape(login)}")
+        else:
+            lines.append("• (все пропущены)")
+        lines.append("\nВнести в реестр? Напишите <b>да</b> (60 сек), любой другой текст — отмена.")
+        _set_user_state(key, "confirm_registry_fix", {
+            "collected": collected,
+            "type": "mapping",
+            "next_empty_fields": data.get("next_empty_fields", []),
+            "next_spelling": data.get("next_spelling", [])
+        })
+        send_message(chat_id, "\n".join(lines))
+
 _processed_callbacks = set()
 _MAX_CALLBACK_CACHE = 1000
 
@@ -1457,13 +1508,8 @@ def process_callback(callback: Dict):
                     "next_empty_fields": empty_fields,
                     "next_spelling": issues.get("spelling", [])
                 })
-                send_message(chat_id, (
-                    f"🔧 <b>Исправление привязок</b> ({1}/{len(unmapped)})\n\n"
-                    f"Ответственный: <b>{html.escape(first['name'])}</b>\n"
-                    f"Поручение <b>#{first['task_id']}</b>: {html.escape(first['description'])}\n\n"
-                    f"Введите Telegram-логин:\n"
-                    f"<code>@username</code>"
-                ))
+                text, kb = _binding_prompt(first, 1, len(unmapped))
+                send_message(chat_id, text, reply_markup=kb)
             # 3. Иначе если есть пустые поля — переходим к ним
             elif empty_fields:
                 _set_user_state(key, "fix_empty_fields", {
@@ -1503,6 +1549,13 @@ def process_callback(callback: Dict):
     if data == "skip_registry":
         _clear_user_state(key)
         send_message(chat_id, "⏭ Проверка пропущена. Режим администратора не активирован.")
+        answer_callback_query(callback_id)
+        return
+
+    if data == "skip_binding":
+        state = _get_user_state(key)
+        if state and state.get("state") == "collect_username":
+            _advance_collect_username(chat_id, key, state["data"])
         answer_callback_query(callback_id)
         return
 
@@ -1709,43 +1762,10 @@ def process_updates(updates: List[Dict]):
         state = _get_user_state(key)
         if state and state.get("state") == "collect_username":
             data = state["data"]
-            current_name = data["current"]
-            index = data["index"]
-            unmapped = data["unmapped"]
-            collected = data["collected"]
             tg_login = text.strip().lstrip('@')
             if tg_login:
-                collected[current_name] = tg_login
-            nxt = index + 1
-            if nxt < len(unmapped):
-                nxt_item = unmapped[nxt]
-                _set_user_state(key, "collect_username", {
-                    "unmapped": unmapped,
-                    "current": nxt_item["name"],
-                    "index": nxt,
-                    "collected": collected
-                })
-                send_message(chat_id, (
-                    f"🔧 <b>Исправление привязок</b> ({nxt+1}/{len(unmapped)})\n\n"
-                    f"Ответственный: <b>{html.escape(nxt_item['name'])}</b>\n"
-                    f"Поручение <b>#{nxt_item['task_id']}</b>: {html.escape(nxt_item['description'])}\n\n"
-                    f"Введите Telegram-логин:\n"
-                    f"<code>@username</code>"
-                ))
-            else:
-                lines = ["📋 <b>Собранные привязки:</b>\n"]
-                for name, login in collected.items():
-                    lines.append(f"• {html.escape(name)} → @{html.escape(login)}")
-                lines.append("\nВнести в реестр? Напишите <b>да</b> (60 сек), любой другой текст — отмена.")
-                next_empty = data.get("next_empty_fields", [])
-                next_spell = data.get("next_spelling", [])
-                _set_user_state(key, "confirm_registry_fix", {
-                    "collected": collected,
-                    "type": "mapping",
-                    "next_empty_fields": next_empty,
-                    "next_spelling": next_spell
-                })
-                send_message(chat_id, "\n".join(lines))
+                data["collected"][data["current"]] = tg_login
+            _advance_collect_username(chat_id, key, data)
             continue
 
         # --- исправление пустых полей ---
