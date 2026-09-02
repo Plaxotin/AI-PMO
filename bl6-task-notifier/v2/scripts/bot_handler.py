@@ -430,6 +430,22 @@ def normalize_login(login: str) -> str:
     return lg
 
 
+def _normalize_fix_value(field_name: str, value: str) -> str:
+    """Добивка года для поля «срок»: 02.09 → 02.09.2026, 02.09.26 → 02.09.2026."""
+    if field_name.lower() != 'срок':
+        return value
+    v = value.strip()
+    for fmt in ("%d.%m.%Y", "%d.%m.%y", "%d.%m"):
+        try:
+            dt = datetime.strptime(v, fmt)
+            if fmt == "%d.%m":
+                dt = dt.replace(year=now_msk().year)
+            return dt.strftime("%d.%m.%Y")
+        except ValueError:
+            continue
+    return value
+
+
 def update_task_fields_in_sheet(task_id: str, fields: Dict[str, str]) -> bool:
     """Обновляет поля задачи в Google Sheets.
     fields: {'срок': '...', 'описание': '...', 'контрагент': '...'}
@@ -1355,6 +1371,21 @@ def run_registry_audit(chat_id, key, username: str):
 
 # ======== ОБРАБОТКА CALLBACK ========
 
+_FIELD_EXAMPLES = {'срок': '05.09.2026', 'описание': 'Текст задачи',
+                   'контрагент': 'Компания'}
+
+
+def _empty_fields_prompt(item: Dict, n: int, total: int) -> str:
+    """Текст шага исправления пустых полей с примером ввода."""
+    example = ', '.join(_FIELD_EXAMPLES.get(f, 'значение') for f in item['fields'])
+    return (
+        f"📝 <b>Исправление пустых полей</b> ({n}/{total})\n\n"
+        f"Задача <b>ID {item['id']}</b>\n"
+        f"Пустые поля: {', '.join(item['fields'])}\n\n"
+        f"Введите значения через запятую в том же порядке, например:\n"
+        f"<code>{example}</code>"
+    )
+
 def _binding_prompt(item: Dict, n: int, total: int):
     """Текст шага сбора логина + кнопка «Пропустить»
     (на случай, если логина нет или админ его не знает)."""
@@ -1619,12 +1650,7 @@ def process_callback(callback: Dict):
                     "next_spelling": issues.get("spelling", [])
                 })
                 first = empty_fields[0]
-                send_message(chat_id, (
-                    f"📝 <b>Исправление пустых полей</b> ({1}/{len(empty_fields)})\n\n"
-                    f"Задача <b>ID {first['id']}</b>\n"
-                    f"Пустые поля: {', '.join(first['fields'])}\n\n"
-                    f"Введите значения через запятую в том же порядке."
-                ))
+                send_message(chat_id, _empty_fields_prompt(first, 1, len(empty_fields)))
             # 4. Иначе если есть опечатки — переходим к ним
             elif issues.get("spelling"):
                 sp = issues["spelling"]
@@ -1875,8 +1901,19 @@ def process_updates(updates: List[Dict]):
             items = data["items"]
             index = data["index"]
             collected = data["collected"]
+            cur_fields = items[index]["fields"]
             vals = [v.strip() for v in text.split(",")]
-            collected.append({"id": items[index]["id"], "values": vals})
+            if len(vals) != len(cur_fields):
+                example = ', '.join(_FIELD_EXAMPLES.get(f, 'значение') for f in cur_fields)
+                send_message(chat_id, (
+                    f"⚠️ Нужно значений: <b>{len(cur_fields)}</b> "
+                    f"({', '.join(cur_fields)}), получено: {len(vals)}.\n"
+                    f"Введите их через запятую в том же порядке, например:\n"
+                    f"<code>{example}</code>"
+                ))
+                continue
+            collected.append({"id": items[index]["id"], "values": vals,
+                              "fields": cur_fields})
             nxt = index + 1
             if nxt < len(items):
                 _set_user_state(key, "fix_empty_fields", {
@@ -1885,12 +1922,7 @@ def process_updates(updates: List[Dict]):
                     "collected": collected
                 })
                 it = items[nxt]
-                send_message(chat_id, (
-                    f"📝 <b>Исправление пустых полей</b> ({nxt+1}/{len(items)})\n\n"
-                    f"Задача <b>ID {it['id']}</b>\n"
-                    f"Пустые поля: {', '.join(it['fields'])}\n\n"
-                    f"Введите значения через запятую в том же порядке."
-                ))
+                send_message(chat_id, _empty_fields_prompt(it, nxt + 1, len(items)))
             else:
                 lines = ["📋 <b>Собранные правки:</b>\n"]
                 for c in collected:
@@ -1974,12 +2006,7 @@ def process_updates(updates: List[Dict]):
                                 "next_spelling": next_spell
                             })
                             first = next_empty[0]
-                            send_message(chat_id, (
-                                f"📝 <b>Исправление пустых полей</b> ({1}/{len(next_empty)})\n\n"
-                                f"Задача <b>ID {first['id']}</b>\n"
-                                f"Пустые поля: {', '.join(first['fields'])}\n\n"
-                                f"Введите значения через запятую в том же порядке."
-                            ))
+                            send_message(chat_id, _empty_fields_prompt(first, 1, len(next_empty)))
                             continue
                         elif next_spell:
                             _set_user_state(key, "fix_spelling", {
@@ -2005,7 +2032,7 @@ def process_updates(updates: List[Dict]):
                             update_dict = {}
                             for i, field_name in enumerate(fields):
                                 if i < len(vals) and vals[i]:
-                                    update_dict[field_name] = vals[i]
+                                    update_dict[field_name] = _normalize_fix_value(field_name, vals[i])
                             if update_dict:
                                 if update_task_fields_in_sheet(task_id, update_dict):
                                     ok_count += 1
