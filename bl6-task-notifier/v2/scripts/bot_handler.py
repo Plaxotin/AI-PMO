@@ -1403,6 +1403,21 @@ def collect_unbound_assignees(cmds_batch):
     return unbound
 
 
+def enrich_create_command(c: str) -> str:
+    """Подставляет в create-команду компанию ответственного из «Контакты»,
+    чтобы предпросмотр показывал реального контрагента, а не «?»."""
+    check = commands.parse_canonical(c, today=now_msk().date())
+    if not check.ok or check.name != "create":
+        return c
+    company = resolve_contragent(check.args.get("assignee", ""))
+    if not company or check.args.get("contragent") == company:
+        return c
+    return (f"создать поручение: Контрагент={company}; "
+            f"Описание={check.args['description']}; "
+            f"Ответственный={check.args['assignee']}; "
+            f"Срок={check.args['deadline']}")
+
+
 
 # ======== ПРОВЕРКА МАППИНГА ПРИ ВХОДЕ В ADMIN MODE ========
 
@@ -2312,7 +2327,7 @@ def process_updates(updates: List[Dict]):
             for c in (cmd_texts or []):
                 check = commands.parse_canonical(c, today=now_msk().date())
                 if check.ok and check.name != "help":
-                    parsed.append(c)
+                    parsed.append(enrich_create_command(c))
                 else:
                     bad.append(c)
             if parsed:
@@ -2394,7 +2409,7 @@ def process_updates(updates: List[Dict]):
                 for c in cmd_texts:
                     check = commands.parse_canonical(c, today=now_msk().date())
                     if check.ok and check.name != "help":
-                        parsed.append(c)
+                        parsed.append(enrich_create_command(c))
                     else:
                         bad.append(c)
                 if parsed:
