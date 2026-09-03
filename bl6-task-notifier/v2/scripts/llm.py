@@ -138,7 +138,10 @@ def interpret_free_text(text: str, today_str: str, cfg: dict, username: str = ""
             {"role": "system", "content": SYSTEM_PROMPT.format(today=today_str, registries=registries_text, active_registry=active_registry, username=username)},
             {"role": "user", "content": text},
         ],
-        # temperature не передаём: kimi-k2.x принимает только temperature=1
+        # temperature не передаём: kimi-k2.x принимает только temperature=1.
+        # Перевод в команду — задача простая, reasoning отключаем:
+        # быстрее (секунды вместо 40+), дешевле, и reasoning не съест max_tokens.
+        "thinking": {"type": "disabled"},
         "max_tokens": MAX_TOKENS,
     }
     try:
