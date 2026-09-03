@@ -2091,7 +2091,59 @@ def process_updates(updates: List[Dict]):
         elif state and state.get("state") == "admin_mode_confirm":
             data = state.get("data", {})
             if text_clean.lower() in ("✅ да", "да", "yes", "д"):
-                check = commands.parse_canonical(data.get("command_text", ""),
+                cmds_batch = data.get("commands") or []
+                if len(cmds_batch) > 1:
+                    # Пакетное выполнение: общее подтверждение уже получено,
+                    # create/delete выполняем напрямую, без вложенных confirm_create/
+                    # confirm_delete (иначе состояния перезапишут друг друга).
+                    responses = []
+                    for c in cmds_batch:
+                        check = commands.parse_canonical(c, today=now_msk().date())
+                        if not check.ok or check.name == "help":
+                            responses.append(f"❌ Не распознал: <code>{html.escape(c)}</code>")
+                            continue
+                        try:
+                            if check.name == "create":
+                                dup = find_recent_duplicate(check.args["contragent"],
+                                                            check.args["description"])
+                                if dup:
+                                    responses.append(
+                                        f"⚠️ Дубль (уже есть #{dup[3]}), не создаю: "
+                                        f"<code>{html.escape(c)}</code>")
+                                else:
+                                    responses.append(cmd_create_execute(
+                                        check.args, username, first_name))
+                            elif check.name == "delete":
+                                if get_task_info(check.args["id"]):
+                                    responses.append(cmd_delete_execute(
+                                        check.args["id"], username))
+                                else:
+                                    responses.append(
+                                        f"❌ Поручение <b>#{check.args['id']}</b> не найдено.")
+                            else:
+                                responses.append(dispatch(check, username, first_name,
+                                                          chat_id, key, user_id))
+                        except Exception as e:
+                            log(f"⚠️ Ошибка выполнения команды {check.name}: {e}")
+                            responses.append(f"❌ Ошибка при выполнении: <code>{html.escape(c)}</code>")
+                    response = "\n\n".join(responses)
+                    ok = any(not r.startswith(("❌", "⚠️")) for r in responses)
+                    if ok:
+                        send_message(chat_id,
+                            f"{response}\n\n"
+                            "🔒 <b>Режим администратора отключён.</b>\n"
+                            "Возвращаю стандартное меню управления.",
+                            reply_to=message.get('message_id'),
+                            reply_markup=reply_main_keyboard(role))
+                        _clear_user_state(key)
+                    else:
+                        _set_user_state(key, "admin_mode")
+                        send_message(chat_id, response,
+                                     reply_to=message.get('message_id'),
+                                     reply_markup=admin_mode_keyboard())
+                    continue
+                single_text = cmds_batch[0] if cmds_batch else data.get("command_text", "")
+                check = commands.parse_canonical(single_text,
                                                   today=now_msk().date())
                 if check.ok and check.name != "help":
                     try:
@@ -2143,18 +2195,29 @@ def process_updates(updates: List[Dict]):
             continue
 
         elif state and state.get("state") == "admin_mode" and role == "admin":
-            command_text = llm.interpret_free_text(
-                text, now_msk().strftime("%d.%m.%Y"), cfg, log_fn=log)
-            if command_text:
-                check = commands.parse_canonical(command_text,
-                                                  today=now_msk().date())
-                if check.ok and check.name != "help":
+            cmd_texts = llm.interpret_free_text(
+                text, now_msk().strftime("%d.%m.%Y"), cfg,
+                username=username, log_fn=log)
+            if cmd_texts:
+                parsed, bad = [], []
+                for c in cmd_texts:
+                    check = commands.parse_canonical(c, today=now_msk().date())
+                    if check.ok and check.name != "help":
+                        parsed.append(c)
+                    else:
+                        bad.append(c)
+                if parsed:
                     _set_user_state(key, "admin_mode_confirm", {
-                        "command_text": command_text
+                        "commands": parsed
                     })
+                    preview = "\n".join(
+                        f"{i}) <code>{html.escape(c)}</code>"
+                        for i, c in enumerate(parsed, 1))
+                    if bad:
+                        preview += ("\n\n⚠️ Не распознал и пропускаю: "
+                                    + ", ".join(html.escape(c) for c in bad))
                     send_message(chat_id,
-                        "📝 <b>Я понял задачу так:</b>\n"
-                        f"<code>{html.escape(command_text)}</code>\n\n"
+                        f"📝 <b>Я понял задачу так:</b>\n{preview}\n\n"
                         "Всё верно?",
                         reply_to=message.get('message_id'),
                         reply_markup=confirm_keyboard())

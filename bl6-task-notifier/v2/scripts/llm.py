@@ -33,7 +33,8 @@ SYSTEM_PROMPT = """Ты — транслятор просьб в команды 
 Активный реестр: {active_registry}
 Пользователь: {username}
 
-Переведи просьбу пользователя в ОДНУ каноническую команду бота.
+Переведи просьбу пользователя в ОДНУ ИЛИ НЕСКОЛЬКО канонических команд бота
+(если в просьбе несколько действий — верни несколько команд, по одной на действие).
 Допустимые команды (строго в этих форматах):
 - создать поручение: Контрагент=<контрагент>; Описание=<описание>; Ответственный=<имя>; Срок=<дата>
 - закрыть #N
@@ -60,16 +61,17 @@ SYSTEM_PROMPT = """Ты — транслятор просьб в команды 
   - Срок = завтра
   - Описание = краткая суть запроса
 • Если пользователь говорит "тестовое поручение" — используй описание "Тестовое поручение", контрагент = активный реестр, ответственный = пользователь, срок = завтра.
+• Слова «мне», «для меня», «моё» — Ответственный = имя пользователя (см. выше: {username}).
 
 ВАЖНО:
-• Если пользователь задаёт ВОПРОС (содержит '?' или слова 'как', 'что', 'почему', 'какие', 'сколько', 'где', 'когда', 'кто'), а не просит выполнить действие — верни {{"command_text": null}}.
-• Если просьба не подходит ни под одну команду выше — верни {{"command_text": null}}.
+• Если пользователь задаёт ВОПРОС (содержит '?' или слова 'как', 'что', 'почему', 'какие', 'сколько', 'где', 'когда', 'кто'), а не просит выполнить действие — верни {{"commands": []}}.
+• Если просьба не подходит ни под одну команду выше — верни {{"commands": []}}.
 • Отвечай СТРОГО одним JSON-объектом без пояснений и markdown.
 
 Формат ответа:
-{{"command_text": "<каноническая команда>"}}
-или:
-{{"command_text": null}}"""
+{{"commands": ["<каноническая команда 1>", "<каноническая команда 2>"]}}
+или (если действий нет):
+{{"commands": []}}"""
 
 
 def load_kimi_config() -> Optional[dict]:
@@ -114,7 +116,11 @@ def _format_registries(cfg: dict) -> str:
     return "\n".join(lines)
 
 
-def interpret_free_text(text: str, today_str: str, cfg: dict, username: str = "", log_fn=print) -> Optional[str]:
+def interpret_free_text(text: str, today_str: str, cfg: dict, username: str = "", log_fn=print) -> Optional[list]:
+    """Переводит свободный текст в список канонических команд.
+
+    Возвращает list[str] (1+ команд) или None, если интерпретировать не удалось.
+    """
     cfg_kimi = load_kimi_config()
     if not cfg_kimi:
         log_fn("⚠️ kimi.json не настроен, LLM-режим недоступен")
@@ -144,28 +150,42 @@ def interpret_free_text(text: str, today_str: str, cfg: dict, username: str = ""
         "thinking": {"type": "disabled"},
         "max_tokens": MAX_TOKENS,
     }
-    try:
-        resp = requests.post(
-            f"{base_url}/chat/completions",
-            headers={"Authorization": f"Bearer {cfg_kimi['api_key']}",
-                     "Content-Type": "application/json"},
-            json=payload,
-            timeout=TIMEOUT,
-        )
-        if resp.status_code != 200:
-            log_fn(f"⚠️ Kimi API вернул {resp.status_code}: {resp.text[:150]}")
+
+    content = ""
+    for attempt in range(2):
+        try:
+            resp = requests.post(
+                f"{base_url}/chat/completions",
+                headers={"Authorization": f"Bearer {cfg_kimi['api_key']}",
+                         "Content-Type": "application/json"},
+                json=payload,
+                timeout=TIMEOUT,
+            )
+            if resp.status_code != 200:
+                log_fn(f"⚠️ Kimi API вернул {resp.status_code}: {resp.text[:150]}")
+                return None
+            content = (resp.json().get('choices') or [{}])[0] \
+                              .get('message', {}).get('content', '') or ''
+        except Exception as e:
+            log_fn(f"⚠️ Ошибка вызова Kimi API: {e}")
             return None
-        content = (resp.json().get('choices') or [{}])[0] \
-                          .get('message', {}).get('content', '')
-    except Exception as e:
-        log_fn(f"⚠️ Ошибка вызова Kimi API: {e}")
-        return None
+        if content.strip():
+            break
+        # Пустой ответ с отключённым reasoning — разовый сбой модели.
+        # Повторяем один раз с включённым thinking.
+        log_fn("⚠️ Kimi вернул пустой ответ, повторяю с thinking")
+        payload.pop("thinking", None)
 
     data = extract_json(content)
     if not data:
         log_fn(f"⚠️ Kimi вернул не-JSON: {content[:150]}")
         return None
-    command_text = data.get('command_text')
-    if not command_text or not isinstance(command_text, str):
+    # Новый формат: {"commands": [...]}. Старый (обратная совместимость): {"command_text": "..."}.
+    cmds = data.get('commands')
+    if cmds is None:
+        single = data.get('command_text')
+        cmds = [single] if isinstance(single, str) and single.strip() else []
+    if not isinstance(cmds, list):
         return None
-    return command_text.strip()
+    result = [c.strip() for c in cmds if isinstance(c, str) and c.strip()]
+    return result or None
