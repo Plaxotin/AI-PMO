@@ -509,6 +509,55 @@ def load_contacts_from_registry() -> Dict[str, str]:
         return {}
 
 
+def load_contacts_full() -> List[Dict[str, str]]:
+    """Читает вкладку «Контакты»: [{fio, tg, company}]."""
+    try:
+        spreadsheet = _get_spreadsheet()
+        ws = spreadsheet.worksheet('Контакты')
+        rows = ws.get_all_values()
+        out = []
+        for row in rows[1:]:
+            fio = row[0].strip() if len(row) > 0 else ""
+            tg = row[1].strip() if len(row) > 1 else ""
+            company = row[2].strip() if len(row) > 2 else ""
+            if fio or tg:
+                out.append({"fio": fio, "tg": tg, "company": company})
+        return out
+    except Exception:
+        return []
+
+
+def resolve_contragent(assignee: str) -> Optional[str]:
+    """Определяет компанию ответственного по вкладке «Контакты».
+
+    Совпадение по: telegram-логину, полному ФИО или короткой форме
+    «Фамилия И.». Возвращает компанию или None.
+    """
+    a = (assignee or "").strip().lower()
+    if not a:
+        return None
+    a_login = a.lstrip('@')
+    # Разбор короткой формы «Фамилия И.» / «Фамилия И»
+    a_parts = a.replace('.', ' ').split()
+    a_surname = a_parts[0] if a_parts else ""
+    a_initial = a_parts[1][0] if len(a_parts) > 1 and a_parts[1] else ""
+    for c in load_contacts_full():
+        if not c["company"]:
+            continue
+        fio = c["fio"].lower()
+        tg = c["tg"].lstrip('@').lower()
+        if tg and a_login == tg:
+            return c["company"]
+        if fio and a == fio:
+            return c["company"]
+        f_parts = fio.split()
+        if len(f_parts) >= 2 and a_surname and a_surname == f_parts[0]:
+            # Фамилия совпала: сверяем инициал, если он есть в запросе
+            if not a_initial or a_initial == f_parts[1][0]:
+                return c["company"]
+    return None
+
+
 
 def get_assignee_by_telegram(username: str, user_id=None) -> Optional[str]:
     mapping = load_user_mapping()
@@ -888,6 +937,10 @@ def cmd_create_preview(args: Dict, username: str) -> str:
 
 def cmd_create_execute(args: Dict, username: str, first_name: str) -> str:
     author = f"{first_name} (@{username})" if username else first_name
+    # Контрагент = компания ответственного (вкладка «Контакты»)
+    company = resolve_contragent(args.get("assignee", ""))
+    if company:
+        args["contragent"] = company
     success, output = run_task_manager(
         'add',
         '--author', author,
@@ -902,6 +955,7 @@ def cmd_create_execute(args: Dict, username: str, first_name: str) -> str:
         new_id = ""
         for token in output.split():
             if token.startswith('#') and token[1:].isdigit():
+                new_id = token[1:]
                 new_id = token[1:]
         audit("create", new_id or "?",
               f"Контрагент={args['contragent']} | Описание={args['description']} | "
@@ -1210,6 +1264,10 @@ def dispatch(cmd: "commands.ParsedCommand", username: str, first_name: str,
         return cmd_close_task(args["id"], username, user_id)
 
     if name == "create":
+        # Контрагент = компания ответственного (вкладка «Контакты»)
+        company = resolve_contragent(args.get("assignee", ""))
+        if company:
+            args["contragent"] = company
         dup = find_recent_duplicate(args["contragent"], args["description"])
         if dup:
             return (f"⚠️ Похоже, такое поручение уже создавалось недавно "
