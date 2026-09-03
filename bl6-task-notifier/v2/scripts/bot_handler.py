@@ -275,7 +275,40 @@ def digest_chat_keyboard() -> Dict:
 
 
 def confirm_keyboard() -> Dict:
-    return {"keyboard": [[{"text": "✅ Да"}, {"text": "❌ Нет"}]], "resize_keyboard": True}
+    return {"keyboard": [[{"text": "✅ Да"}, {"text": "✏️ Изменить"}, {"text": "❌ Нет"}]],
+            "resize_keyboard": True}
+
+
+def bind_keyboard() -> Dict:
+    return {"keyboard": [[{"text": "⏭ Пропустить"}]], "resize_keyboard": True}
+
+
+def resolve_tg_login(name: str) -> Optional[str]:
+    """Telegram-логин ответственного: user_mapping.json + вкладка «Контакты».
+    Возвращает '@login' / 'id:<uid>' или None."""
+    n = (name or "").strip().lower()
+    if not n:
+        return None
+    mapping = load_user_mapping()
+    for k, v in mapping.items():
+        if k.strip().lower() == n and v:
+            return v
+    n_login = n.lstrip('@')
+    n_parts = n.replace('.', ' ').split()
+    n_surname = n_parts[0] if n_parts else ""
+    n_initial = n_parts[1][0] if len(n_parts) > 1 and n_parts[1] else ""
+    for c in load_contacts_full():
+        tg = c["tg"].strip()
+        if not tg:
+            continue
+        fio = c["fio"].lower()
+        if n == fio or n_login == tg.lstrip('@').lower():
+            return tg if tg.startswith('@') else f"@{tg}"
+        f_parts = fio.split()
+        if len(f_parts) >= 2 and n_surname and n_surname == f_parts[0]:
+            if not n_initial or n_initial == f_parts[1][0]:
+                return tg if tg.startswith('@') else f"@{tg}"
+    return None
 
 
 # ======== АНТИФЛУД ========
@@ -1317,6 +1350,59 @@ def dispatch(cmd: "commands.ParsedCommand", username: str, first_name: str,
     return "🤔 Не понял команду."
 
 
+def execute_admin_commands(cmds_batch, username, first_name, chat_id, key, user_id):
+    """Выполняет список канонических команд (режим админа, подтверждение получено).
+    create/delete — напрямую, без вложенных confirm_create/confirm_delete.
+    Возвращает (текст_ответа, есть_ли_успешные)."""
+    responses = []
+    for c in cmds_batch:
+        check = commands.parse_canonical(c, today=now_msk().date())
+        if not check.ok or check.name == "help":
+            responses.append(f"❌ Не распознал: <code>{html.escape(c)}</code>")
+            continue
+        try:
+            if check.name == "create":
+                company = resolve_contragent(check.args.get("assignee", ""))
+                if company:
+                    check.args["contragent"] = company
+                dup = find_recent_duplicate(check.args["contragent"],
+                                            check.args["description"])
+                if dup:
+                    responses.append(
+                        f"⚠️ Дубль (уже есть #{dup[3]}), не создаю: "
+                        f"<code>{html.escape(c)}</code>")
+                else:
+                    responses.append(cmd_create_execute(
+                        check.args, username, first_name))
+            elif check.name == "delete":
+                if get_task_info(check.args["id"]):
+                    responses.append(cmd_delete_execute(
+                        check.args["id"], username))
+                else:
+                    responses.append(
+                        f"❌ Поручение <b>#{check.args['id']}</b> не найдено.")
+            else:
+                responses.append(dispatch(check, username, first_name,
+                                          chat_id, key, user_id))
+        except Exception as e:
+            log(f"⚠️ Ошибка выполнения команды {check.name}: {e}")
+            responses.append(f"❌ Ошибка при выполнении: <code>{html.escape(c)}</code>")
+    ok = any(not r.startswith(("❌", "⚠️")) for r in responses)
+    return "\n\n".join(responses), ok
+
+
+def collect_unbound_assignees(cmds_batch):
+    """Имена ответственных из create-команд без привязки к TG-логину."""
+    unbound = []
+    for c in cmds_batch:
+        check = commands.parse_canonical(c, today=now_msk().date())
+        if check.ok and check.name == "create":
+            name = check.args.get("assignee", "").strip()
+            if name and not resolve_tg_login(name) and name not in unbound:
+                unbound.append(name)
+    return unbound
+
+
 
 # ======== ПРОВЕРКА МАППИНГА ПРИ ВХОДЕ В ADMIN MODE ========
 
@@ -2149,84 +2235,27 @@ def process_updates(updates: List[Dict]):
         elif state and state.get("state") == "admin_mode_confirm":
             data = state.get("data", {})
             if text_clean.lower() in ("✅ да", "да", "yes", "д"):
-                cmds_batch = data.get("commands") or []
-                if len(cmds_batch) > 1:
-                    # Пакетное выполнение: общее подтверждение уже получено,
-                    # create/delete выполняем напрямую, без вложенных confirm_create/
-                    # confirm_delete (иначе состояния перезапишут друг друга).
-                    responses = []
-                    for c in cmds_batch:
-                        check = commands.parse_canonical(c, today=now_msk().date())
-                        if not check.ok or check.name == "help":
-                            responses.append(f"❌ Не распознал: <code>{html.escape(c)}</code>")
-                            continue
-                        try:
-                            if check.name == "create":
-                                dup = find_recent_duplicate(check.args["contragent"],
-                                                            check.args["description"])
-                                if dup:
-                                    responses.append(
-                                        f"⚠️ Дубль (уже есть #{dup[3]}), не создаю: "
-                                        f"<code>{html.escape(c)}</code>")
-                                else:
-                                    responses.append(cmd_create_execute(
-                                        check.args, username, first_name))
-                            elif check.name == "delete":
-                                if get_task_info(check.args["id"]):
-                                    responses.append(cmd_delete_execute(
-                                        check.args["id"], username))
-                                else:
-                                    responses.append(
-                                        f"❌ Поручение <b>#{check.args['id']}</b> не найдено.")
-                            else:
-                                responses.append(dispatch(check, username, first_name,
-                                                          chat_id, key, user_id))
-                        except Exception as e:
-                            log(f"⚠️ Ошибка выполнения команды {check.name}: {e}")
-                            responses.append(f"❌ Ошибка при выполнении: <code>{html.escape(c)}</code>")
-                    response = "\n\n".join(responses)
-                    ok = any(not r.startswith(("❌", "⚠️")) for r in responses)
-                    if ok:
-                        send_message(chat_id,
-                            f"{response}\n\n"
-                            "🔒 <b>Режим администратора отключён.</b>\n"
-                            "Возвращаю стандартное меню управления.",
-                            reply_to=message.get('message_id'),
-                            reply_markup=reply_main_keyboard(role))
-                        _clear_user_state(key)
-                    else:
-                        _set_user_state(key, "admin_mode")
-                        send_message(chat_id, response,
-                                     reply_to=message.get('message_id'),
-                                     reply_markup=admin_mode_keyboard())
+                cmds_batch = data.get("commands") or \
+                    ([data["command_text"]] if data.get("command_text") else [])
+                # Перед записью: у create-команд проверяем привязку
+                # ответственного к Telegram-логину
+                unbound = collect_unbound_assignees(cmds_batch)
+                if unbound:
+                    _set_user_state(key, "admin_mode_bind", {
+                        "commands": cmds_batch,
+                        "queue": unbound,
+                        "idx": 0,
+                    })
+                    send_message(chat_id,
+                        f"👤 Не нашёл Telegram-логин для <b>{html.escape(unbound[0])}</b>.\n"
+                        "Отправьте логин (@...) — сохраню привязку и запишу поручение.\n"
+                        "Или нажмите <b>⏭ Пропустить</b>.",
+                        reply_to=message.get('message_id'),
+                        reply_markup=bind_keyboard())
                     continue
-                single_text = cmds_batch[0] if cmds_batch else data.get("command_text", "")
-                check = commands.parse_canonical(single_text,
-                                                  today=now_msk().date())
-                if check.ok and check.name != "help":
-                    try:
-                        response = dispatch(check, username, first_name, chat_id, key, user_id)
-                    except Exception as e:
-                        log(f"⚠️ Ошибка выполнения команды {check.name}: {e}")
-                        response = "❌ Внутренняя ошибка при выполнении команды."
-                    # Если dispatch поставил следующее подтверждение (confirm_create/
-                    # confirm_delete) — задача ещё НЕ выполнена: режим админа
-                    # сохраняется, состояние не трогаем
-                    nxt = _get_user_state(key)
-                    if nxt and nxt.get("state", "") != "admin_mode_confirm" \
-                            and nxt.get("state", "").startswith("confirm_"):
-                        send_message(chat_id, response,
-                                     reply_to=message.get('message_id'),
-                                     reply_markup=confirm_keyboard())
-                        continue
-                    # Ошибка выполнения — задача не выполнена: остаёмся в режиме админа
-                    if response.startswith("❌"):
-                        _set_user_state(key, "admin_mode")
-                        send_message(chat_id, response,
-                                     reply_to=message.get('message_id'),
-                                     reply_markup=admin_mode_keyboard())
-                        continue
-                    # Задача выполнена — только теперь отключаем режим админа
+                response, ok = execute_admin_commands(
+                    cmds_batch, username, first_name, chat_id, key, user_id)
+                if ok:
                     send_message(chat_id,
                         f"{response}\n\n"
                         "🔒 <b>Режим администратора отключён.</b>\n"
@@ -2236,10 +2265,22 @@ def process_updates(updates: List[Dict]):
                     _clear_user_state(key)
                 else:
                     _set_user_state(key, "admin_mode")
-                    send_message(chat_id,
-                        "❌ Команда больше не актуальна. Попробуйте снова.",
-                        reply_to=message.get('message_id'),
-                        reply_markup=admin_mode_keyboard())
+                    send_message(chat_id, response,
+                                 reply_to=message.get('message_id'),
+                                 reply_markup=admin_mode_keyboard())
+                continue
+            elif text_clean.lower() in ("✏️ изменить", "изменить", "правка"):
+                _set_user_state(key, "admin_mode_edit", {
+                    "origin_text": data.get("origin_text", "")
+                })
+                send_message(chat_id,
+                    "✏️ Напишите, что поправить — одной фразой.\n"
+                    "Например: «срок 10.09», «ответственный Инзарцев», "
+                    "«контрагент PSI», «описание: …».\n\n"
+                    "Или «отмена» — вернуться к исходной формулировке.",
+                    reply_to=message.get('message_id'),
+                    reply_markup=admin_mode_keyboard())
+                continue
             elif text_clean.lower() in ("❌ нет", "нет", "no", "н"):
                 _set_user_state(key, "admin_mode")
                 send_message(chat_id,
@@ -2248,8 +2289,100 @@ def process_updates(updates: List[Dict]):
                     reply_to=message.get('message_id'),
                     reply_markup=admin_mode_keyboard())
             else:
-                send_message(chat_id, "❓ Нажмите <b>✅ Да</b> или <b>❌ Нет</b>.",
+                send_message(chat_id, "❓ Нажмите <b>✅ Да</b>, <b>✏️ Изменить</b> или <b>❌ Нет</b>.",
                              reply_markup=confirm_keyboard())
+            continue
+
+        elif state and state.get("state") == "admin_mode_edit" and role == "admin":
+            data = state.get("data", {})
+            if text_clean.lower() in ("отмена", "❌ выйти", "выйти"):
+                _set_user_state(key, "admin_mode")
+                send_message(chat_id,
+                    "🔄 Хорошо, отменил правку.\n\n"
+                    "Опишите задачу по изменению реестра в свободной форме.",
+                    reply_to=message.get('message_id'),
+                    reply_markup=admin_mode_keyboard())
+                continue
+            origin = data.get("origin_text", "")
+            combined = f"{origin}\nУточнение: {text}" if origin else text
+            cmd_texts = llm.interpret_free_text(
+                combined, now_msk().strftime("%d.%m.%Y"), cfg,
+                username=username, log_fn=log)
+            parsed, bad = [], []
+            for c in (cmd_texts or []):
+                check = commands.parse_canonical(c, today=now_msk().date())
+                if check.ok and check.name != "help":
+                    parsed.append(c)
+                else:
+                    bad.append(c)
+            if parsed:
+                _set_user_state(key, "admin_mode_confirm", {
+                    "commands": parsed,
+                    "origin_text": combined,
+                })
+                preview = "\n".join(
+                    f"{i}) <code>{html.escape(c)}</code>"
+                    for i, c in enumerate(parsed, 1))
+                if bad:
+                    preview += ("\n\n⚠️ Не распознал и пропускаю: "
+                                + ", ".join(html.escape(c) for c in bad))
+                send_message(chat_id,
+                    f"📝 <b>С учётом правки получилось так:</b>\n{preview}\n\n"
+                    "Всё верно?",
+                    reply_to=message.get('message_id'),
+                    reply_markup=confirm_keyboard())
+            else:
+                _set_user_state(key, "admin_mode")
+                send_message(chat_id, with_footer(
+                    "🤔 Не удалось интерпретировать правку. "
+                    "Опишите задачу заново в свободной форме."),
+                    reply_markup=admin_mode_keyboard())
+            continue
+
+        elif state and state.get("state") == "admin_mode_bind" and role == "admin":
+            data = state.get("data", {})
+            queue = data.get("queue", [])
+            idx = data.get("idx", 0)
+            note = ""
+            if text_clean.lower() in ("⏭ пропустить", "пропустить", "skip"):
+                note = ""
+            else:
+                login_norm = normalize_login(text_clean)
+                if login_norm and re.fullmatch(r"@[A-Za-z0-9_]{4,32}|id:\d+", login_norm):
+                    mapping = load_user_mapping()
+                    mapping[queue[idx]] = login_norm
+                    save_user_mapping(mapping)
+                    note = (f"✅ Привязка <b>{html.escape(queue[idx])}</b> → "
+                            f"{html.escape(login_norm)} сохранена.\n\n")
+                else:
+                    send_message(chat_id,
+                        "❌ Это не похоже на Telegram-логин. "
+                        "Отправьте @login или нажмите <b>⏭ Пропустить</b>.",
+                        reply_markup=bind_keyboard())
+                    continue
+            idx += 1
+            if idx < len(queue):
+                _set_user_state(key, "admin_mode_bind", {**data, "idx": idx})
+                send_message(chat_id,
+                    f"{note}👤 Не нашёл Telegram-логин для "
+                    f"<b>{html.escape(queue[idx])}</b>.\n"
+                    "Отправьте логин (@...) или нажмите <b>⏭ Пропустить</b>.",
+                    reply_markup=bind_keyboard())
+                continue
+            # Очередь привязок закончилась — записываем поручения
+            response, ok = execute_admin_commands(
+                data.get("commands", []), username, first_name, chat_id, key, user_id)
+            if ok:
+                send_message(chat_id,
+                    f"{note}{response}\n\n"
+                    "🔒 <b>Режим администратора отключён.</b>\n"
+                    "Возвращаю стандартное меню управления.",
+                    reply_markup=reply_main_keyboard(role))
+                _clear_user_state(key)
+            else:
+                _set_user_state(key, "admin_mode")
+                send_message(chat_id, f"{note}{response}",
+                             reply_markup=admin_mode_keyboard())
             continue
 
         elif state and state.get("state") == "admin_mode" and role == "admin":
@@ -2266,7 +2399,8 @@ def process_updates(updates: List[Dict]):
                         bad.append(c)
                 if parsed:
                     _set_user_state(key, "admin_mode_confirm", {
-                        "commands": parsed
+                        "commands": parsed,
+                        "origin_text": text,
                     })
                     preview = "\n".join(
                         f"{i}) <code>{html.escape(c)}</code>"
