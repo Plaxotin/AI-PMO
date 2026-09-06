@@ -14,6 +14,8 @@ AI PMO toolbox — набор фич вокруг Telegram-ботов и Google 
 - Бот BL-6 живёт в `/opt/openclaw-server/skills/task-registry/scripts/`
   (bot_handler.py, task_manager.py, llm.py, commands.py, feedback.py)
 - Сервис: `task-registry-bot.service`, лог `/var/log/task-registry-bot.log`
+- Бот BL-28 живёт в `/opt/bl28-requirements-bot/` (bot.py, generate.py, шаблон v2),
+  сервис `bl28-requirements-bot.service`
 - Конфиги (не в репо!): `.credentials/` — config.json, telegram.json, kimi.json, user_mapping.json
 - Плановый дайджест: systemd `plaxotin-task-digest.timer`, пн–пт 06:17 UTC (9:17 МСК)
 - OpenClaw gateway на том же сервере: telegram-канал и telegram-плагин ВЫКЛЮЧЕНЫ
@@ -47,6 +49,28 @@ AI PMO toolbox — набор фич вокруг Telegram-ботов и Google 
 - Переключатель «⏰ Авто-дайджесты» (dg_auto:toggle) гейтит плановые рассылки.
 - Известная особенность: message_id отправленных дайджестов не сохраняются
   (удаление — только перебором, бот-участник может удалять только свои сообщения).
+
+## BL-28 «Генератор требований к проекту» (@PMO_requirements_bot) — статус: MVP реализовано (06.09.2026)
+
+- Локально: `bl28-requirements-generator/`; сервер: `/opt/bl28-requirements-bot/`,
+  сервис `bl28-requirements-bot.service`. Деплой-цикл как у BL-6 (py_compile → scp → restart).
+- Пайплайн: исходники (.docx/.txt/.md файлами и текстом в чат) → `generate.py` (kimi) →
+  JSON по схеме → `fill_docx` в шаблон `project-requirements-template-v2.docx`
+  (генерируется `create_template_v2.py`, структура — `parse_template.py` → template-structure-v2.json).
+- Два режима: ⚡ Быстрый — бесплатно, kimi-k2.6, один вызов + thinking, 2–3 мин (~$0.05);
+  💎 Pro — kimi-k3, посекционно (6 групп) + проход критика, 10–15 мин (~$0.62);
+  бесплатный Pro-прогон: запрос админу → `/grant <uid>`. Usage — `outputs/_usage.jsonl`.
+- Документ полностью на русском: приоритеты «Обязательно / Желательно / Возможно /
+  Не входит», нумерация БТ/ФТ/НФТ, незаполненное — [уточнить].
+- Название документа модель извлекает из исходников сама (заглушка «Проект» запрещена).
+- Открытые вопросы — нумерованным сообщением в чат; ответы пользователя сохраняются
+  в сессию (`data/<uid>/answers_NN.txt`, состояние — `data/<uid>/state.json`),
+  кнопка «🔄 Перегенерировать с ответами» — без повторного списания Pro-квоты.
+- Версии: каждый прогон = новый файл `v0.N` + строка в «Истории изменений» документа.
+- Rate limit org Moonshot: вызовы последовательно, паузы 4 с, backoff; черновики секций
+  в `outputs/_draft_<uid>.json` (resume), CLI-флаги `--sections-only` / `--from-draft`.
+- Конфиги на сервере (не в репо!): `.credentials/` — telegram.json (token, owner_id),
+  config.json (allowed_user_ids, pro_quota), kimi.json (модели kimi-k2.6 / kimi-k3).
 
 ## Ключевые люди
 
