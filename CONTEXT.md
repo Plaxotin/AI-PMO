@@ -87,7 +87,7 @@ AI PMO toolbox — набор фич вокруг Telegram-ботов и Google 
 - Конфиги на сервере (не в репо!): `.credentials/` — telegram.json (token, owner_id),
   config.json (allowed_user_ids, pro_quota), kimi.json (модели kimi-k2.6 / kimi-k3).
 
-## BL-1 «Аудит проектного плана» (@PMO_plan_auditor_bot) — статус: MVP задеплоен (06.09.26)
+## BL-1 «Аудит проектного плана» (@PMO_plan_auditor_bot) — статус: РЕАЛИЗОВАНО (07.09.26)
 
 - Отдельный бот: сервер `/opt/plan-audit-bot/`, сервис `plan-audit-bot.service`,
   код в `bl1-plan-audit-bot/` (scripts/: bot_handler, config, plan_model, plan_parser,
