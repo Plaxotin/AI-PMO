@@ -210,6 +210,233 @@ def compliance_score(violations: list) -> int:
     return max(0, round(100 - penalty))
 
 
+# ---------- Качество расписания: DCMA 14-point (адаптация) ----------
+# Источник: DCMA 14-Point Schedule Assessment — де-факто стандарт проверки
+# качества расписания (CPM). Три семейства проверок:
+#   structure    — может ли CPM считать честные даты (логика сети)
+#   realism      — правдоподобны ли даты (резервы, длительности, валидность)
+#   performance  — поспевает ли проект (BEI, missed, CPLI)
+# Leads/lags/типы связей/жёсткие ограничения MS Project наш парсер пока
+# не извлекает — такие проверки помечаются status='n/a'.
+
+DCMA_HIGH_DAYS = 44          # high float / high duration: > 44 рабочих дней
+DCMA_THRESHOLD_PCT = 5.0     # типовой порог доли нарушений
+BEI_THRESHOLD = 0.95
+
+
+def schedule_health(plan: Plan, report_date: date, cpm: dict) -> dict:
+    """DCMA-подобные проверки. Возвращает {'checks': [...], 'bei': float|None}.
+
+    Каждая проверка: {'id', 'name', 'family', 'count', 'percent',
+                      'threshold', 'status' ('pass'|'fail'|'n/a'), 'evidence'}.
+    """
+    floats = cpm.get('float_by_uid', {})
+    incomplete = [t for t in plan.leaves() if t.percent_complete < 100
+                  and not t.is_milestone]
+    n = max(1, len(incomplete))
+    checks = []
+
+    def add(cid, name, family, items, threshold=DCMA_THRESHOLD_PCT,
+            zero_tolerance=False):
+        pct = round(100.0 * len(items) / n, 1)
+        passed = (len(items) == 0) if zero_tolerance else (pct <= threshold)
+        checks.append({
+            'id': cid, 'name': name, 'family': family,
+            'count': len(items), 'percent': pct, 'threshold': threshold,
+            'status': 'pass' if passed else 'fail',
+            'evidence': [t.name if isinstance(t, Task) else str(t)
+                         for t in items[:10]],
+        })
+
+    # --- structure ---
+    # D-01 Logic: у незавершённой задачи нет предшественника или последователя
+    no_logic = [t for t in incomplete if not t.predecessors or not t.successors]
+    add('D-01', 'Логика: задачи без связей', 'structure', no_logic)
+    # D-02 Leads / D-03 Lags / D-04 Типы связей / D-05 Жёсткие ограничения
+    for cid, name in (('D-02', 'Leads (отрицательные лаги)'),
+                      ('D-03', 'Lags (положительные лаги)'),
+                      ('D-04', 'Доля связей Finish-to-Start'),
+                      ('D-05', 'Жёсткие ограничения дат')):
+        checks.append({'id': cid, 'name': name, 'family': 'structure',
+                       'count': 0, 'percent': 0.0, 'threshold': 0,
+                       'status': 'n/a',
+                       'evidence': ['парсер пока не извлекает типы связей, лаги '
+                                    'и ограничения — полноценно доступно из .mpp']})
+
+    # --- realism ---
+    high_float = [t for t in incomplete if floats.get(t.uid, 0) > DCMA_HIGH_DAYS]
+    add('D-06', f'Резерв > {DCMA_HIGH_DAYS} дней', 'realism', high_float)
+    neg_float = [t for t in incomplete if floats.get(t.uid, 0) < 0]
+    add('D-07', 'Отрицательный резерв', 'realism', neg_float, zero_tolerance=True)
+    high_dur = [t for t in incomplete if (t.duration_days or 0) > DCMA_HIGH_DAYS]
+    add('D-08', f'Длительность > {DCMA_HIGH_DAYS} дней', 'realism', high_dur)
+    # D-09 Invalid dates: окончание в прошлом при незавершённости,
+    # или начало в будущем при уже начатой задаче
+    invalid = [t for t in incomplete
+               if (t.finish and t.finish < report_date)
+               or (t.start and t.start > report_date and t.percent_complete > 0)]
+    add('D-09', 'Невалидные даты (прогноз в прошлом)', 'realism', invalid,
+        zero_tolerance=True)
+    # D-10 Resources: незавершённая задача без ответственного
+    no_resp = [t for t in incomplete if not t.responsible]
+    add('D-10', 'Задачи без ответственного', 'realism', no_resp)
+
+    # --- performance ---
+    missed = [t for t in incomplete
+              if t.baseline_finish and t.finish and t.finish > t.baseline_finish]
+    add('D-11', 'Срыв базовых дат окончания', 'performance', missed)
+
+    # D-14 BEI: выполненные задачи / задачи, которые по базе должны быть
+    # выполнены к дате отчёта
+    bei = None
+    due = [t for t in plan.leaves()
+           if t.baseline_finish and t.baseline_finish <= report_date]
+    if due:
+        done_due = [t for t in due if t.percent_complete >= 100]
+        bei = round(len(done_due) / len(due), 3)
+        checks.append({
+            'id': 'D-14', 'name': 'BEI (индекс выполнения базового плана)',
+            'family': 'performance', 'count': len(due) - len(done_due),
+            'percent': round(100.0 * (len(due) - len(done_due)) / max(1, len(due)), 1),
+            'threshold': BEI_THRESHOLD,
+            'status': 'pass' if bei >= BEI_THRESHOLD else 'fail',
+            'evidence': [f'BEI = {bei} (выполнено {len(done_due)} из {len(due)} '
+                         f'запланированных к дате отчёта)'],
+        })
+    else:
+        checks.append({'id': 'D-14', 'name': 'BEI (индекс выполнения базового плана)',
+                       'family': 'performance', 'count': 0, 'percent': 0.0,
+                       'threshold': BEI_THRESHOLD, 'status': 'n/a',
+                       'evidence': ['нет базовых дат — BEI не вычисляется']})
+
+    # D-13 CPLI — упрощённо: доля критического пути с нулевым резервом.
+    # Полноценный CPLI требует длины критического пути до даты отчёта — TODO(IMPL).
+    crit = cpm.get('critical_uids', [])
+    total = max(1, len([t for t in incomplete]))
+    checks.append({'id': 'D-13', 'name': 'CPLI (индекс длины критического пути)',
+                   'family': 'performance', 'count': len(crit),
+                   'percent': round(100.0 * len(crit) / total, 1),
+                   'threshold': 0, 'status': 'n/a',
+                   'evidence': [f'критических задач: {len(crit)} '
+                                f'({round(100.0 * len(crit) / total, 1)}% незавершённых) '
+                                '— полный расчёт CPLI в v1.1']})
+
+    # D-12 Critical path test — требует пересчёта сети с инжектированной
+    # задержкой; для каркаса: тест считается пройденным, если критический
+    # путь непрерывен (цепочка связана)
+    path = cpm.get('critical_path', [])
+    by_uid = plan.by_uid()
+    continuous = all(
+        i == 0 or path[i - 1] in by_uid.get(path[i], Task(uid='', name='')).predecessors
+        for i in range(len(path))
+    ) if path else False
+    checks.append({'id': 'D-12', 'name': 'Тест критического пути (непрерывность)',
+                   'family': 'performance', 'count': 0 if continuous else 1,
+                   'percent': 0.0, 'threshold': 0,
+                   'status': 'pass' if continuous else ('fail' if path else 'n/a'),
+                   'evidence': [] if continuous else ['критический путь разорван — '
+                                                      'проверьте логику связей']})
+
+    return {'checks': checks, 'bei': bei}
+
+
+# ---------- Освоенный объём (EVM, PMI) ----------
+
+def compute_evm(plan: Plan, report_date: date) -> dict:
+    """EVM по PMI: PV/EV/SPI.
+
+    При наличии «Затрат» — стоимостной вес; иначе duration-weighted proxy
+    (вес = длительность задачи), с пометкой proxy=True.
+    PV = вес задач, которые должны завершиться к дате отчёта (по текущему плану;
+    если есть база — по базовой дате).
+    EV = Σ вес_i × %_i. SPI = EV / PV.
+    """
+    leaves = [t for t in plan.leaves() if not t.is_milestone]
+    if not leaves:
+        return {'available': False, 'reason': 'нет листовых задач'}
+
+    use_cost = any(t.cost for t in leaves)
+    if use_cost:
+        weights = {t.uid: (t.cost or 0.0) for t in leaves}
+        proxy = False
+    else:
+        weights = {t.uid: (t.duration_days or 0.0) for t in leaves}
+        proxy = True
+    total_w = sum(weights.values())
+    if total_w <= 0:
+        return {'available': False, 'reason': 'нет затрат и длительностей для весов'}
+
+    pv = ev = 0.0
+    for t in leaves:
+        w = weights[t.uid]
+        plan_finish = t.baseline_finish or t.finish
+        if plan_finish and plan_finish <= report_date:
+            pv += w
+        ev += w * t.percent_complete / 100.0
+    spi = round(ev / pv, 3) if pv > 0 else None
+    return {
+        'available': True, 'proxy': proxy,
+        'basis': 'затраты' if not proxy else 'длительности (proxy — в плане нет затрат)',
+        'pv_pct': round(100.0 * pv / total_w, 1),
+        'ev_pct': round(100.0 * ev / total_w, 1),
+        'spi': spi,
+        'interpretation': ('проект поспевает' if spi and spi >= 0.95 else
+                           'умеренное отставание' if spi and spi >= 0.8 else
+                           'существенное отставание' if spi is not None else
+                           'недостаточно данных'),
+    }
+
+
+# ---------- Сводный статус здоровья (RAG, Asana-style) ----------
+
+def health_verdict(metrics: dict, evm: dict, violations: list,
+                   sched: dict) -> dict:
+    """On track / At risk / Off track — как status tag в Asana + PMI RAG.
+
+    Возвращает {'status': 'on_track'|'at_risk'|'off_track',
+                'label': str, 'reasons': [...]}.
+    """
+    reasons_red, reasons_yellow = [], []
+    total = max(1, metrics['tasks_total'])
+    overdue_pct = 100.0 * metrics['overdue'] / total
+    score = compliance_score(violations)
+    spi = evm.get('spi') if evm.get('available') else None
+    bei = sched.get('bei')
+    fails = [c for c in sched.get('checks', []) if c['status'] == 'fail']
+    structure_fails = [c for c in fails if c['family'] == 'structure']
+
+    if overdue_pct > 15:
+        reasons_red.append(f'просрочено {metrics["overdue"]} задач ({overdue_pct:.0f}%)')
+    elif metrics['overdue'] > 0:
+        reasons_yellow.append(f'есть просроченные задачи ({metrics["overdue"]})')
+    if spi is not None:
+        if spi < 0.8:
+            reasons_red.append(f'SPI = {spi} (существенное отставание)')
+        elif spi < 0.95:
+            reasons_yellow.append(f'SPI = {spi}')
+    if bei is not None:
+        if bei < 0.8:
+            reasons_red.append(f'BEI = {bei} (базовый план срывается)')
+        elif bei < BEI_THRESHOLD:
+            reasons_yellow.append(f'BEI = {bei}')
+    if score < 60:
+        reasons_red.append(f'соответствие Инструкции {score}/100')
+    elif score < 85:
+        reasons_yellow.append(f'соответствие Инструкции {score}/100')
+    if structure_fails:
+        reasons_yellow.append('структурные проблемы сети задач: '
+                              + ', '.join(c["id"] for c in structure_fails))
+
+    if reasons_red:
+        return {'status': 'off_track', 'label': '🔴 Off track (срыв)',
+                'reasons': reasons_red + reasons_yellow}
+    if reasons_yellow:
+        return {'status': 'at_risk', 'label': '🟡 At risk (риск срыва)',
+                'reasons': reasons_yellow}
+    return {'status': 'on_track', 'label': '🟢 On track (в графике)',
+            'reasons': ['критических отклонений не выявлено']}
+
+
 # ---------- Точка входа ----------
 
 def run_analysis(plan: Plan, report_date: Optional[date] = None,
@@ -219,6 +446,8 @@ def run_analysis(plan: Plan, report_date: Optional[date] = None,
     cpm = compute_cpm(plan)
     metrics = compute_metrics(plan, report_date)
     violations = check_compliance(plan, report_date, cpm)
+    sched = schedule_health(plan, report_date, cpm)
+    evm = compute_evm(plan, report_date)
     facts = {
         'plan_name': plan.name,
         'source_format': plan.source_format,
@@ -231,6 +460,9 @@ def run_analysis(plan: Plan, report_date: Optional[date] = None,
         },
         'compliance': violations,
         'compliance_score': compliance_score(violations),
+        'schedule_health': sched,
+        'evm': evm,
+        'health': health_verdict(metrics, evm, violations, sched),
     }
     if baseline_plan is not None:
         from diff import diff_plans

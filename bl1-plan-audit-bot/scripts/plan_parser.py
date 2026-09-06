@@ -129,9 +129,14 @@ def _rows_to_plan(rows: list, headers: list, name: str, fmt: str) -> Plan:
             row_ref=f'строка {idx}',
         ))
 
-    # summary = задача, за которой следует задача с бо́льшим outline_level
+    # summary = задача, за которой следует задача с бо́льшим outline_level;
+    # а также строка-заголовок без длительности, дат и процента (типичный
+    # этап в Excel-выгрузке: «Этап 1. …»)
     for i, t in enumerate(tasks):
         if i + 1 < len(tasks) and tasks[i + 1].outline_level > t.outline_level:
+            t.is_summary = True
+        elif (t.duration_days is None and not t.start and not t.finish
+              and not t.percent_complete):
             t.is_summary = True
         elif duration_is_zero_milestone(t):
             t.is_milestone = True
