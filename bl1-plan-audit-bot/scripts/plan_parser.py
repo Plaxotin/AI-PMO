@@ -9,8 +9,6 @@
 import csv
 import os
 import re
-import subprocess
-import tempfile
 from datetime import date, datetime
 from typing import Optional
 
@@ -181,24 +179,130 @@ def parse_csv(path: str, name: str) -> Plan:
 
 
 def parse_mpp(path: str, name: str) -> Plan:
-    """MPP → JSON через MPXJ (Java), затем в Plan.
+    """MPP → Plan через MPXJ (JVM поднимается один раз на процесс).
 
-    TODO(IMPL): положить mpxj-converter.jar на сервер, проверить команду,
-    смаппить поля MPXJ JSON (включая baseline, deadline, стоимости) на Task.
+    Требует на сервере: default-jre-headless + pip-пакеты jpype1 и mpxj.
     """
-    jar = os.environ.get('MPXJ_JAR', '/opt/plan-audit-bot/mpxj-converter.jar')
-    if not os.path.exists(jar):
-        raise RuntimeError('MPXJ-конвертер не установлен на сервере (MPXJ_JAR)')
-    with tempfile.NamedTemporaryFile(suffix='.json', delete=False) as tmp:
-        out_path = tmp.name
+    _ensure_jvm()
+    import jpype
+    reader = jpype.JClass('org.mpxj.reader.UniversalProjectReader')()
+    return _mpxj_to_plan(reader.read(path), name)
+
+
+_jvm_ready = False
+
+
+def _ensure_jvm():
+    global _jvm_ready
+    if _jvm_ready:
+        return
+    if 'JAVA_HOME' not in os.environ and \
+            os.path.exists('/usr/lib/jvm/default-java'):
+        os.environ['JAVA_HOME'] = '/usr/lib/jvm/default-java'
+    import jpype
+    import mpxj  # noqa: F401 — регистрирует jar'ы MPXJ в classpath
+    if not jpype.isJVMStarted():
+        jpype.startJVM()
+    _jvm_ready = True
+
+
+def _ld(value) -> Optional[date]:
+    """java.time.LocalDateTime/LocalDate → date (или None)."""
+    if value is None:
+        return None
     try:
-        subprocess.run(['java', '-jar', jar, path, out_path],
-                       check=True, timeout=120, capture_output=True)
-        # TODO(IMPL): распарсить JSON MPXJ и собрать Plan через _rows_to_plan-подобный маппинг
-        raise NotImplementedError('Маппинг MPXJ JSON → Plan ещё не реализован')
-    finally:
-        if os.path.exists(out_path):
-            os.unlink(out_path)
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def _dur_days(dur) -> Optional[float]:
+    """MPXJ Duration → дни (8-часовой день, 5-дневная неделя)."""
+    if dur is None:
+        return None
+    v = float(dur.getDuration())
+    units = dur.getUnits()
+    try:
+        u = str(units.name())  # каноническое имя enum: HOURS, DAYS…
+    except Exception:
+        u = str(units).upper()
+    table = {
+        'MINUTES': v / 480.0, 'HOURS': v / 8.0, 'DAYS': v,
+        'WEEKS': v * 5.0, 'MONTHS': v * 20.0, 'YEARS': v * 240.0,
+        'ELAPSED_MINUTES': v / 1440.0, 'ELAPSED_HOURS': v / 24.0,
+        'ELAPSED_DAYS': v, 'ELAPSED_WEEKS': v * 7.0,
+        'ELAPSED_MONTHS': v * 30.0, 'ELAPSED_YEARS': v * 365.0,
+    }
+    return table.get(u, v)
+
+
+def _mpxj_to_plan(pf, name: str) -> Plan:
+    """Конвертирует org.mpxj.ProjectFile в Plan."""
+    tasks = []
+    for jt in pf.getTasks():
+        if jt is None or bool(jt.getNull()):
+            continue
+        uid_v = jt.getUniqueID()
+        if uid_v is None or int(uid_v) == 0:
+            continue  # проектная сводка (UID 0)
+        uid = str(int(uid_v))
+
+        preds = []
+        try:
+            for rel in jt.getPredecessors():
+                tgt = rel.getPredecessorTask()
+                if tgt is not None and tgt.getUniqueID() is not None:
+                    preds.append(str(int(tgt.getUniqueID())))
+        except Exception:
+            pass
+
+        responsible = ''
+        try:
+            names = []
+            for a in jt.getResourceAssignments():
+                r = a.getResource()
+                if r is not None and r.getName():
+                    names.append(str(r.getName()))
+            responsible = ', '.join(names[:3])
+        except Exception:
+            pass
+
+        pct = jt.getPercentageComplete()
+        cost = jt.getCost()
+        level = jt.getOutlineLevel()
+        tasks.append(Task(
+            uid=uid,
+            name=str(jt.getName() or ''),
+            wbs=str(jt.getWBS() or ''),
+            outline_level=int(level) if level is not None else 1,
+            is_summary=bool(jt.getSummary()),
+            is_milestone=bool(jt.getMilestone()),
+            start=_ld(jt.getStart()),
+            finish=_ld(jt.getFinish()),
+            duration_days=_dur_days(jt.getDuration()),
+            percent_complete=float(pct) if pct is not None else 0.0,
+            predecessors=preds,
+            deadline=_ld(jt.getDeadline()),
+            cost=float(cost) if cost is not None else None,
+            baseline_start=_ld(jt.getBaselineStart()),
+            baseline_finish=_ld(jt.getBaselineFinish()),
+            responsible=responsible,
+            row_ref=f'mpp uid={uid}',
+        ))
+
+    by_uid = {t.uid: t for t in tasks}
+    for t in tasks:
+        for p in t.predecessors:
+            if p in by_uid:
+                by_uid[p].successors.append(t.uid)
+
+    if not tasks:
+        raise ValueError('В .mpp не найдено ни одной задачи')
+    return Plan(name=name, source_format='mpp', tasks=tasks,
+                columns_found=['uid', 'name', 'wbs', 'outline_level',
+                               'is_summary', 'is_milestone', 'start', 'finish',
+                               'duration', 'percent_complete', 'predecessors',
+                               'deadline', 'cost', 'baseline', 'responsible'])
 
 
 def parse_plan(path: str, filename: Optional[str] = None) -> Plan:

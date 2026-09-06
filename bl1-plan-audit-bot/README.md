@@ -61,7 +61,10 @@ tests/
 3. `systemctl restart plan-audit-bot`
 4. Проверка: `ps aux | grep bot_handler | grep -v grep | wc -l` = 1
 
-MPP-конвертер: Java + MPXJ на сервере, вызов через subprocess (см. plan_parser.py).
+MPP-поддержка: на сервере стоят `default-jre-headless` + pip-пакеты `jpype1`
+и `mpxj`; JVM поднимается внутри процесса бота при первом .mpp-файле
+(см. `parse_mpp` в plan_parser.py). API MPXJ 16: пакет `org.mpxj`,
+`Relation.getPredecessorTask()`, `TimeUnit.name()`.
 
-Статус: **каркас (skeleton)** — интерфейсы и LLM-контур готовы, тяжёлые
-части помечены `TODO(IMPL)`.
+Статус: **MVP работает** — полный пайплайн (.xlsx/.csv/.mpp → аналитика →
+Kimi k2.6 → сводка + PDF) задеплоен и прогнан e2e на сервере.
