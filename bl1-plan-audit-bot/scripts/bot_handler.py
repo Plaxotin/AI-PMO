@@ -138,14 +138,29 @@ class Bot:
 
         self.run_audit(chat_id, doc)
 
+    def _offer(self, chat_id: int, action: str, text: str):
+        """Одна follow-up кнопка: «Что дальше?»."""
+        self.call('sendMessage', json={
+            'chat_id': chat_id,
+            'text': 'Что дальше?',
+            'reply_markup': {'inline_keyboard': [[
+                {'text': text, 'callback_data': action}]]},
+        })
+
     def handle_callback(self, cq: dict):
-        chat_id = (cq.get('message') or {}).get('chat', {}).get('id')
+        msg = cq.get('message') or {}
+        chat_id = msg.get('chat', {}).get('id')
         action = cq.get('data')
         try:
             self.call('answerCallbackQuery', json={'id': cq['id']})
+            # убираем нажатую клавиатуру — защита от повторных запусков
+            if msg.get('message_id'):
+                self.call('editMessageReplyMarkup', json={
+                    'chat_id': chat_id, 'message_id': msg['message_id'],
+                    'reply_markup': {'inline_keyboard': []}})
         except Exception:
             pass
-        doc = self.pending.pop(chat_id, None)
+        doc = self.pending.get(chat_id)  # не pop: после конвертации может идти аудит
         if not doc:
             self.send_text(chat_id, '⚠️ Файл не найден (бот перезапускался?) — '
                                     'пришлите его ещё раз')
@@ -173,6 +188,7 @@ class Bot:
                                   f'({len(plan.leaves())} работ, '
                                   f'{len(plan.summaries())} сводок, '
                                   f'{len(plan.milestones())} вех)')
+            self._offer(chat_id, 'audit', '🔍 Начать аудит плана')
         except Exception as e:
             print(f'❌ ошибка конвертации: {e}')
             self.send_text(chat_id, f'❌ Не получилось: {e}')
@@ -219,6 +235,8 @@ class Bot:
             generate_pdf(plan, facts, llm_text, pdf_path)
             self.send_doc(chat_id, pdf_path,
                           caption='Полный отчёт по аудиту плана')
+            if file_name.lower().endswith('.mpp'):
+                self._offer(chat_id, 'xlsx', '📊 Конвертировать в Excel')
 
             state.remember_plan(chat_id, doc['file_id'], file_name)
         except Exception as e:
