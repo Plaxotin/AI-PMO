@@ -216,12 +216,13 @@ def compliance_score(violations: list) -> int:
 #   structure    — может ли CPM считать честные даты (логика сети)
 #   realism      — правдоподобны ли даты (резервы, длительности, валидность)
 #   performance  — поспевает ли проект (BEI, missed, CPLI)
-# Leads/lags/типы связей/жёсткие ограничения MS Project наш парсер пока
-# не извлекает — такие проверки помечаются status='n/a'.
+# Leads/lags/типы связей/жёсткие ограничения извлекаются из .mpp
+# (Task.pred_detail / Task.constraint_type); для xlsx/csv — status='n/a'.
 
 DCMA_HIGH_DAYS = 44          # high float / high duration: > 44 рабочих дней
 DCMA_THRESHOLD_PCT = 5.0     # типовой порог доли нарушений
 BEI_THRESHOLD = 0.95
+HARD_CONSTRAINTS = {'MUST_START_ON', 'MUST_FINISH_ON'}  # DCMA hard constraints
 
 
 def schedule_health(plan: Plan, report_date: date, cpm: dict) -> dict:
@@ -252,16 +253,50 @@ def schedule_health(plan: Plan, report_date: date, cpm: dict) -> dict:
     # D-01 Logic: у незавершённой задачи нет предшественника или последователя
     no_logic = [t for t in incomplete if not t.predecessors or not t.successors]
     add('D-01', 'Логика: задачи без связей', 'structure', no_logic)
-    # D-02 Leads / D-03 Lags / D-04 Типы связей / D-05 Жёсткие ограничения
-    for cid, name in (('D-02', 'Leads (отрицательные лаги)'),
-                      ('D-03', 'Lags (положительные лаги)'),
-                      ('D-04', 'Доля связей Finish-to-Start'),
-                      ('D-05', 'Жёсткие ограничения дат')):
-        checks.append({'id': cid, 'name': name, 'family': 'structure',
-                       'count': 0, 'percent': 0.0, 'threshold': 0,
-                       'status': 'n/a',
-                       'evidence': ['парсер пока не извлекает типы связей, лаги '
-                                    'и ограничения — полноценно доступно из .mpp']})
+    # D-02 Leads / D-03 Lags / D-04 Типы связей / D-05 Жёсткие ограничения.
+    # Доступно, когда источник несёт типы связей и ограничения (.mpp: pred_detail,
+    # constraint_type); иначе — n/a.
+    rels = [(t, p) for t in incomplete for p in (t.pred_detail or [])]
+    has_constraints = any(t.constraint_type for t in plan.leaves())
+
+    if rels:
+        leads = {t.uid: t for t, p in rels if p.get('lag_days', 0) < 0}
+        add('D-02', 'Leads (отрицательные лаги)', 'structure',
+            list(leads.values()))
+        lags = {t.uid: t for t, p in rels if p.get('lag_days', 0) > 0}
+        add('D-03', 'Lags (положительные лаги)', 'structure',
+            list(lags.values()))
+        non_fs = [(t, p) for t, p in rels if p.get('type') != 'FS']
+        pct = round(100.0 * len(non_fs) / len(rels), 1)
+        checks.append({
+            'id': 'D-04', 'name': 'Доля связей Finish-to-Start',
+            'family': 'structure', 'count': len(non_fs), 'percent': pct,
+            'threshold': DCMA_THRESHOLD_PCT,
+            'status': 'pass' if pct <= DCMA_THRESHOLD_PCT else 'fail',
+            'evidence': [f'{t.name} ({p.get("type")})'
+                         for t, p in non_fs[:10]] or
+                        [f'все {len(rels)} связей — Finish-to-Start'],
+        })
+    else:
+        for cid, name in (('D-02', 'Leads (отрицательные лаги)'),
+                          ('D-03', 'Lags (положительные лаги)'),
+                          ('D-04', 'Доля связей Finish-to-Start')):
+            checks.append({'id': cid, 'name': name, 'family': 'structure',
+                           'count': 0, 'percent': 0.0, 'threshold': 0,
+                           'status': 'n/a',
+                           'evidence': ['источник не несёт типов связей и лагов'
+                                        ' (доступно в .mpp)']})
+
+    if has_constraints:
+        hard = [t for t in incomplete
+                if t.constraint_type in HARD_CONSTRAINTS]
+        add('D-05', 'Жёсткие ограничения дат', 'structure', hard)
+    else:
+        checks.append({'id': 'D-05', 'name': 'Жёсткие ограничения дат',
+                       'family': 'structure', 'count': 0, 'percent': 0.0,
+                       'threshold': 0, 'status': 'n/a',
+                       'evidence': ['источник не несёт ограничений дат'
+                                    ' (доступно в .mpp)']})
 
     # --- realism ---
     high_float = [t for t in incomplete if floats.get(t.uid, 0) > DCMA_HIGH_DAYS]

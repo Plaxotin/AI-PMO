@@ -236,6 +236,10 @@ def _dur_days(dur) -> Optional[float]:
     return table.get(u, v)
 
 
+_REL_TYPES = {'FINISH_START': 'FS', 'START_START': 'SS',
+              'FINISH_FINISH': 'FF', 'START_FINISH': 'SF'}
+
+
 def _mpxj_to_plan(pf, name: str) -> Plan:
     """Конвертирует org.mpxj.ProjectFile в Plan."""
     tasks = []
@@ -248,11 +252,29 @@ def _mpxj_to_plan(pf, name: str) -> Plan:
         uid = str(int(uid_v))
 
         preds = []
+        pred_detail = []
         try:
             for rel in jt.getPredecessors():
                 tgt = rel.getPredecessorTask()
-                if tgt is not None and tgt.getUniqueID() is not None:
-                    preds.append(str(int(tgt.getUniqueID())))
+                if tgt is None or tgt.getUniqueID() is None:
+                    continue
+                puid = str(int(tgt.getUniqueID()))
+                preds.append(puid)
+                rtype = rel.getType()
+                pred_detail.append({
+                    'uid': puid,
+                    'type': _REL_TYPES.get(str(rtype.name())
+                                           if rtype is not None else '', 'FS'),
+                    'lag_days': _dur_days(rel.getLag()) or 0.0,
+                })
+        except Exception:
+            pass
+
+        constraint = ''
+        try:
+            ct = jt.getConstraintType()
+            if ct is not None:
+                constraint = str(ct.name())
         except Exception:
             pass
 
@@ -282,6 +304,8 @@ def _mpxj_to_plan(pf, name: str) -> Plan:
             duration_days=_dur_days(jt.getDuration()),
             percent_complete=float(pct) if pct is not None else 0.0,
             predecessors=preds,
+            pred_detail=pred_detail,
+            constraint_type=constraint,
             deadline=_ld(jt.getDeadline()),
             cost=float(cost) if cost is not None else None,
             baseline_start=_ld(jt.getBaselineStart()),
@@ -298,11 +322,13 @@ def _mpxj_to_plan(pf, name: str) -> Plan:
 
     if not tasks:
         raise ValueError('В .mpp не найдено ни одной задачи')
+    # columns_found — канонические имена полей, которые .mpp несёт всегда
+    # (на них опираются проверки R-07/R-08: для .mpp состав колонок присущ формату)
     return Plan(name=name, source_format='mpp', tasks=tasks,
-                columns_found=['uid', 'name', 'wbs', 'outline_level',
-                               'is_summary', 'is_milestone', 'start', 'finish',
+                columns_found=['uid', 'name', 'wbs', 'start', 'finish',
                                'duration', 'percent_complete', 'predecessors',
-                               'deadline', 'cost', 'baseline', 'responsible'])
+                               'deadline', 'cost', 'baseline_start',
+                               'baseline_finish', 'responsible'])
 
 
 def parse_plan(path: str, filename: Optional[str] = None) -> Plan:

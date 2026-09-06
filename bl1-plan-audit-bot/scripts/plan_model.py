@@ -25,6 +25,8 @@ class Task:
     percent_complete: float = 0.0     # 0..100
     predecessors: list = field(default_factory=list)   # list[uid]
     successors: list = field(default_factory=list)     # list[uid]
+    pred_detail: list = field(default_factory=list)    # [{'uid','type','lag_days'}] — из .mpp
+    constraint_type: str = ""                          # org.mpxj.ConstraintType.name() — из .mpp
     deadline: Optional[date] = None
     cost: Optional[float] = None                       # «Затраты» (по Инструкции сумма = 100)
     baseline_start: Optional[date] = None
