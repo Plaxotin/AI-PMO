@@ -72,6 +72,21 @@ AI PMO toolbox — набор фич вокруг Telegram-ботов и Google 
 - Конфиги на сервере (не в репо!): `.credentials/` — telegram.json (token, owner_id),
   config.json (allowed_user_ids, pro_quota), kimi.json (модели kimi-k2.6 / kimi-k3).
 
+## BL-1 «Аудит проектного плана» (Telegram-бот) — статус: каркас (старт 06.09.26)
+
+- Отдельный бот (свой токен, сервис `plan-audit-bot`), каркас в `bl1-plan-audit-bot/`
+  (scripts/: bot_handler, config, plan_model, plan_parser, analytics, diff, llm, report, pdf, state).
+- Рамка фичи и решения — в Notion, страница BL-1. Спека SPEC-PLAN-AUDIT.md — вторична (веб-версия не строим).
+- Решения 06.09.26: .mpp в MVP (MPXJ-конвертер на сервере); маскирования ПДн НЕТ;
+  версии плана хранятся в истории Telegram (бот держит только file_id в state.json);
+  PDF упрощённый (без диаграмм D-01…D-04).
+- Пайплайн: файл → parse_plan → run_analysis (CPM + правила Инструкции R-01…R-12,
+  детерминированно) → LLM Kimi k2.6 (thinking ВКЛЮЧЁН, max_tokens=16000, timeout=300)
+  → сводка в чат + PDF. Качество результата важнее времени и стоимости анализа.
+- LLM работает только с фактами аналитики — нарушения не выдумывает.
+- Деплой (план): `/opt/plan-audit-bot/`, сервис `plan-audit-bot.service`, цикл как у BL-6.
+- TODO: маппинг MPXJ JSON → Plan; эталонный корпус планов для регрессии качества.
+
 ## Ключевые люди
 
 - Константин @plaxotin (uid 107227641) — владелец, админ
