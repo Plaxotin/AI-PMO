@@ -12,6 +12,11 @@ PM присылает боту файл плана (.xlsx / .csv / .mpp) → б�
 LLM (Kimi k2.6, thinking включён) интерпретирует факты → бот отвечает
 краткой сводкой в чат + PDF-отчётом.
 
+Отдельная пользовательская функция: при отправке .mpp бот предлагает
+inline-кнопки — «🔍 Аудит плана» или «📊 Конвертировать в Excel»
+(xlsx_export.py; заголовки из COLUMN_SYNONYMS, файл читается обратно
+парсером — round-trip проверен на реальном плане: 632 задачи, 0 расхождений).
+
 Отчёт построен по лучшим практикам: Asana (health-тег on track / at risk /
 off track, инвертированная пирамида, next steps со сроками), PMI (EVM,
 variance analysis «причина → влияние → действие», RAG), DCMA 14-point
@@ -40,6 +45,7 @@ scripts/
   llm.py           # Kimi k2.6: интерпретация фактов, рекомендации (thinking on)
   report.py        # краткая сводка для чата
   pdf.py           # упрощённый PDF-отчёт (reportlab)
+  xlsx_export.py   # конвертация Plan → .xlsx (кнопка «В Excel» для .mpp)
   state.py         # история file_id по чатам (метаданные, не файлы)
 tests/
   test_smoke.py    # импорты + мини-тест CPM

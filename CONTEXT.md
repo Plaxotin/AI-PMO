@@ -79,7 +79,7 @@ AI PMO toolbox — набор фич вокруг Telegram-ботов и Google 
 
 - Отдельный бот: сервер `/opt/plan-audit-bot/`, сервис `plan-audit-bot.service`,
   код в `bl1-plan-audit-bot/` (scripts/: bot_handler, config, plan_model, plan_parser,
-  analytics, diff, llm, report, pdf, state). Деплой-цикл как у BL-6.
+  analytics, diff, llm, report, pdf, xlsx_export, state). Деплой-цикл как у BL-6.
 - Рамка фичи и решения — в Notion, страница BL-1. Спека SPEC-PLAN-AUDIT.md — вторична (веб-версия не строим).
 - Решения 06.09.26: .mpp в MVP (РЕАЛИЗОВАНО: default-jre-headless + pip jpype1/mpxj,
   JVM внутри процесса бота; маппинг MPXJ → Plan протестирован: связи, длительности,
@@ -88,6 +88,10 @@ AI PMO toolbox — набор фич вокруг Telegram-ботов и Google 
 - Пайплайн: файл → parse_plan → run_analysis → LLM Kimi k2.6 (thinking ВКЛЮЧЁН,
   max_tokens=16000, timeout=300, ответ ~2,5 мин) → сводка в чат + PDF.
   Качество результата важнее времени и стоимости анализа.
+- Вторая пользовательская функция (06.09.26): конвертация .mpp → Excel.
+  На .mpp бот отвечает inline-кнопками «Аудит» / «В Excel» (callback_query);
+  xlsx_export.py пишет заголовки из COLUMN_SYNONYMS + колонку «Тип»
+  (round-trip точный: 632 задачи, 0 расхождений, включая вехи-сводки).
 - Аналитика (детерминированно, без LLM): CPM; правила Инструкции R-01…R-12;
   DCMA 14-point (адаптация D-01…D-14: логика, резервы, длительности, валидность дат,
   ресурсы, BEI, тест крит. пути; leads/lags/типы связей/ограничения — из .mpp);

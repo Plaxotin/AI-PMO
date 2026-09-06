@@ -21,6 +21,7 @@ import analytics
 import llm
 import plan_parser
 import state
+import xlsx_export
 from config import load_telegram_config
 from pdf import generate_pdf
 from report import build_chat_summary
@@ -32,8 +33,9 @@ ALLOWED_EXT = ('.xlsx', '.xls', '.csv', '.mpp')
 
 HELP_TEXT = (
     '👋 Привет! Я аудитую проектные планы.\n\n'
-    'Просто пришлите файл плана (.xlsx, .csv или .mpp) — я проверю его '
+    'Пришлите файл плана (.xlsx, .csv или .mpp) — проверю его '
     'по корпоративной Инструкции, найду риски и верну сводку и PDF-отчёт.\n\n'
+    'Для .mpp предложу на выбор: аудит или конвертацию в Excel.\n'
     'Пришлите новую версию позже — покажу, что изменилось.'
 )
 
@@ -61,6 +63,7 @@ class Bot:
         self.token = token
         self.api = f'https://api.telegram.org/bot{token}'
         self.offset = 0
+        self.pending = {}  # chat_id → doc: .mpp ждёт выбора действия
 
     # --- Telegram API ---
     def call(self, method: str, **kwargs):
@@ -119,6 +122,70 @@ class Bot:
             self.send_text(chat_id, f'⚠️ Файл больше {MAX_FILE_MB} МБ не принимаю')
             return
 
+        # .mpp — на выбор: аудит или конвертация в Excel
+        if ext == '.mpp':
+            self.pending[chat_id] = doc
+            self.call('sendMessage', json={
+                'chat_id': chat_id,
+                'text': f'📥 Принял «{file_name}». Что сделать с файлом?',
+                'reply_markup': {'inline_keyboard': [[
+                    {'text': '🔍 Аудит плана', 'callback_data': 'audit'},
+                    {'text': '📊 Конвертировать в Excel',
+                     'callback_data': 'xlsx'},
+                ]]},
+            })
+            return
+
+        self.run_audit(chat_id, doc)
+
+    def handle_callback(self, cq: dict):
+        chat_id = (cq.get('message') or {}).get('chat', {}).get('id')
+        action = cq.get('data')
+        try:
+            self.call('answerCallbackQuery', json={'id': cq['id']})
+        except Exception:
+            pass
+        doc = self.pending.pop(chat_id, None)
+        if not doc:
+            self.send_text(chat_id, '⚠️ Файл не найден (бот перезапускался?) — '
+                                    'пришлите его ещё раз')
+            return
+        if action == 'xlsx':
+            self.convert_document(chat_id, doc)
+        else:
+            self.run_audit(chat_id, doc)
+
+    def convert_document(self, chat_id: int, doc: dict):
+        """Конвертация .mpp → .xlsx и отправка результата."""
+        file_name = doc.get('file_name', 'plan.mpp')
+        self.send_text(chat_id, f'📊 Конвертирую «{file_name}» в Excel…')
+        tmpdir = tempfile.mkdtemp(prefix='bl1conv_')
+        local_path = os.path.join(tmpdir, file_name)
+        xlsx_path = None
+        try:
+            self.download(doc['file_id'], local_path)
+            plan = plan_parser.parse_mpp(local_path, file_name)
+            xlsx_path = os.path.join(
+                tmpdir, os.path.splitext(file_name)[0] + '.xlsx')
+            xlsx_export.plan_to_xlsx(plan, xlsx_path)
+            self.send_doc(chat_id, xlsx_path,
+                          caption=f'Готово: {len(plan.tasks)} задач '
+                                  f'({len(plan.leaves())} работ, '
+                                  f'{len(plan.summaries())} сводок, '
+                                  f'{len(plan.milestones())} вех)')
+        except Exception as e:
+            print(f'❌ ошибка конвертации: {e}')
+            self.send_text(chat_id, f'❌ Не получилось: {e}')
+        finally:
+            for p in (local_path, xlsx_path):
+                try:
+                    if p and os.path.exists(p):
+                        os.unlink(p)
+                except Exception:
+                    pass
+
+    def run_audit(self, chat_id: int, doc: dict):
+        file_name = doc.get('file_name', 'plan')
         self.send_text(chat_id, f'📥 Принял «{file_name}», начинаю аудит…')
         tmpdir = tempfile.mkdtemp(prefix='bl1_')
         local_path = os.path.join(tmpdir, file_name)
@@ -175,6 +242,9 @@ class Bot:
                     'offset': self.offset, 'timeout': POLL_TIMEOUT})
                 for upd in data.get('result', []):
                     self.offset = upd['update_id'] + 1
+                    if upd.get('callback_query'):
+                        self.handle_callback(upd['callback_query'])
+                        continue
                     msg = upd.get('message') or {}
                     chat_id = (msg.get('chat') or {}).get('id')
                     if not chat_id:

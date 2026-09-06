@@ -29,6 +29,7 @@ COLUMN_SYNONYMS = {
     'baseline_start': ['базовое начало', 'baseline start', 'баз. начало'],
     'baseline_finish': ['базовое окончание', 'baseline finish', 'баз. окончание'],
     'responsible': ['ответственный', 'ресурсы', 'resources', 'resource names', 'исполнитель'],
+    'typ': ['тип', 'type', 'категория'],  # колонка из нашего экспорта .mpp→xlsx
 }
 
 DATE_FORMATS = ('%d.%m.%Y', '%Y-%m-%d', '%d.%m.%y', '%m/%d/%Y', '%d/%m/%Y')
@@ -94,6 +95,7 @@ def _rows_to_plan(rows: list, headers: list, name: str, fmt: str) -> Plan:
         return row[i] if i is not None and i < len(row) else None
 
     tasks = []
+    typs = []
     for idx, row in enumerate(rows, start=2):  # +1 строка заголовка
         task_name = cell(row, 'name')
         if task_name is None or str(task_name).strip() == '':
@@ -109,6 +111,7 @@ def _rows_to_plan(rows: list, headers: list, name: str, fmt: str) -> Plan:
             stripped = raw.lstrip()
             outline = max(1, (len(raw) - len(stripped)) // 2 + 1)
         duration = _parse_float(cell(row, 'duration'))
+        typs.append(str(cell(row, 'typ') or '').strip().lower())
         tasks.append(Task(
             uid=uid,
             name=str(task_name).strip(),
@@ -138,6 +141,15 @@ def _rows_to_plan(rows: list, headers: list, name: str, fmt: str) -> Plan:
             t.is_summary = True
         elif duration_is_zero_milestone(t):
             t.is_milestone = True
+
+    # Явная колонка «Тип» (наш экспорт .mpp→xlsx) переопределяет эвристику:
+    # веха с ненулевой длительностью в mpp не должна теряться при round-trip
+    for t, typ in zip(tasks, typs):
+        if 'сводка' in typ:
+            t.is_summary = True
+            t.is_milestone = 'веха' in typ
+        elif 'веха' in typ:
+            t.is_milestone, t.is_summary = True, False
 
     # successors — обратные связи из predecessors
     by_uid = {t.uid: t for t in tasks}
