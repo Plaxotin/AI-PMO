@@ -1638,8 +1638,8 @@ def _advance_collect_username(chat_id, key, data: Dict):
 
 _processed_callbacks = set()
 _MAX_CALLBACK_CACHE = 1000
-# Антиповтор для рассылки дайджеста: ключ пользователя → ts последнего запуска
-_digest_last_run: Dict[str, float] = {}
+# Флаг «дайджест формируется прямо сейчас»: ключ пользователя → bool
+_digest_running: Dict[str, bool] = {}
 
 def process_callback(callback: Dict):
     callback_id = callback.get('id')
@@ -1757,24 +1757,27 @@ def process_callback(callback: Dict):
         if role != "admin":
             answer_callback_query(callback_id, text="❌ Только для администраторов.")
             return
-        # Защита от повторных нажатий, пока дайджест формируется (это долго)
-        now_ts = time.time()
-        last = _digest_last_run.get(key, 0)
-        if now_ts - last < 240:
+        # Блокируем только пока дайджест реально формируется (флаг снимается
+        # по завершении), а не фиксированные 240 сек — иначе следующую
+        # отправку в другой чат приходится ждать 4 минуты.
+        if _digest_running.get(key):
             answer_callback_query(callback_id,
                                   text="⏳ Дайджест уже формируется, подождите...")
             return
-        _digest_last_run[key] = now_ts
+        _digest_running[key] = True
         # Сразу снимаем «часики» с кнопки — формирование займёт до минуты+
         answer_callback_query(callback_id, text="⏳ Формирую дайджест...")
-        target = data.split(":", 1)[1]
-        if target == "all":
-            response = cmd_digest()
-        elif target == "me":
-            # Личка админа: chat_id диалога с ботом
-            response = cmd_digest(chats=str(chat_id))
-        else:
-            response = cmd_digest(chats=target)
+        try:
+            target = data.split(":", 1)[1]
+            if target == "all":
+                response = cmd_digest()
+            elif target == "me":
+                # Личка админа: chat_id диалога с ботом
+                response = cmd_digest(chats=str(chat_id))
+            else:
+                response = cmd_digest(chats=target)
+        finally:
+            _digest_running[key] = False
         send_message(chat_id, response)
         return
 
