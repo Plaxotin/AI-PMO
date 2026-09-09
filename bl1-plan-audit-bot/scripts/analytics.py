@@ -108,7 +108,26 @@ def compute_metrics(plan: Plan, report_date: date) -> dict:
     }
 
 
-# ---------- Правила Инструкции R-01…R-12 ----------
+# ---------- Правила качества планирования (внутренний чек-лист R-01…R-12) ----------
+# Коды R-NN и ссылки на корпоративную Инструкцию используются только внутри
+# анализа; в пользовательский вывод они не попадают (решение от 10.09.2026) —
+# наружу выходят человеческие формулировки из RULE_TITLES.
+
+RULE_TITLES = {
+    'R-01': 'Задачи без связей (нет предшественников и/или последователей)',
+    'R-02': 'Связи назначены на этапы (суммарные задачи)',
+    'R-03': 'Завышенный резерв у критических задач',
+    'R-04': 'Контрольные вехи без крайнего срока или с ненулевой длительностью',
+    'R-05': 'В плане нет раздела ключевых вех',
+    'R-06': 'Не заполнен вес задач (колонка «Затраты»)',
+    'R-07': 'Не сохранён базовый план / нет базовых сроков',
+    'R-08': 'Не хватает рекомендованных колонок плана',
+    'R-09': 'Незавершённые задачи со сроками «в прошлом»',
+    'R-10': 'Не актуализированы задачи, которые по графику должны были начаться',
+    'R-11': 'Отклонение от базового плана более 30 дней без пересмотра',
+    'R-12': 'Отклонение даты окончания от базовой даты',
+}
+
 
 def check_compliance(plan: Plan, report_date: date, cpm: dict) -> list:
     """Возвращает список нарушений:
@@ -120,7 +139,8 @@ def check_compliance(plan: Plan, report_date: date, cpm: dict) -> list:
 
     def add(rule, severity, items, ref):
         if items:
-            v.append({'rule': rule, 'severity': severity, 'count': len(items),
+            v.append({'rule': rule, 'title': RULE_TITLES.get(rule, rule),
+                      'severity': severity, 'count': len(items),
                       'evidence': items[:10], 'ref': ref})
 
     # R-01: «подвисшие» задачи — нет ни предшественников, ни последователей
@@ -441,34 +461,50 @@ def health_verdict(metrics: dict, evm: dict, violations: list,
     structure_fails = [c for c in fails if c['family'] == 'structure']
 
     if overdue_pct > 15:
-        reasons_red.append(f'просрочено {metrics["overdue"]} задач ({overdue_pct:.0f}%)')
+        reasons_red.append(
+            f'просрочено {metrics["overdue"]} задач из {metrics["tasks_total"]} '
+            f'({overdue_pct:.0f} %) — сроки уже вышли, а работы не завершены')
     elif metrics['overdue'] > 0:
-        reasons_yellow.append(f'есть просроченные задачи ({metrics["overdue"]})')
+        reasons_yellow.append(
+            f'есть просроченные задачи ({metrics["overdue"]}) — срок вышел, '
+            f'работа не завершена')
     if spi is not None:
+        done_pct = round(spi * 100)
         if spi < 0.8:
-            reasons_red.append(f'SPI = {spi} (существенное отставание)')
+            reasons_red.append(
+                f'работы выполняются на {done_pct} % от графика '
+                f'(SPI = {spi}) — команда успевает примерно 1 из '
+                f'{round(1 / spi)} запланированных объёмов')
         elif spi < 0.95:
-            reasons_yellow.append(f'SPI = {spi}')
+            reasons_yellow.append(
+                f'работы выполняются на {done_pct} % от графика (SPI = {spi})')
     if bei is not None:
+        bei_pct = round(bei * 100)
         if bei < 0.8:
-            reasons_red.append(f'BEI = {bei} (базовый план срывается)')
+            reasons_red.append(
+                f'из задач, которые по базовому плану должны быть завершены '
+                f'к сегодня, выполнено лишь {bei_pct} % (BEI = {bei})')
         elif bei < BEI_THRESHOLD:
-            reasons_yellow.append(f'BEI = {bei}')
+            reasons_yellow.append(
+                f'из запланированных к сегодня задач выполнено {bei_pct} % '
+                f'(BEI = {bei})')
     if score < 60:
-        reasons_red.append(f'соответствие Инструкции {score}/100')
+        reasons_red.append(f'оформление плана не соответствует стандарту '
+                           f'({score} из 100 баллов)')
     elif score < 85:
-        reasons_yellow.append(f'соответствие Инструкции {score}/100')
+        reasons_yellow.append(f'оформление плана частично не соответствует '
+                              f'стандарту ({score} из 100 баллов)')
     if structure_fails:
         reasons_yellow.append('структурные проблемы сети задач: '
-                              + ', '.join(c["id"] for c in structure_fails))
+                              + ', '.join(c['name'] for c in structure_fails))
 
     if reasons_red:
-        return {'status': 'off_track', 'label': '🔴 Off track (срыв)',
+        return {'status': 'off_track', 'label': '🔴 Срыв сроков',
                 'reasons': reasons_red + reasons_yellow}
     if reasons_yellow:
-        return {'status': 'at_risk', 'label': '🟡 At risk (риск срыва)',
+        return {'status': 'at_risk', 'label': '🟡 Есть риск срыва',
                 'reasons': reasons_yellow}
-    return {'status': 'on_track', 'label': '🟢 On track (в графике)',
+    return {'status': 'on_track', 'label': '🟢 В графике',
             'reasons': ['критических отклонений не выявлено']}
 
 

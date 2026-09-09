@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""PDF-отчёт BL-1 — структура по лучшим практикам PMI / Asana / DCMA.
+"""PDF-отчёт BL-1 — «понять за 5 минут» (редизайн от 10.09.2026).
 
-Секции: шапка со статусом здоровья (RAG) → ключевые метрики → качество
-расписания (DCMA-проверки с pass/fail) → освоенный объём (SPI) →
-соответствие Инструкции → дифф → заключение аудитора (LLM).
+Структура (лучшие практики PMI / Asana, фидбек пользователя):
+1. Шапка со статусом здоровья (RAG) — без служебных баллов;
+2. «План в цифрах» — каждая метрика с пояснением, как её читать;
+3. Заключение аудитора (LLM) — главная часть отчёта;
+4. Приложение с детальными таблицами — для тех, кто хочет глубже.
 
-Решением от 06.09.2026 — без диаграмм D-01…D-04 (упрощённый шаблон).
+Служебные коды правил (R-NN, D-NN) и упоминания корпоративной Инструкции
+в отчёт не попадают — только суть проверок человеческим языком.
 Шрифт с кириллицей: DejaVu Sans (пакет fonts-dejavu на сервере).
 """
 
@@ -28,9 +31,9 @@ FONT_BOLD_PATHS = (
 )
 
 STATUS_LABELS = {
-    'on_track': 'ON TRACK — в графике',
-    'at_risk': 'AT RISK — риск срыва',
-    'off_track': 'OFF TRACK — срыв',
+    'on_track': 'В ГРАФИКЕ',
+    'at_risk': 'ЕСТЬ РИСК СРЫВА',
+    'off_track': 'СРЫВ СРОКОВ',
 }
 
 STATUS_COLORS = {
@@ -85,6 +88,47 @@ def _pdf_safe(text: str) -> str:
     return _EMOJI_RE.sub('', text)
 
 
+def _metrics_rows(facts: dict) -> list:
+    """«План в цифрах»: показатель → значение → как читать."""
+    m = facts['metrics']
+    total = max(1, m['tasks_total'])
+    rows = [
+        ('Всего задач', str(m['tasks_total']),
+         f"в том числе этапов: {m['summaries']}, контрольных вех: {m['milestones']}"),
+        ('Выполнено', f"{m['done']} ({round(100 * m['done'] / total)} %)",
+         'задачи закрыты полностью'),
+        ('В работе', f"{m['in_progress']} ({round(100 * m['in_progress'] / total)} %)",
+         'начаты, но не завершены'),
+        ('Не начато', f"{m['not_started']} ({round(100 * m['not_started'] / total)} %)",
+         'работа ещё не начиналась'),
+        ('Просрочено', f"{m['overdue']} ({round(100 * m['overdue'] / total)} %)",
+         'срок вышел, а работа не завершена — требуют переноса или решения'),
+        ('Критический путь', str(facts['cpm']['critical_count']),
+         'задач без запаса по срокам: задержка любой из них сдвигает '
+         'весь проект'),
+    ]
+    evm = facts.get('evm', {})
+    if evm.get('available') and evm.get('spi') is not None:
+        spi = evm['spi']
+        if spi >= 0.95:
+            verdict = 'проект поспевает за графиком'
+        elif spi >= 0.8:
+            verdict = 'умеренное отставание'
+        else:
+            verdict = f'отставание примерно в {round(1 / spi, 1)} раза'
+        basis = ('оценка по длительностям задач — в плане нет затрат'
+                 if evm.get('proxy') else 'веса по затратам')
+        rows.append(('Темп выполнения (SPI)', str(spi),
+                     f'работы выполняются на {round(spi * 100)} % от графика — '
+                     f'{verdict} ({basis})'))
+    bei = facts.get('schedule_health', {}).get('bei')
+    if bei is not None:
+        rows.append(('Выполнение базового плана (BEI)', str(bei),
+                     f'из задач, запланированных к сегодня, выполнено '
+                     f'{round(bei * 100)} % (норма ≥ 95 %)'))
+    return rows
+
+
 def generate_pdf(plan: Plan, facts: dict, llm_text: Optional[str],
                  out_path: str) -> str:
     """Собирает PDF в out_path, возвращает путь."""
@@ -103,6 +147,7 @@ def generate_pdf(plan: Plan, facts: dict, llm_text: Optional[str],
     bullet = ParagraphStyle('bullet', parent=body, leftIndent=4 * mm,
                             bulletIndent=1 * mm)
     small = ParagraphStyle('small', fontName=font, fontSize=8, leading=10)
+    cell = ParagraphStyle('cell', parent=small)
 
     def base_table_style(extra=()):
         return TableStyle([
@@ -126,12 +171,10 @@ def generate_pdf(plan: Plan, facts: dict, llm_text: Optional[str],
                        f"Источник: {facts['source_format']}", small),
              Spacer(1, 3 * mm)]
 
-    # --- Шапка здоровья (RAG, Asana-style) ---
+    # --- 1. Шапка здоровья (RAG, Asana-style) ---
     status_label = STATUS_LABELS.get(status, health.get('label', '—'))
-    rag = Table([[Paragraph(f"<font color='white'><b>{status_label}</b>"
-                            f"&nbsp;&nbsp;·&nbsp;&nbsp;Инструкция: "
-                            f"{facts['compliance_score']}/100</font>", body)]],
-                colWidths=[180 * mm])
+    rag = Table([[Paragraph(f"<font color='white'><b>{status_label}</b></font>",
+                            body)]], colWidths=[180 * mm])
     rag.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (0, 0), colors.Color(*sc)),
         ('LEFTPADDING', (0, 0), (-1, -1), 8),
@@ -139,87 +182,21 @@ def generate_pdf(plan: Plan, facts: dict, llm_text: Optional[str],
         ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
     ]))
     story.append(rag)
+    story.append(Spacer(1, 1.5 * mm))
     for reason in health.get('reasons', [])[:5]:
         story.append(Paragraph('• ' + _pdf_safe(_md_inline(reason)), bullet))
 
-    # --- Ключевые метрики ---
-    m = facts['metrics']
-    story.append(Paragraph('Ключевые метрики', h2))
-    evm = facts.get('evm', {})
-    spi_txt = '—'
-    if evm.get('available') and evm.get('spi') is not None:
-        spi_txt = str(evm['spi']) + (' (proxy)' if evm.get('proxy') else '')
-    bei = facts.get('schedule_health', {}).get('bei')
-    tbl = Table([
-        ['Задач', 'Выполнено', 'В работе', 'Не начато', 'Просрочено',
-         'Крит. путь', 'SPI', 'BEI'],
-        [str(m['tasks_total']), str(m['done']), str(m['in_progress']),
-         str(m['not_started']), str(m['overdue']),
-         str(facts['cpm']['critical_count']), spi_txt,
-         str(bei) if bei is not None else '—'],
-    ])
+    # --- 2. План в цифрах (с пояснениями) ---
+    story.append(Paragraph('План в цифрах', h2))
+    rows = [['Показатель', 'Значение', 'Как читать']]
+    for name, value, hint in _metrics_rows(facts):
+        rows.append([Paragraph(_pdf_safe(_md_inline(name)), cell), value,
+                     Paragraph(_pdf_safe(_md_inline(hint)), cell)])
+    tbl = Table(rows, colWidths=[50 * mm, 25 * mm, 105 * mm])
     tbl.setStyle(base_table_style())
     story.append(tbl)
-    if evm.get('available'):
-        story.append(Paragraph(
-            f"Освоенный объём (PMI): PV = {evm['pv_pct']} %, EV = {evm['ev_pct']} % "
-            f"от общего объёма; база весов — {evm['basis']}. "
-            f"Интерпретация: {evm['interpretation']}.", small))
 
-    # --- Качество расписания (DCMA) ---
-    sched = facts.get('schedule_health', {})
-    checks = sched.get('checks', [])
-    if checks:
-        story.append(Paragraph('Качество расписания (по методологии DCMA)', h2))
-        icon = {'pass': 'да', 'fail': 'НЕТ', 'n/a': '—'}
-        family_names = {'structure': 'Структура сети', 'realism': 'Реалистичность',
-                        'performance': 'Исполнение'}
-        rows = [['OK', 'Проверка', 'Семейство', 'Нарушений', 'Доля']]
-        row_colors = []
-        for c in checks:
-            rows.append([icon.get(c['status'], '?'), c['name'],
-                         family_names.get(c['family'], c['family']),
-                         str(c['count']) if c['status'] != 'n/a' else '—',
-                         f"{c['percent']} %" if c['status'] != 'n/a' else 'н/д'])
-            if c['status'] == 'fail':
-                row_colors.append(len(rows) - 1)
-        tbl = Table(rows, colWidths=[12 * mm, 62 * mm, 30 * mm, 22 * mm, 18 * mm])
-        style = [('TEXTCOLOR', (0, r), (0, r), colors.red)
-                 for r in row_colors]
-        tbl.setStyle(base_table_style(style))
-        story.append(tbl)
-        fails = [c for c in checks if c['status'] == 'fail']
-        for c in fails[:4]:
-            if c['evidence']:
-                story.append(Paragraph(
-                    f"<b>{c['id']}</b>: {_pdf_safe(_md_inline('; '.join(c['evidence'][:3])))}",
-                    small))
-
-    # --- Соответствие Инструкции ---
-    if facts['compliance']:
-        story.append(Paragraph('Соответствие корпоративной Инструкции (R-01…R-12)', h2))
-        cell = ParagraphStyle('cell', parent=small)
-        rows = [['Правило', 'Важность', 'Кол-во', 'Пункт', 'Примеры']]
-        for v in facts['compliance']:
-            rows.append([v['rule'], v['severity'], str(v['count']),
-                         Paragraph(_pdf_safe(_md_inline(v.get('ref', ''))), cell),
-                         Paragraph(_pdf_safe(_md_inline('; '.join(v['evidence'][:2]))), cell)])
-        tbl = Table(rows, colWidths=[15 * mm, 19 * mm, 14 * mm, 60 * mm, 62 * mm])
-        tbl.setStyle(base_table_style())
-        story.append(tbl)
-
-    # --- Дифф ---
-    diff = facts.get('diff')
-    if diff:
-        story.append(Paragraph('Изменения к предыдущей версии', h2))
-        story.append(Paragraph(
-            f"Добавлено: {diff['added_count']} · Удалено: {diff['removed_count']} · "
-            f"Сдвигов сроков: {diff['shifted_count']} · "
-            f"Изменений прогресса: {diff['progress_count']}", body))
-        for line in (diff['shifted'][:10] + diff['added'][:5] + diff['removed'][:5]):
-            story.append(Paragraph('• ' + _pdf_safe(_md_inline(line)), bullet))
-
-    # --- Заключение аудитора (LLM) ---
+    # --- 3. Заключение аудитора (LLM) — главная часть ---
     if llm_text:
         story.append(Paragraph('Заключение аудитора', h2))
         for line in llm_text.splitlines():
@@ -235,6 +212,80 @@ def generate_pdf(plan: Plan, facts: dict, llm_text: Optional[str],
                     re.sub(r'^(\d+[\.\)]\s|[-•]\s)', '', s))), bullet))
             else:
                 story.append(Paragraph(_pdf_safe(_md_inline(s)), body))
+
+    # --- 4. Приложение: детали для проверки ---
+    story.append(Spacer(1, 6 * mm))
+    story.append(Paragraph('Приложение. Детализация проверок', h1))
+
+    # 4.1 Качество плана (бывш. DCMA) — с легендой, как читать
+    sched = facts.get('schedule_health', {})
+    checks = sched.get('checks', [])
+    if checks:
+        story.append(Paragraph('Качество плана', h2))
+        story.append(Paragraph(
+            'Каждая проверка оценивает долю задач с определённым дефектом. '
+            'Норма: не более 5 % задач (если не указано иное). Строки, где '
+            'норма нарушена, выделены красным. «н/д» — проверка неприменима '
+            'к этому источнику (нужен исходный .mpp).', small))
+        story.append(Spacer(1, 1.5 * mm))
+        icon = {'pass': 'норма', 'fail': 'НАРУШЕНО', 'n/a': 'н/д'}
+        family_names = {'structure': 'Логика сети', 'realism': 'Реалистичность',
+                        'performance': 'Исполнение'}
+        rows = [['Итог', 'Проверка', 'Группа', 'Нарушений', 'Доля']]
+        row_colors = []
+        for c in checks:
+            rows.append([icon.get(c['status'], '?'), c['name'],
+                         family_names.get(c['family'], c['family']),
+                         str(c['count']) if c['status'] != 'n/a' else '—',
+                         f"{c['percent']} %" if c['status'] != 'n/a' else 'н/д'])
+            if c['status'] == 'fail':
+                row_colors.append(len(rows) - 1)
+        tbl = Table(rows, colWidths=[22 * mm, 62 * mm, 30 * mm, 22 * mm, 18 * mm],
+                    repeatRows=1)
+        style = [('TEXTCOLOR', (0, r), (0, r), colors.red)
+                 for r in row_colors]
+        tbl.setStyle(base_table_style(style))
+        story.append(tbl)
+        fails = [c for c in checks if c['status'] == 'fail']
+        if fails:
+            story.append(Spacer(1, 1.5 * mm))
+            story.append(Paragraph('Примеры нарушений:', small))
+            for c in fails[:4]:
+                if c['evidence']:
+                    story.append(Paragraph(
+                        f"<b>{c['name']}</b>: "
+                        f"{_pdf_safe(_md_inline('; '.join(c['evidence'][:3])))}",
+                        small))
+
+    # 4.2 Оформление плана — суть без кодов и ссылок на Инструкцию
+    if facts['compliance']:
+        story.append(Paragraph('Оформление плана против стандарта', h2))
+        sev_names = {'high': 'критично', 'medium': 'важно', 'info': 'к сведению'}
+        rows = [['Что не так', 'Важность', 'Кол-во', 'Примеры']]
+        for v in facts['compliance']:
+            rows.append([Paragraph(_pdf_safe(_md_inline(
+                             v.get('title', v['rule']))), cell),
+                         sev_names.get(v['severity'], v['severity']),
+                         str(v['count']),
+                         Paragraph(_pdf_safe(_md_inline(
+                             '; '.join(v['evidence'][:2]))), cell)])
+        tbl = Table(rows, colWidths=[48 * mm, 20 * mm, 14 * mm, 98 * mm],
+                    repeatRows=1)
+        tbl.setStyle(base_table_style())
+        story.append(tbl)
+
+    # 4.3 Дифф к предыдущей версии
+    diff = facts.get('diff')
+    if diff:
+        story.append(Paragraph('Изменения к предыдущей версии', h2))
+        story.append(Paragraph(
+            f"Добавлено задач: {diff['added_count']} · "
+            f"Удалено: {diff['removed_count']} · "
+            f"Сдвигов сроков: {diff['shifted_count']} · "
+            f"Изменений прогресса: {diff['progress_count']}", body))
+        for line in (diff['shifted'][:10] + diff['added'][:5]
+                     + diff['removed'][:5]):
+            story.append(Paragraph('• ' + _pdf_safe(_md_inline(line)), bullet))
 
     doc.build(story)
     return out_path
