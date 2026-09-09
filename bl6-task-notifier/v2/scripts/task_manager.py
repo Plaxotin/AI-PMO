@@ -245,7 +245,7 @@ def add_task(args):
     dl_idx = col_map.get("deadline_fallback", col_map.get("deadline"))
     if dl_idx is not None:
         row[dl_idx] = args.deadline
-    put("status", args.status or "Новое")
+    put("status", args.status or "В работе")
     put("closed", "")
     put("comment", args.comment or "")
 
@@ -255,7 +255,7 @@ def add_task(args):
     print(f"   Контрагент: {args.contragent}")
     print(f"   Ответственный: {args.assignee}")
     print(f"   Срок: {args.deadline}")
-    print(f"   Статус: {args.status or 'Новое'}")
+    print(f"   Статус: {args.status or 'В работе'}")
 
 def list_tasks(args):
     """Выводит список поручений."""
@@ -668,10 +668,33 @@ def _get_chat_title(token: str, chat_id) -> str:
     return str(chat_id)
 
 
+LAST_DIGEST_FILE = os.path.join(CREDS_DIR, 'last_digest.json')
+
+
+def _load_last_digest() -> dict:
+    """{chat_id: [message_id, ...]} — последний дайджест в каждом чате."""
+    try:
+        if os.path.exists(LAST_DIGEST_FILE):
+            with open(LAST_DIGEST_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+
+def _save_last_digest(data: dict):
+    try:
+        with open(LAST_DIGEST_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=1)
+    except Exception:
+        pass
+
+
 def send_telegram(message: str, chat_ids=None):
     """Отправляет сообщение в Telegram, разбивая на части при необходимости.
     Поддерживает несколько чатов: chat_ids (список) или chat_id (один).
-    chat_ids — необязательный override получателей (иначе из telegram.json)."""
+    chat_ids — необязательный override получателей (иначе из telegram.json).
+    Предыдущий дайджест в чате удаляется (история — во вкладке «Лог»)."""
     telegram_config = os.path.join(CREDS_DIR, 'telegram.json')
 
     if not os.path.exists(telegram_config):
@@ -692,14 +715,17 @@ def send_telegram(message: str, chat_ids=None):
             print("\n⚠️  В telegram.json не задан chat_id. Пропускаю отправку.")
             return
 
-        url = f"https://api.telegram.org/bot{config['bot_token']}/sendMessage"
+        base_url = f"https://api.telegram.org/bot{config['bot_token']}"
 
         # Разбиваем сообщение на части (лимит Telegram ~4096, берём 3800 с запасом)
         MAX_LEN = 3800
         parts = _split_message(message, MAX_LEN)
 
+        last = _load_last_digest()
+
         for chat_id in chat_ids:
             title = _get_chat_title(config['bot_token'], chat_id)
+            sent_ids = []
             for i, part in enumerate(parts):
                 payload = {
                     'chat_id': chat_id,
@@ -708,13 +734,33 @@ def send_telegram(message: str, chat_ids=None):
                     'disable_web_page_preview': True
                 }
 
-                response = requests.post(url, json=payload, timeout=30)
+                response = requests.post(f"{base_url}/sendMessage", json=payload, timeout=30)
 
                 if response.status_code == 200:
                     print(f"\nУведомление часть {i+1}/{len(parts)} отправлено в чат «{title}»")
+                    try:
+                        sent_ids.append(response.json()['result']['message_id'])
+                    except Exception:
+                        pass
                 else:
                     print(f"\nОшибка отправки части {i+1} в чат «{title}»: {response.status_code}")
                     print(f"Ответ: {response.text[:200]}")
+
+            # Удаляем предыдущий дайджест в этом чате
+            if sent_ids:
+                old_ids = last.get(str(chat_id), [])
+                for mid in old_ids:
+                    try:
+                        requests.post(f"{base_url}/deleteMessage",
+                                      json={'chat_id': chat_id, 'message_id': mid},
+                                      timeout=15)
+                    except Exception:
+                        pass
+                if old_ids:
+                    print(f"Предыдущий дайджест в чате «{title}» удалён ({len(old_ids)} сообщ.)")
+                last[str(chat_id)] = sent_ids
+
+        _save_last_digest(last)
 
     except ImportError:
         print("\nУстановите requests: pip install requests")
@@ -785,7 +831,7 @@ def main():
     add_parser.add_argument('--description', required=True, help='Описание')
     add_parser.add_argument('--assignee', required=True, help='Ответственный')
     add_parser.add_argument('--deadline', required=True, help='Срок (ДД.ММ.ГГГГ)')
-    add_parser.add_argument('--status', default='Новое', help='Статус (по умолчанию: Новое)')
+    add_parser.add_argument('--status', default='В работе', help='Статус (по умолчанию: В работе)')
     add_parser.add_argument('--comment', help='Комментарий')
     
     # list

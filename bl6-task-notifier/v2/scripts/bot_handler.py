@@ -283,6 +283,62 @@ def bind_keyboard() -> Dict:
     return {"keyboard": [[{"text": "⏭ Пропустить"}]], "resize_keyboard": True}
 
 
+def _edit_distance(a: str, b: str, cap: int) -> int:
+    """Расстояние Левенштейна с ранним выходом за cap."""
+    if abs(len(a) - len(b)) > cap:
+        return cap + 1
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        row_min = i
+        for j, cb in enumerate(b, 1):
+            v = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb))
+            cur.append(v)
+            row_min = min(row_min, v)
+        if row_min > cap:
+            return cap + 1
+        prev = cur
+    return prev[-1]
+
+
+def _surname_match(a: str, b: str) -> bool:
+    """Фамилии совпадают: точно, по префиксу (склонения: «плахотина»→«плахотин»)
+    или с опечаткой (расстояние ≤ 2 для длинных фамилий)."""
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    if min(len(a), len(b)) >= 4 and (a.startswith(b) or b.startswith(a)):
+        return True
+    if min(len(a), len(b)) >= 5 and _edit_distance(a, b, 2) <= 2:
+        return True
+    return False
+
+
+def _person_matches_fio(query: str, fio: str) -> bool:
+    """Запрос («Плахотин», «К. Плахотин», «Плахотина», «Плахотин Константин»)
+    соответствует ФИО из Контактов («Плахотин Константин»)?"""
+    q = (query or "").strip().lower()
+    f = (fio or "").strip().lower()
+    if not q or not f:
+        return False
+    if q == f:
+        return True
+    f_parts = f.split()
+    if len(f_parts) < 2:
+        return False
+    f_surname, f_name_init = f_parts[0], f_parts[1][0]
+    q_tokens = [p for p in re.split(r"[\s.]+", q) if p]
+    q_letters = [t for t in q_tokens if len(t) == 1]
+    q_words = [t for t in q_tokens if len(t) > 1]
+    if not any(_surname_match(w, f_surname) for w in q_words):
+        return False
+    # Если в запросе есть инициал — он обязан совпасть с инициалом имени
+    if q_letters and f_name_init not in q_letters:
+        return False
+    return True
+
+
 def resolve_tg_login(name: str) -> Optional[str]:
     """Telegram-логин ответственного: user_mapping.json + вкладка «Контакты».
     Возвращает '@login' / 'id:<uid>' или None."""
@@ -294,20 +350,12 @@ def resolve_tg_login(name: str) -> Optional[str]:
         if k.strip().lower() == n and v:
             return v
     n_login = n.lstrip('@')
-    n_parts = n.replace('.', ' ').split()
-    n_surname = n_parts[0] if n_parts else ""
-    n_initial = n_parts[1][0] if len(n_parts) > 1 and n_parts[1] else ""
     for c in load_contacts_full():
         tg = c["tg"].strip()
         if not tg:
             continue
-        fio = c["fio"].lower()
-        if n == fio or n_login == tg.lstrip('@').lower():
+        if n_login == tg.lstrip('@').lower() or _person_matches_fio(n, c["fio"]):
             return tg if tg.startswith('@') else f"@{tg}"
-        f_parts = fio.split()
-        if len(f_parts) >= 2 and n_surname and n_surname == f_parts[0]:
-            if not n_initial or n_initial == f_parts[1][0]:
-                return tg if tg.startswith('@') else f"@{tg}"
     return None
 
 
@@ -563,31 +611,21 @@ def load_contacts_full() -> List[Dict[str, str]]:
 def resolve_contragent(assignee: str) -> Optional[str]:
     """Определяет компанию ответственного по вкладке «Контакты».
 
-    Совпадение по: telegram-логину, полному ФИО или короткой форме
-    «Фамилия И.». Возвращает компанию или None.
+    Совпадение по: telegram-логину или ФИО (нечётко: склонения,
+    «Фамилия И.», «И. Фамилия», опечатки). Возвращает компанию или None.
     """
     a = (assignee or "").strip().lower()
     if not a:
         return None
     a_login = a.lstrip('@')
-    # Разбор короткой формы «Фамилия И.» / «Фамилия И»
-    a_parts = a.replace('.', ' ').split()
-    a_surname = a_parts[0] if a_parts else ""
-    a_initial = a_parts[1][0] if len(a_parts) > 1 and a_parts[1] else ""
     for c in load_contacts_full():
         if not c["company"]:
             continue
-        fio = c["fio"].lower()
         tg = c["tg"].lstrip('@').lower()
         if tg and a_login == tg:
             return c["company"]
-        if fio and a == fio:
+        if _person_matches_fio(a, c["fio"]):
             return c["company"]
-        f_parts = fio.split()
-        if len(f_parts) >= 2 and a_surname and a_surname == f_parts[0]:
-            # Фамилия совпала: сверяем инициал, если он есть в запросе
-            if not a_initial or a_initial == f_parts[1][0]:
-                return c["company"]
     return None
 
 
@@ -876,8 +914,10 @@ def build_registry_selector() -> Tuple[str, Optional[Dict]]:
 
 
 def handle_close_callback(task_id: int, username: str, user_id=None) -> Tuple[str, bool]:
+    # Админ может закрывать любые поручения (не только свои)
+    is_admin = resolve_role(username, load_config(), user_id) == "admin"
     assignee = get_assignee_by_telegram(username, user_id)
-    if not assignee:
+    if not assignee and not is_admin:
         return "❌ Вы не найдены в реестре, обратитесь к администратору.", False
 
     task = get_task_info(task_id)
@@ -885,12 +925,12 @@ def handle_close_callback(task_id: int, username: str, user_id=None) -> Tuple[st
         return f"❌ Поручение #{task_id} не найдено (уже удалено?).", False
 
     task_assignees_raw = task.get('assignee', '').strip()
-    if not task_assignees_raw:
+    if not task_assignees_raw and not is_admin:
         return f"❌ У поручения #{task_id} не указан ответственный.", False
     task_assignees = [a.strip() for a in task_assignees_raw.split(',')]
 
     # Проверка 1: имя из user_mapping совпадает с ответственным в реестре
-    is_match = any(assignee.lower() == ta.lower() for ta in task_assignees)
+    is_match = any((assignee or "").lower() == ta.lower() for ta in task_assignees)
     # Проверка 2: Telegram username пользователя совпадает с ответственным (если в реестре записан логин)
     user_clean = username.lstrip('@').lower()
     if not is_match:
@@ -905,7 +945,7 @@ def handle_close_callback(task_id: int, username: str, user_id=None) -> Tuple[st
                 is_match = True
                 break
 
-    if not is_match:
+    if not is_match and not is_admin:
         log(f"⚠️ @{username} попытался закрыть чужое поручение #{task_id} "
             f"(ответственный: {task_assignees_raw})")
         return f"❌ #{task_id} — не ваше поручение ({task_assignees_raw}).", False
@@ -916,7 +956,7 @@ def handle_close_callback(task_id: int, username: str, user_id=None) -> Tuple[st
     success, output = run_task_manager('update', str(task_id), '--status', 'Выполнено')
     if success:
         invalidate_cache()
-        audit("close", task_id, f"Статус → Выполнено ({assignee}) [кнопка]", username)
+        audit("close", task_id, f"Статус → Выполнено ({assignee or 'админ'}) [кнопка]", username)
         return f"✅ Поручение #{task_id} закрыто!", True
     log(f"⚠️ Ошибка закрытия #{task_id}: {output[:200]}")
     return f"❌ Не удалось закрыть #{task_id}.", False
@@ -981,7 +1021,7 @@ def cmd_create_execute(args: Dict, username: str, first_name: str) -> str:
         '--description', args['description'],
         '--assignee', args['assignee'],
         '--deadline', args['deadline'],
-        '--status', 'Новое',
+        '--status', 'В работе',
     )
     if success:
         invalidate_cache()
