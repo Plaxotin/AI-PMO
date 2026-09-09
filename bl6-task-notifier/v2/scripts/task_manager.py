@@ -671,6 +671,24 @@ def _get_chat_title(token: str, chat_id) -> str:
 LAST_DIGEST_FILE = os.path.join(CREDS_DIR, 'last_digest.json')
 
 
+def _migrate_chat_id(config: dict, old_id: str, new_id: str):
+    """Группа стала супергруппой: прописываем новый chat_id в telegram.json."""
+    try:
+        changed = False
+        if str(config.get('chat_id')) == old_id:
+            config['chat_id'] = new_id
+            changed = True
+        ids = config.get('chat_ids') or []
+        if old_id in [str(c) for c in ids]:
+            config['chat_ids'] = [new_id if str(c) == old_id else c for c in ids]
+            changed = True
+        if changed:
+            with open(os.path.join(CREDS_DIR, 'telegram.json'), 'w', encoding='utf-8') as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
 def _load_last_digest() -> dict:
     """{chat_id: [message_id, ...]} — последний дайджест в каждом чате."""
     try:
@@ -735,6 +753,21 @@ def send_telegram(message: str, chat_ids=None):
                 }
 
                 response = requests.post(f"{base_url}/sendMessage", json=payload, timeout=30)
+
+                # Группа апгрейднулась до супергруппы → новый chat_id
+                if response.status_code == 400:
+                    try:
+                        new_id = response.json().get('parameters', {}).get('migrate_to_chat_id')
+                    except Exception:
+                        new_id = None
+                    if new_id:
+                        print(f"\nЧат «{title}» мигрировал: {chat_id} → {new_id}. Обновляю telegram.json.")
+                        payload['chat_id'] = new_id
+                        response = requests.post(f"{base_url}/sendMessage", json=payload, timeout=30)
+                        if response.status_code == 200:
+                            _migrate_chat_id(config, str(chat_id), str(new_id))
+                            chat_id = new_id
+                            title = _get_chat_title(config['bot_token'], chat_id)
 
                 if response.status_code == 200:
                     print(f"\nУведомление часть {i+1}/{len(parts)} отправлено в чат «{title}»")
