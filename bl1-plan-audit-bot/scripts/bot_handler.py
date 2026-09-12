@@ -23,7 +23,7 @@ import plan_parser
 import state
 import xlsx_export
 from config import load_telegram_config
-from pdf import generate_pdf
+from pdf import generate_pdf, generate_sponsor_pdf
 from report import build_chat_summary
 
 POLL_TIMEOUT = 30
@@ -33,10 +33,26 @@ ALLOWED_EXT = ('.xlsx', '.xls', '.csv', '.mpp')
 
 HELP_TEXT = (
     '👋 Привет! Я аудирую проектные планы.\n\n'
-    'Пришлите файл плана (.xlsx, .csv или .mpp) — проверю его '
-    'по корпоративной Инструкции, найду риски и верну сводку и PDF-отчёт.\n\n'
+    'Пришлите файл плана (.xlsx, .csv или .mpp) — найду риски, проверю '
+    'исполнение и верну сводку и PDF-отчёт.\n\n'
+    'Перед аудитом можно одним сообщением указать акценты — '
+    'отвечу на них в отчёте.\n'
     'Для .mpp предложу на выбор: аудит или конвертацию в Excel.\n'
+    'После аудита доступен отдельный отчёт для спонсора (C-level).\n'
     'Пришлите новую версию позже — покажу, что изменилось.'
+)
+
+COMMENT_OFFER = (
+    '💬 Есть акценты для аудитора? Напишите одним сообщением, что для вас '
+    'сейчас важнее всего в плане — учту в аудите и отвечу отдельным разделом '
+    'отчёта. Или начните аудит сразу:'
+)
+
+SPONSOR_CONTEXT_OFFER = (
+    '📄 Отчёт для спонсора. Чтобы связать выводы с бизнесом, напишите одним '
+    'сообщением: цель проекта для компании, критерии успеха, что важнее — '
+    'срок или содержание, какие решения ждёте от спонсора.\n'
+    'Или сформируйте отчёт только по данным плана:'
 )
 
 
@@ -63,7 +79,13 @@ class Bot:
         self.token = token
         self.api = f'https://api.telegram.org/bot{token}'
         self.offset = 0
-        self.pending = {}  # chat_id → doc: .mpp ждёт выбора действия
+        self.pending = {}   # chat_id → doc: .mpp ждёт выбора действия
+        # chat_id → {'purpose': 'audit'|'sponsor', 'doc': doc}
+        # ждём текст-комментарий от пользователя (или кнопку «Пропустить»)
+        self.awaiting = {}
+        # chat_id → {'plan_name', 'facts'} последнего аудита (в памяти,
+        # stateless: после перезапуска бота отчёт для спонсора попросит файл заново)
+        self.last_run = {}
 
     # --- Telegram API ---
     def call(self, method: str, **kwargs):
@@ -136,7 +158,18 @@ class Bot:
             })
             return
 
-        self.run_audit(chat_id, doc)
+        self.offer_comment(chat_id, doc)
+
+    def offer_comment(self, chat_id: int, doc: dict):
+        """Мягкий шаг (v1.1): комментарий аудитору в свободной форме или скип."""
+        self.awaiting[chat_id] = {'purpose': 'audit', 'doc': doc}
+        self.call('sendMessage', json={
+            'chat_id': chat_id,
+            'text': COMMENT_OFFER,
+            'reply_markup': {'inline_keyboard': [[
+                {'text': '⏩ Пропустить — начать аудит',
+                 'callback_data': 'skip'}]]},
+        })
 
     def _offer(self, chat_id: int, action: str, text: str):
         """Одна follow-up кнопка: «Что дальше?»."""
@@ -160,6 +193,23 @@ class Bot:
                     'reply_markup': {'inline_keyboard': []}})
         except Exception:
             pass
+
+        # Кнопка «Пропустить» на шаге комментария / контекста спонсора
+        if action == 'skip':
+            wait = self.awaiting.pop(chat_id, None)
+            if not wait:
+                self.send_text(chat_id, '⚠️ Сессия устарела — пришлите файл '
+                                        'плана ещё раз')
+            elif wait['purpose'] == 'audit':
+                self.run_audit(chat_id, wait['doc'])
+            else:
+                self.run_sponsor(chat_id, context=None)
+            return
+
+        if action == 'sponsor':
+            self.start_sponsor_flow(chat_id)
+            return
+
         doc = self.pending.get(chat_id)  # не pop: после конвертации может идти аудит
         if not doc:
             self.send_text(chat_id, '⚠️ Файл не найден (бот перезапускался?) — '
@@ -167,8 +217,8 @@ class Bot:
             return
         if action == 'xlsx':
             self.convert_document(chat_id, doc)
-        else:
-            self.run_audit(chat_id, doc)
+        else:  # audit
+            self.offer_comment(chat_id, doc)
 
     def convert_document(self, chat_id: int, doc: dict):
         """Конвертация .mpp → .xlsx и отправка результата."""
@@ -200,7 +250,7 @@ class Bot:
                 except Exception:
                     pass
 
-    def run_audit(self, chat_id: int, doc: dict):
+    def run_audit(self, chat_id: int, doc: dict, comment: str = None):
         file_name = doc.get('file_name', 'plan')
         self.send_text(chat_id, f'📥 Принял «{file_name}», начинаю аудит…')
         tmpdir = tempfile.mkdtemp(prefix='bl1_')
@@ -225,18 +275,27 @@ class Bot:
                     print(f'⚠️ не удалось загрузить предыдущую версию: {e}')
 
             facts = analytics.run_analysis(plan, baseline_plan=baseline_plan)
+            # Кэш для отчёта спонсору (в памяти, stateless при перезапуске)
+            self.last_run[chat_id] = {'plan_name': plan.name, 'facts': facts}
 
             self.send_text(chat_id, '🤖 Метрики посчитаны, запускаю '
                                     'ИИ-анализ (обычно 1–3 минуты)…')
-            llm_text = llm.analyze_plan(facts)
+            llm_text = llm.analyze_plan(facts, user_comment=comment)
 
             self.send_text(chat_id, build_chat_summary(plan, facts))
             pdf_path = os.path.join(tmpdir, 'audit_report.pdf')
             generate_pdf(plan, facts, llm_text, pdf_path)
             self.send_doc(chat_id, pdf_path,
                           caption='Полный отчёт по аудиту плана')
+
+            buttons = [{'text': '📄 Отчёт для спонсора',
+                        'callback_data': 'sponsor'}]
             if file_name.lower().endswith('.mpp'):
-                self._offer(chat_id, 'xlsx', '📊 Конвертировать в Excel')
+                buttons.append({'text': '📊 Конвертировать в Excel',
+                                'callback_data': 'xlsx'})
+            self.call('sendMessage', json={
+                'chat_id': chat_id, 'text': 'Что дальше?',
+                'reply_markup': {'inline_keyboard': [buttons]}})
 
             state.remember_plan(chat_id, doc['file_id'], file_name)
         except Exception as e:
@@ -250,6 +309,53 @@ class Bot:
                         os.unlink(p)
                 except Exception:
                     pass
+
+    # --- Отчёт для спонсора (v1.1) ---
+    def start_sponsor_flow(self, chat_id: int):
+        if chat_id not in self.last_run:
+            self.send_text(chat_id,
+                           '⚠️ Нет данных аудита (бот перезапускался?) — '
+                           'пришлите файл плана и прогоните аудит заново')
+            return
+        self.awaiting[chat_id] = {'purpose': 'sponsor', 'doc': None}
+        self.call('sendMessage', json={
+            'chat_id': chat_id,
+            'text': SPONSOR_CONTEXT_OFFER,
+            'reply_markup': {'inline_keyboard': [[
+                {'text': '⏩ Пропустить — сформировать отчёт',
+                 'callback_data': 'skip'}]]},
+        })
+
+    def run_sponsor(self, chat_id: int, context: str = None):
+        cached = self.last_run.get(chat_id)
+        if not cached:
+            self.send_text(chat_id,
+                           '⚠️ Нет данных аудита — пришлите файл плана '
+                           'и прогоните аудит заново')
+            return
+        self.send_text(chat_id, '🤖 Формирую отчёт для спонсора '
+                                '(обычно 1–2 минуты)…')
+        tmpdir = tempfile.mkdtemp(prefix='bl1sponsor_')
+        pdf_path = os.path.join(tmpdir, 'sponsor_report.pdf')
+        try:
+            text = llm.sponsor_report(cached['facts'], context=context)
+            if not text:
+                self.send_text(chat_id, '❌ ИИ-анализ недоступен, попробуйте '
+                                        'позже')
+                return
+            generate_sponsor_pdf(cached['plan_name'], cached['facts'], text,
+                                 pdf_path)
+            self.send_doc(chat_id, pdf_path,
+                          caption='Отчёт для спонсора (1 страница)')
+        except Exception as e:
+            print(f'❌ ошибка спонсорского отчёта: {e}')
+            self.send_text(chat_id, f'❌ Не получилось: {e}')
+        finally:
+            try:
+                if os.path.exists(pdf_path):
+                    os.unlink(pdf_path)
+            except Exception:
+                pass
 
     # --- Цикл ---
     def run(self):
@@ -267,11 +373,22 @@ class Bot:
                     chat_id = (msg.get('chat') or {}).get('id')
                     if not chat_id:
                         continue
+                    text = msg.get('text') or ''
                     if msg.get('document'):
+                        # новый файл отменяет ожидание комментария
+                        self.awaiting.pop(chat_id, None)
                         self.handle_document(chat_id, msg['document'])
-                    elif (msg.get('text') or '').startswith('/start') or \
-                            (msg.get('text') or '').startswith('/help'):
+                    elif text.startswith('/start') or text.startswith('/help'):
                         self.send_text(chat_id, HELP_TEXT)
+                    elif text.startswith('/sponsor'):
+                        self.start_sponsor_flow(chat_id)
+                    elif text and chat_id in self.awaiting:
+                        # ответ на шаг комментария / контекста спонсора
+                        wait = self.awaiting.pop(chat_id)
+                        if wait['purpose'] == 'audit':
+                            self.run_audit(chat_id, wait['doc'], comment=text)
+                        else:
+                            self.run_sponsor(chat_id, context=text)
             except Exception as e:
                 print(f'⚠️ polling error: {e}')
                 time.sleep(5)

@@ -217,9 +217,11 @@ def generate_pdf(plan: Plan, facts: dict, llm_text: Optional[str],
     story.append(Spacer(1, 6 * mm))
     story.append(Paragraph('Приложение. Детализация проверок', h1))
 
-    # 4.1 Качество плана (бывш. DCMA) — с легендой, как читать
+    # 4.1 Качество плана (бывш. DCMA) — с легендой, как читать.
+    # Проверки полноты модели (kind='model') сюда не входят — они выше
+    # вынесены в рекомендации (решение 12.09.26).
     sched = facts.get('schedule_health', {})
-    checks = sched.get('checks', [])
+    checks = [c for c in sched.get('checks', []) if c.get('kind') != 'model']
     if checks:
         story.append(Paragraph('Качество плана', h2))
         story.append(Paragraph(
@@ -257,12 +259,13 @@ def generate_pdf(plan: Plan, facts: dict, llm_text: Optional[str],
                         f"{_pdf_safe(_md_inline('; '.join(c['evidence'][:3])))}",
                         small))
 
-    # 4.2 Оформление плана — суть без кодов и ссылок на Инструкцию
-    if facts['compliance']:
-        story.append(Paragraph('Оформление плана против стандарта', h2))
+    # 4.2 Замечания по оформлению — суть без кодов (только finding)
+    findings = [v for v in facts['compliance'] if v.get('kind') != 'model']
+    if findings:
+        story.append(Paragraph('Замечания по оформлению плана', h2))
         sev_names = {'high': 'критично', 'medium': 'важно', 'info': 'к сведению'}
         rows = [['Что не так', 'Важность', 'Кол-во', 'Примеры']]
-        for v in facts['compliance']:
+        for v in findings:
             rows.append([Paragraph(_pdf_safe(_md_inline(
                              v.get('title', v['rule']))), cell),
                          sev_names.get(v['severity'], v['severity']),
@@ -271,6 +274,27 @@ def generate_pdf(plan: Plan, facts: dict, llm_text: Optional[str],
                              '; '.join(v['evidence'][:2]))), cell)])
         tbl = Table(rows, colWidths=[48 * mm, 20 * mm, 14 * mm, 98 * mm],
                     repeatRows=1)
+        tbl.setStyle(base_table_style())
+        story.append(tbl)
+
+    # 4.3 Полнота модели → рекомендации (не замечания, решение 12.09.26)
+    model = facts.get('model_completeness') or []
+    if model:
+        story.append(Paragraph(
+            'Рекомендации по улучшению плана (не замечания)', h2))
+        story.append(Paragraph(
+            'Эти поля многие команды сознательно не ведут — это не ошибки '
+            'исполнения. Но их заполнение повышает качество и плана, и аудита.',
+            small))
+        story.append(Spacer(1, 1.5 * mm))
+        rows = [['Что заполнить', 'Масштаб', 'Зачем это нужно']]
+        for r in model:
+            scale = (f"{r['count']} шт. ({r['percent']} %)"
+                     if r.get('percent') is not None else f"{r['count']} шт.")
+            rows.append([Paragraph(_pdf_safe(_md_inline(r['topic'])), cell),
+                         scale,
+                         Paragraph(_pdf_safe(_md_inline(r['benefit'])), cell)])
+        tbl = Table(rows, colWidths=[45 * mm, 28 * mm, 107 * mm], repeatRows=1)
         tbl.setStyle(base_table_style())
         story.append(tbl)
 
@@ -286,6 +310,77 @@ def generate_pdf(plan: Plan, facts: dict, llm_text: Optional[str],
         for line in (diff['shifted'][:10] + diff['added'][:5]
                      + diff['removed'][:5]):
             story.append(Paragraph('• ' + _pdf_safe(_md_inline(line)), bullet))
+
+    doc.build(story)
+    return out_path
+
+
+def generate_sponsor_pdf(plan_name: str, facts: dict, llm_text: str,
+                         out_path: str) -> str:
+    """Спонсорский отчёт (C-level) — 1 страница A4, 6 разделов (v1.1).
+
+    Контент пишет LLM (sponsor-промпт в llm.py); здесь — рамка:
+    цветной статус-баннер + компактная вёрстка без приложений.
+    """
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
+                                    Table, TableStyle)
+    from reportlab.lib import colors
+
+    font, font_bold = _register_fonts()
+    h1 = ParagraphStyle('h1', fontName=font_bold, fontSize=14, spaceAfter=1 * mm)
+    h2 = ParagraphStyle('h2', fontName=font_bold, fontSize=10.5,
+                        spaceBefore=2.5 * mm, spaceAfter=1 * mm)
+    body = ParagraphStyle('body', fontName=font, fontSize=9, leading=12)
+    bullet = ParagraphStyle('bullet', parent=body, leftIndent=4 * mm,
+                            bulletIndent=1 * mm)
+    small = ParagraphStyle('small', fontName=font, fontSize=7.5, leading=9.5)
+
+    health = facts.get('health', {})
+    status = health.get('status', 'at_risk')
+    sc = STATUS_COLORS.get(status, (0.5, 0.5, 0.5))
+
+    doc = SimpleDocTemplate(out_path, pagesize=A4,
+                            leftMargin=14 * mm, rightMargin=14 * mm,
+                            topMargin=12 * mm, bottomMargin=12 * mm)
+
+    story = [Paragraph(f'Отчёт для спонсора · проект «{plan_name}»', h1),
+             Paragraph(f"Дата: {facts['report_date']}", small),
+             Spacer(1, 2 * mm)]
+
+    status_label = STATUS_LABELS.get(status, '—')
+    rag = Table([[Paragraph(f"<font color='white'><b>{status_label}</b></font>",
+                            body)]], colWidths=[182 * mm])
+    rag.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, 0), colors.Color(*sc)),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    story.append(rag)
+
+    if llm_text:
+        for line in llm_text.splitlines():
+            s = line.strip()
+            if not s:
+                story.append(Spacer(1, 0.8 * mm))
+            elif s.startswith('### '):
+                story.append(Paragraph(_pdf_safe(_md_inline(s[4:])), h2))
+            elif s.startswith('## '):
+                story.append(Paragraph(_pdf_safe(_md_inline(s[3:])), h2))
+            elif re.match(r'^(\d+[\.\)]\s|[-•]\s)', s):
+                story.append(Paragraph('• ' + _pdf_safe(_md_inline(
+                    re.sub(r'^(\d+[\.\)]\s|[-•]\s)', '', s))), bullet))
+            else:
+                story.append(Paragraph(_pdf_safe(_md_inline(s)), body))
+
+    story.append(Spacer(1, 3 * mm))
+    story.append(Paragraph(
+        'Подготовлено автоматическим аудитором проектных планов на основе '
+        'детерминированного анализа расписания. Файл плана не сохраняется '
+        'на сервере.', small))
 
     doc.build(story)
     return out_path

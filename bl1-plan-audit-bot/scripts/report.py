@@ -89,7 +89,8 @@ def build_chat_summary(plan: Plan, facts: dict) -> str:
         lines.append(line)
     lines.append('')
 
-    fails = [c for c in sched.get('checks', []) if c['status'] == 'fail']
+    fails = [c for c in sched.get('checks', [])
+             if c['status'] == 'fail' and c.get('kind') != 'model']
     if fails:
         lines.append('*Качество плана — что не так* '
                      '(норма: проблем ≤ 5 % задач):')
@@ -97,11 +98,22 @@ def build_chat_summary(plan: Plan, facts: dict) -> str:
             lines.append(f"❌ {c['name']} — {c['count']} шт. ({c['percent']} %)")
         lines.append('')
 
-    if facts['compliance']:
-        lines.append('*Требования к оформлению плана:*')
-        for v in facts['compliance'][:8]:
+    findings = [v for v in facts['compliance'] if v.get('kind') != 'model']
+    if findings:
+        lines.append('*Замечания по оформлению плана:*')
+        for v in findings[:8]:
             icon = SEVERITY_ICON.get(v['severity'], '•')
             lines.append(f"{icon} {v.get('title', v['rule'])} — {v['count']} шт.")
+        lines.append('')
+
+    model = facts.get('model_completeness') or []
+    if model:
+        lines.append('*Рекомендации — сделают план и аудит лучше:*')
+        for r in model[:5]:
+            scale = (f" — {r['count']} шт. ({r['percent']} %)" if r.get('percent')
+                     is not None else f" — {r['count']} шт.")
+            lines.append(f"💡 {r['topic']}{scale}")
+            lines.append(f"   {r['benefit'].capitalize()}")
         lines.append('')
 
     diff = facts.get('diff')

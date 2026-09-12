@@ -42,6 +42,11 @@ SYSTEM_PROMPT = """Ты — старший аудитор PMO (PMP, 15+ лет �
 - evm — темп выполнения (pv_pct — сколько % объёма должно быть сделано
   к сегодня, ev_pct — сколько фактически сделано, spi = ev/pv);
 - health — сводный статус (on_track/at_risk/off_track) с причинами;
+- model_completeness — НЕ заполненные поля плана (связи, ответственные,
+  затраты, колонки) с полем benefit (польза заполнения). Это НЕ замечания и
+  НЕ проблемы: многие команды сознательно не ведут эти поля. Используй их
+  ТОЛЬКО в разделе «## Рекомендации» — как советы, повышающие качество плана
+  и точность аудита, с формулировкой пользы из benefit;
 - diff (если есть) — изменения к предыдущей версии плана.
 
 Аудитория отчёта — руководители и проектные менеджеры БЕЗ подготовки по
@@ -102,8 +107,62 @@ SYSTEM_PROMPT = """Ты — старший аудитор PMO (PMP, 15+ лет �
   «улучшите планирование». Объём — до 1500 слов."""
 
 
-def analyze_plan(facts: dict, log_fn=print) -> Optional[str]:
-    """Факты анализа → аудиторское заключение (Markdown) или None при сбое."""
+SPONSOR_PROMPT = """Ты — доверенный советник спонсора проекта (C-level).
+Тебе передан ДЕТЕРМИНИРОВАННЫЙ аудит проектного плана (JSON): metrics, cpm,
+compliance, schedule_health, evm, health, diff (если есть). Возможно, ниже
+будет КОНТЕКСТ ОТ ПРОЕКТНОГО МЕНЕДЖЕРА — бизнес-цели, критерии успеха,
+приоритеты. Если контекста нет — раздел о бизнес-целях пропусти.
+
+Напиши отчёт ДЛЯ СПОНСОРА на русском языке. Спонсор занят и не обязан
+разбираться в методологиях: ЗАПРЕЩЕНЫ любые аббревиатуры и термины
+(SPI, BEI, CPM, EVM, DCMA, критический путь, освоенный объём) без перевода
+на бизнес-язык. Все цифры — в форме «сдвиг примерно N месяцев», «каждая
+вторая задача», а не «0.38».
+
+СТРОГАЯ структура (Markdown, заголовки ровно как указано), одна страница:
+
+## Главное
+3 строки: что происходит с проектом и что это значит для бизнес-результата.
+
+## Связь с бизнес-целями
+Только если есть контекст от PM: проект по-прежнему ведёт к заявленной цели?
+Что из обещанной ценности под угрозой? Если контекста нет — раздел пропусти.
+
+## Ключевые риски
+Максимум 3 риска по убыванию. Каждый: **Риск.** → что это значит для бизнеса
+→ масштаб словами (высокий/средний). Без жаргона.
+
+## Прогноз
+Качественный, БЕЗ ложной точности: «при текущем темпе завершение сдвинется
+ориентировочно на N–M месяцев» или «сроки достижимы». Опирайся на темп
+выполнения и просрочки из фактов, точную дату не называй.
+
+## Что нужно от вас
+ГЛАВНЫЙ раздел. 2–4 конкретных решения/действия спонсора: эскалации за
+пределами полномочий PM, решения go/no-go, снятие препятствий, ресурсы.
+Формат: действие → зачем → к какому сроку.
+
+## Вера в план
+Одна строка: насколько плану можно доверять (высокая/средняя/низкая)
++ одно предложение почему (покрытие связями, наличие базового плана,
+доля просрочек).
+
+ЖЁСТКИЕ ПРАВИЛА:
+- Используй ТОЛЬКО факты из JSON и контекст от PM. Ничего не выдумывай.
+- Тон: уважительный, прямой, без запугивания и без приукрашивания.
+- Объём — до 450 слов. Это читают за 2 минуты."""
+
+
+def _facts_text(facts: dict) -> str:
+    text = json.dumps(facts, ensure_ascii=False, indent=1)
+    if len(text) > MAX_FACTS_CHARS:
+        text = text[:MAX_FACTS_CHARS] + '\n…(усечено)'
+    return text
+
+
+def _call_kimi(system_prompt: str, user_content: str,
+               log_fn=print) -> Optional[str]:
+    """Один вызов Kimi с retry/backoff. Ответ или None при сбое."""
     cfg = load_kimi_config()
     if not cfg:
         log_fn('⚠️ kimi.json не настроен, LLM-анализ недоступен')
@@ -115,15 +174,11 @@ def analyze_plan(facts: dict, log_fn=print) -> Optional[str]:
         return None
 
     base_url = cfg.get('base_url', 'https://api.moonshot.ai/v1').rstrip('/')
-    facts_text = json.dumps(facts, ensure_ascii=False, indent=1)
-    if len(facts_text) > MAX_FACTS_CHARS:
-        facts_text = facts_text[:MAX_FACTS_CHARS] + '\n…(усечено)'
     payload = {
         'model': cfg.get('model', 'kimi-k2.6'),
         'messages': [
-            {'role': 'system', 'content': SYSTEM_PROMPT},
-            {'role': 'user', 'content':
-                'Детерминированный анализ плана (JSON):\n' + facts_text},
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': user_content},
         ],
         # temperature не передаём: kimi-k2.x принимает только temperature=1.
         # thinking ВКЛЮЧЁН (качество > скорость): глубокий разбор фактов.
@@ -131,7 +186,9 @@ def analyze_plan(facts: dict, log_fn=print) -> Optional[str]:
     }
 
     import time
-    for attempt in range(3):
+    # 429 (concurrency=1 на организацию, аккаунт общий с BL-6) требует
+    # длинных пауз: до 6 попыток, до 60 сек между ними.
+    for attempt in range(6):
         try:
             resp = requests.post(
                 f'{base_url}/chat/completions',
@@ -142,7 +199,8 @@ def analyze_plan(facts: dict, log_fn=print) -> Optional[str]:
             )
             if resp.status_code != 200:
                 log_fn(f'⚠️ Kimi API вернул {resp.status_code}: {resp.text[:200]}')
-                time.sleep(2 ** attempt)
+                time.sleep(min(60, 15 * (attempt + 1))
+                           if resp.status_code == 429 else 2 ** attempt)
                 continue
             content = (resp.json().get('choices') or [{}])[0] \
                               .get('message', {}).get('content', '') or ''
@@ -153,3 +211,35 @@ def analyze_plan(facts: dict, log_fn=print) -> Optional[str]:
             log_fn(f'⚠️ Ошибка вызова Kimi API: {e}')
             time.sleep(2 ** attempt)
     return None
+
+
+def analyze_plan(facts: dict, user_comment: Optional[str] = None,
+                 log_fn=print) -> Optional[str]:
+    """Факты анализа → аудиторское заключение (Markdown) или None при сбое.
+
+    user_comment (v1.1): акценты от пользователя — LLM обязан ответить на них
+    отдельным разделом «## Ответ на ваш запрос» (добавляется последним).
+    """
+    prompt = SYSTEM_PROMPT
+    user = 'Детерминированный анализ плана (JSON):\n' + _facts_text(facts)
+    if user_comment:
+        prompt += (
+            '\n\nПОСЛЕ раздела «## Рекомендации» добавь финальный раздел '
+            '«## Ответ на ваш запрос»: прямой, конкретный ответ на комментарий '
+            'пользователя, опирающийся только на факты анализа. Если комментарий '
+            'спрашивает о том, чего в данных нет, — честно скажи, что для ответа '
+            'нужно, и что видно из имеющегося.')
+        user += ('\n\nКОММЕНТАРИЙ ПОЛЬЗОВАТЕЛЯ (его акценты и интересы, '
+                 'учитывай их во всём заключении):\n' + user_comment.strip())
+    return _call_kimi(prompt, user, log_fn)
+
+
+def sponsor_report(facts: dict, context: Optional[str] = None,
+                   log_fn=print) -> Optional[str]:
+    """Факты анализа (+ бизнес-контекст) → отчёт для спонсора (Markdown)."""
+    user = 'Детерминированный аудит плана (JSON):\n' + _facts_text(facts)
+    if context:
+        user += ('\n\nКОНТЕКСТ ОТ ПРОЕКТНОГО МЕНЕДЖЕРА (бизнес-цели, '
+                 'критерии успеха, приоритеты, ожидаемые решения):\n'
+                 + context.strip())
+    return _call_kimi(SPONSOR_PROMPT, user, log_fn)

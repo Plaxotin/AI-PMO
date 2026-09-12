@@ -128,6 +128,25 @@ RULE_TITLES = {
     'R-12': 'Отклонение даты окончания от базовой даты',
 }
 
+# Проверки «полноты модели» (решение 12.09.26): их отсутствие — не ошибка
+# исполнения, а незаполненность данных; многие команды сознательно не ведут
+# эти поля. В замечания и статус здоровья НЕ идут — выходят как рекомендации
+# с обоснованием пользы для качества аудита.
+MODEL_RULES = {'R-01', 'R-06', 'R-08'}
+MODEL_CHECKS = {'D-01', 'D-10'}
+
+MODEL_BENEFITS = {
+    'R-01': 'заполните предшественников и последователей — бот достоверно '
+            'рассчитает критический путь, резервы и прогноз сроков',
+    'D-01': 'заполните предшественников и последователей — бот достоверно '
+            'рассчитает критический путь, резервы и прогноз сроков',
+    'D-10': 'назначьте ответственных — аудит сможет указать владельца '
+            'каждой просрочки и точку эскалации',
+    'R-06': 'заполните веса задач (затраты) — темп выполнения будет считаться '
+            'по объёму работ, а не приблизительно по длительностям',
+    'R-08': 'добавьте рекомендованные колонки — аудит станет полнее и точнее',
+}
+
 
 def check_compliance(plan: Plan, report_date: date, cpm: dict) -> list:
     """Возвращает список нарушений:
@@ -141,6 +160,7 @@ def check_compliance(plan: Plan, report_date: date, cpm: dict) -> list:
         if items:
             v.append({'rule': rule, 'title': RULE_TITLES.get(rule, rule),
                       'severity': severity, 'count': len(items),
+                      'kind': 'model' if rule in MODEL_RULES else 'finding',
                       'evidence': items[:10], 'ref': ref})
 
     # R-01: «подвисшие» задачи — нет ни предшественников, ни последователей
@@ -223,10 +243,14 @@ def check_compliance(plan: Plan, report_date: date, cpm: dict) -> list:
 
 
 def compliance_score(violations: list) -> int:
-    """100 − Σ(вес severity × нормированный count). Веса: high=5, medium=2, info=0.5."""
+    """100 − Σ(вес severity × нормированный count). Веса: high=5, medium=2, info=0.5.
+
+    Проверки полноты модели (kind='model') в скор не входят — это рекомендации,
+    а не замечания (решение 12.09.26).
+    """
     weights = {'high': 5.0, 'medium': 2.0, 'info': 0.5}
     penalty = sum(weights.get(x['severity'], 1.0) * min(x['count'], 20) / 20
-                  for x in violations)
+                  for x in violations if x.get('kind') != 'model')
     return max(0, round(100 - penalty))
 
 
@@ -264,6 +288,7 @@ def schedule_health(plan: Plan, report_date: date, cpm: dict) -> dict:
         checks.append({
             'id': cid, 'name': name, 'family': family,
             'count': len(items), 'percent': pct, 'threshold': threshold,
+            'kind': 'model' if cid in MODEL_CHECKS else 'finding',
             'status': 'pass' if passed else 'fail',
             'evidence': [t.name if isinstance(t, Task) else str(t)
                          for t in items[:10]],
@@ -458,7 +483,9 @@ def health_verdict(metrics: dict, evm: dict, violations: list,
     spi = evm.get('spi') if evm.get('available') else None
     bei = sched.get('bei')
     fails = [c for c in sched.get('checks', []) if c['status'] == 'fail']
-    structure_fails = [c for c in fails if c['family'] == 'structure']
+    structure_fails = [c for c in fails
+                       if c['family'] == 'structure'
+                       and c.get('kind') != 'model']
 
     if overdue_pct > 15:
         reasons_red.append(
@@ -510,6 +537,38 @@ def health_verdict(metrics: dict, evm: dict, violations: list,
 
 # ---------- Точка входа ----------
 
+def model_completeness(violations: list, sched: dict) -> list:
+    """Находки «полноты модели» → рекомендации с обоснованием пользы (v1.1).
+
+    Берёт нарушения kind='model' из compliance и проваленные проверки
+    kind='model' из schedule_health; дедупликация по benefit
+    (R-01 и D-01 — про одни и те же связи).
+    """
+    out, seen = [], set()
+    for v in violations:
+        if v.get('kind') != 'model':
+            continue
+        key = MODEL_BENEFITS.get(v['rule'], '')
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({'topic': v.get('title', v['rule']),
+                    'count': v['count'], 'percent': None,
+                    'benefit': key,
+                    'evidence': v['evidence'][:3]})
+    for c in sched.get('checks', []):
+        if c.get('kind') != 'model' or c['status'] != 'fail':
+            continue
+        key = MODEL_BENEFITS.get(c['id'], '')
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({'topic': c['name'], 'count': c['count'],
+                    'percent': c['percent'], 'benefit': key,
+                    'evidence': c['evidence'][:3]})
+    return out
+
+
 def run_analysis(plan: Plan, report_date: Optional[date] = None,
                  baseline_plan: Optional[Plan] = None) -> dict:
     """Все детерминированные факты по плану — вход для LLM и отчёта."""
@@ -534,6 +593,7 @@ def run_analysis(plan: Plan, report_date: Optional[date] = None,
         'schedule_health': sched,
         'evm': evm,
         'health': health_verdict(metrics, evm, violations, sched),
+        'model_completeness': model_completeness(violations, sched),
     }
     if baseline_plan is not None:
         from diff import diff_plans
