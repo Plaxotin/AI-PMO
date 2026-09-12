@@ -24,7 +24,7 @@ import state
 import xlsx_export
 from config import load_telegram_config
 from pdf import generate_pdf, generate_sponsor_pdf
-from report import build_chat_summary
+from report import build_chat_summary, build_detail
 
 POLL_TIMEOUT = 30
 MAX_FILE_MB = 20  # лимит getFile Bot API
@@ -210,6 +210,11 @@ class Bot:
             self.start_sponsor_flow(chat_id)
             return
 
+        # Drill-down по направлениям отчёта (v1.1): качество/замечания/рекомендации
+        if action and action.startswith('det_'):
+            self.send_detail(chat_id, action[4:])
+            return
+
         doc = self.pending.get(chat_id)  # не pop: после конвертации может идти аудит
         if not doc:
             self.send_text(chat_id, '⚠️ Файл не найден (бот перезапускался?) — '
@@ -293,9 +298,16 @@ class Bot:
             if file_name.lower().endswith('.mpp'):
                 buttons.append({'text': '📊 Конвертировать в Excel',
                                 'callback_data': 'xlsx'})
+            detail_row = [
+                {'text': '🔎 Качество', 'callback_data': 'det_quality'},
+                {'text': '🔎 Замечания', 'callback_data': 'det_findings'},
+                {'text': '🔎 Рекомендации', 'callback_data': 'det_reco'},
+            ]
             self.call('sendMessage', json={
-                'chat_id': chat_id, 'text': 'Что дальше?',
-                'reply_markup': {'inline_keyboard': [buttons]}})
+                'chat_id': chat_id,
+                'text': 'Что дальше? Кнопки «🔎 …» дают детальные списки '
+                        'задач по каждому направлению отчёта:',
+                'reply_markup': {'inline_keyboard': [detail_row, buttons]}})
 
             state.remember_plan(chat_id, doc['file_id'], file_name)
         except Exception as e:
@@ -309,6 +321,38 @@ class Bot:
                         os.unlink(p)
                 except Exception:
                     pass
+
+    # --- Drill-down по направлениям отчёта (v1.1) ---
+    def send_detail(self, chat_id: int, direction: str):
+        cached = self.last_run.get(chat_id)
+        if not cached:
+            self.send_text(chat_id,
+                           '⚠️ Нет данных аудита (бот перезапускался?) — '
+                           'пришлите файл плана и прогоните аудит заново')
+            return
+        try:
+            text = build_detail(cached['facts'], direction)
+        except Exception as e:
+            print(f'❌ ошибка детализации {direction}: {e}')
+            self.send_text(chat_id, f'❌ Не получилось собрать сводку: {e}')
+            return
+        if len(text) <= TG_MSG_LIMIT:
+            self.send_text(chat_id, text)
+            return
+        # Длинная сводка — файлом .txt (читается прямо в Telegram)
+        tmpdir = tempfile.mkdtemp(prefix='bl1det_')
+        path = os.path.join(tmpdir, f'detail_{direction}.txt')
+        try:
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(text.replace('*', ''))  # без markdown-разметки в файле
+            self.send_doc(chat_id, path,
+                          caption='Полная детализация — список задач')
+        finally:
+            try:
+                if os.path.exists(path):
+                    os.unlink(path)
+            except Exception:
+                pass
 
     # --- Отчёт для спонсора (v1.1) ---
     def start_sponsor_flow(self, chat_id: int):

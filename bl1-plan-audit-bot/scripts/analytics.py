@@ -161,6 +161,7 @@ def check_compliance(plan: Plan, report_date: date, cpm: dict) -> list:
             v.append({'rule': rule, 'title': RULE_TITLES.get(rule, rule),
                       'severity': severity, 'count': len(items),
                       'kind': 'model' if rule in MODEL_RULES else 'finding',
+                      'items': list(items),        # полный список (drill-down)
                       'evidence': items[:10], 'ref': ref})
 
     # R-01: «подвисшие» задачи — нет ни предшественников, ни последователей
@@ -192,13 +193,20 @@ def check_compliance(plan: Plan, report_date: date, cpm: dict) -> list:
 
     # R-06: затраты = 100 и заполнены у листьев
     if 'cost' not in cols:
-        add('R-06', 'medium', ['колонка «Затраты» отсутствует'],
+        add('R-06', 'medium', ['колонка «Затраты» отсутствует — добавьте её '
+                               'и проставьте вес каждой работе'],
             'п. 1: затраты суммарно = 100 ₽, декомпозиция до ключевых работ')
     else:
-        total = sum(t.cost or 0 for t in leaves)
-        if abs(total - 100) > 0.5:
-            add('R-06', 'medium', [f'сумма затрат листьев = {total:.1f} ≠ 100'],
-                'п. 1: сумма затрат = 100 ₽')
+        # v1.1: показываем, у каких именно задач вес не заполнен
+        no_cost = [t.name for t in leaves if not t.cost]
+        if no_cost:
+            add('R-06', 'medium', no_cost,
+                'п. 1: затраты заполнены у всех листовых задач')
+        else:
+            total = sum(t.cost or 0 for t in leaves)
+            if abs(total - 100) > 0.5:
+                add('R-06', 'medium', [f'сумма затрат листьев = {total:.1f} ≠ 100'],
+                    'п. 1: сумма затрат = 100 ₽')
 
     # R-07: базовый план сохранён
     if 'baseline_start' not in cols or 'baseline_finish' not in cols:
@@ -290,6 +298,8 @@ def schedule_health(plan: Plan, report_date: date, cpm: dict) -> dict:
             'count': len(items), 'percent': pct, 'threshold': threshold,
             'kind': 'model' if cid in MODEL_CHECKS else 'finding',
             'status': 'pass' if passed else 'fail',
+            'items': [t.name if isinstance(t, Task) else str(t)
+                      for t in items],      # полный список (drill-down)
             'evidence': [t.name if isinstance(t, Task) else str(t)
                          for t in items[:10]],
         })

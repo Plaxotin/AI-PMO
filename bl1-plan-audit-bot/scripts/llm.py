@@ -154,7 +154,16 @@ compliance, schedule_health, evm, health, diff (если есть). Возмож
 
 
 def _facts_text(facts: dict) -> str:
-    text = json.dumps(facts, ensure_ascii=False, indent=1)
+    """JSON фактов для LLM. Полные списки задач ('items') исключаем —
+    они нужны только drill-down в боте, а не модели (экономия токенов)."""
+    def strip_items(obj):
+        if isinstance(obj, dict):
+            return {k: strip_items(v) for k, v in obj.items() if k != 'items'}
+        if isinstance(obj, list):
+            return [strip_items(x) for x in obj]
+        return obj
+    text = json.dumps(strip_items(facts), ensure_ascii=False, indent=1,
+                      default=str)
     if len(text) > MAX_FACTS_CHARS:
         text = text[:MAX_FACTS_CHARS] + '\n…(усечено)'
     return text

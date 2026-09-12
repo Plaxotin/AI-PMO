@@ -129,3 +129,81 @@ def build_chat_summary(plan: Plan, facts: dict) -> str:
 
     text = '\n'.join(lines)
     return text[:TG_LIMIT - 1] + '…' if len(text) > TG_LIMIT else text
+
+
+# ---------- Drill-down: детальные сводки по направлениям (v1.1) ----------
+
+DETAIL_TITLES = {
+    'quality': 'Качество плана — детализация нарушений',
+    'findings': 'Замечания по оформлению — детализация',
+    'reco': 'Рекомендации по улучшению плана — детализация',
+}
+
+
+def _items_of(entry: dict) -> list:
+    """Полный список задач находки (или усечённые примеры как запасной вариант)."""
+    return entry.get('items') or entry.get('evidence') or []
+
+
+def _detail_section(lines: list, icon: str, title: str, count,
+                    items: list, note: str = None):
+    suffix = f' — {count} шт.' if count is not None else ''
+    lines.append(f'{icon} *{title}*{suffix}')
+    if note:
+        lines.append(f'_{note}_')
+    for i, name in enumerate(items, 1):
+        lines.append(f'{i}. {name}')
+    lines.append('')
+
+
+def build_detail(facts: dict, direction: str) -> str:
+    """Полные списки задач по направлению: quality / findings / reco.
+
+    Источник — полные списки 'items' в facts (в LLM не уходят).
+    Текст может быть длинным — отправка через bot (чат или .txt-файл).
+    """
+    lines = [f"📋 *{DETAIL_TITLES[direction]}*", '']
+
+    if direction == 'quality':
+        rows = [c for c in facts.get('schedule_health', {}).get('checks', [])
+                if c.get('kind') != 'model' and c['status'] == 'fail']
+        if not rows:
+            lines.append('Нарушений норм качества не выявлено ✅')
+        for c in rows:
+            _detail_section(lines, '❌', c['name'], c['count'],
+                            _items_of(c),
+                            note=f"доля: {c['percent']} % (норма ≤ 5 %)")
+
+    elif direction == 'findings':
+        rows = [v for v in facts.get('compliance', [])
+                if v.get('kind') != 'model']
+        if not rows:
+            lines.append('Замечаний нет ✅')
+        for v in rows:
+            icon = SEVERITY_ICON.get(v['severity'], '•')
+            _detail_section(lines, icon, v.get('title', v['rule']),
+                            v['count'], _items_of(v))
+
+    elif direction == 'reco':
+        from analytics import MODEL_BENEFITS
+        seen = set()
+        rows = []
+        for v in facts.get('compliance', []):
+            if v.get('kind') == 'model':
+                rows.append((v.get('title', v['rule']), v['count'], None,
+                             _items_of(v), MODEL_BENEFITS.get(v['rule'], '')))
+        for c in facts.get('schedule_health', {}).get('checks', []):
+            if c.get('kind') == 'model' and c['status'] == 'fail':
+                rows.append((c['name'], c['count'], c['percent'],
+                             _items_of(c), MODEL_BENEFITS.get(c['id'], '')))
+        for title, count, pct, items, benefit in rows:
+            if benefit in seen:
+                continue
+            seen.add(benefit)
+            scale = f'{count} шт.' + (f' ({pct} %)' if pct is not None else '')
+            _detail_section(lines, '💡', f'{title} — {scale}', None,
+                            items, note=benefit)
+        if not rows:
+            lines.append('План заполнен полностью, рекомендаций нет ✅')
+
+    return '\n'.join(lines).strip()
