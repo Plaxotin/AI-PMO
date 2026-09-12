@@ -256,6 +256,11 @@ def parse_canonical(text: str, today: Optional[date] = None) -> ParsedCommand:
     if m:
         return finish("comment", {"id": int(m.group(1)), "comment": m.group(2).strip()})
 
+    # --- приоритет ---
+    m = re.match(r"^приоритет\s*#\s*(\d+)\s+(.+)$", norm, flags=re.IGNORECASE)
+    if m:
+        return finish("priority", {"id": int(m.group(1)), "priority": m.group(2).strip()})
+
     # --- удалить ---
     m = re.match(r"^удалить\s*#\s*(\d+)$", low) or re.match(r"^удалить\s+(\d+)$", low)
     if m:
@@ -274,6 +279,7 @@ def parse_canonical(text: str, today: Optional[date] = None) -> ParsedCommand:
         description = parts.get("описание", "")
         assignee = parts.get("ответственный", "")
         deadline_str = parts.get("срок", "")
+        priority = parts.get("приоритет", "")
         if not contragent or not description or not assignee or not deadline_str:
             return ParsedCommand(ok=False, error="❌ Неполные данные для создания поручения.")
         date_str = normalize_date(deadline_str, today)
@@ -284,6 +290,7 @@ def parse_canonical(text: str, today: Optional[date] = None) -> ParsedCommand:
             "description": description,
             "assignee": assignee,
             "deadline": date_str,
+            "priority": priority,
         })
 
     return ParsedCommand(ok=False)

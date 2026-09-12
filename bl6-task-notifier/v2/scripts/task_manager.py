@@ -129,6 +129,7 @@ COLUMN_SYNONYMS = {
     "status":      ["Статус", "Status"],
     "closed":      ["Дата закрытия", "Data zakrytiya"],
     "comment":     ["Комментарий", "Kommentariy"],
+    "priority":    ["Приоритет", "Prioritet"],
 }
 REQUIRED_FIELDS = ["id", "description", "assignee", "deadline", "status"]
 FIELD_LABELS = {
@@ -136,6 +137,7 @@ FIELD_LABELS = {
     "contragent": "Контрагент", "description": "Описание",
     "assignee": "Ответственный", "deadline": "Срок", "status": "Статус",
     "closed": "Дата закрытия", "comment": "Комментарий",
+    "priority": "Приоритет",
 }
 
 
@@ -235,7 +237,8 @@ def add_task(args):
         if idx is not None:
             row[idx] = value
 
-    put("id", str(task_id))
+    # ID пишем числом, чтобы в Sheets работала сортировка/фильтр по номеру
+    put("id", task_id)
     put("created", today)
     put("author", args.author)
     put("contragent", args.contragent)
@@ -248,14 +251,17 @@ def add_task(args):
     put("status", args.status or "В работе")
     put("closed", "")
     put("comment", args.comment or "")
+    put("priority", getattr(args, "priority", None) or "")
 
-    worksheet.append_row(row)
+    worksheet.append_row(row, value_input_option="USER_ENTERED")
 
     print(f"Поручение #{task_id} добавлено")
     print(f"   Контрагент: {args.contragent}")
     print(f"   Ответственный: {args.assignee}")
     print(f"   Срок: {args.deadline}")
     print(f"   Статус: {args.status or 'В работе'}")
+    if getattr(args, "priority", None):
+        print(f"   Приоритет: {args.priority}")
 
 def list_tasks(args):
     """Выводит список поручений."""
@@ -307,6 +313,7 @@ def list_tasks(args):
             "status": field_val(r, col_map, "status"),
             "closed": field_val(r, col_map, "closed"),
             "comment": field_val(r, col_map, "comment"),
+            "priority": field_val(r, col_map, "priority"),
         } for r in filtered]
         print(json.dumps(data, ensure_ascii=False))
         return
@@ -391,6 +398,10 @@ def update_task(args):
     if args.description:
         if write("description", args.description):
             updates.append(f"Описание обновлено")
+
+    if getattr(args, "priority", None):
+        if write("priority", args.priority):
+            updates.append(f"Приоритет → {args.priority}")
 
     if updates:
         print(f"✅ Поручение #{args.id} обновлено:")
@@ -866,6 +877,7 @@ def main():
     add_parser.add_argument('--deadline', required=True, help='Срок (ДД.ММ.ГГГГ)')
     add_parser.add_argument('--status', default='В работе', help='Статус (по умолчанию: В работе)')
     add_parser.add_argument('--comment', help='Комментарий')
+    add_parser.add_argument('--priority', help='Приоритет (0 — наивысший … 3 — низкий)')
     
     # list
     list_parser = subparsers.add_parser('list', help='Список поручений')
@@ -883,6 +895,7 @@ def main():
     update_parser.add_argument('--comment', help='Комментарий')
     update_parser.add_argument('--assignee', help='Новый ответственный')
     update_parser.add_argument('--description', help='Новое описание')
+    update_parser.add_argument('--priority', help='Новый приоритет')
     
     # check-deadlines
     check_parser = subparsers.add_parser('check-deadlines', help='Проверить сроки')

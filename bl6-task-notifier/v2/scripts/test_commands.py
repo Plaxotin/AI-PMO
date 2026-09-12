@@ -42,17 +42,12 @@ class TestHelpAndRouting(unittest.TestCase):
         text = commands.help_text("admin")
         self.assertIn("свободной форме", text)
 
-    def test_help_text_superadmin_free_form(self):
-        text = commands.help_text("superadmin")
-        self.assertIn("свободной форме", text)
-
     def test_help_text_user_my_tasks(self):
         text = commands.help_text("user")
         self.assertIn("Мои поручения", text)
 
     def test_route_unrecognized_admin(self):
         self.assertEqual(commands.route_unrecognized("admin"), "llm")
-        self.assertEqual(commands.route_unrecognized("superadmin"), "llm")
 
     def test_route_unrecognized_user(self):
         self.assertEqual(commands.route_unrecognized("user"), "fallback")
@@ -158,11 +153,6 @@ class TestParseAdmin(unittest.TestCase):
             c = parse(t, **ADMIN)
             self.assertFalse(c.ok, t)
             self.assertIn("Не понял команду", c.error, t)
-
-    def test_superadmin_same_as_admin(self):
-        for t in ("мои поручения", "закрыть #5", "лимиты 10 100"):
-            c = parse(t, **SUPER)
-            self.assertFalse(c.ok, t)
 
     def test_admin_unknown_error_has_free_form_hint(self):
         c = parse("мои поручения", **ADMIN)
@@ -297,21 +287,33 @@ class TestParseCanonical(unittest.TestCase):
         self.assertEqual((c.ok, c.name, c.args["id"]), (True, "delete", 9))
 
     def test_create_full(self):
-        c = canon("создать поручение: Проект=Альфа; Описание=Сделать X; "
+        c = canon("создать поручение: Контрагент=Альфа; Описание=Сделать X; "
                   "Ответственный=Иванов; Срок=завтра")
         self.assertTrue(c.ok)
         self.assertEqual(c.name, "create")
-        self.assertEqual(c.args["project"], "Альфа")
+        self.assertEqual(c.args["contragent"], "Альфа")
         self.assertEqual(c.args["description"], "Сделать X")
         self.assertEqual(c.args["assignee"], "Иванов")
         self.assertEqual(c.args["deadline"], "14.08.2026")
+        self.assertEqual(c.args["priority"], "")
+
+    def test_create_with_priority(self):
+        c = canon("создать поручение: Контрагент=Альфа; Описание=Сделать X; "
+                  "Ответственный=Иванов; Срок=завтра; Приоритет=1")
+        self.assertTrue(c.ok)
+        self.assertEqual(c.args["priority"], "1")
+
+    def test_priority_update(self):
+        c = canon("приоритет #7 0")
+        self.assertEqual((c.ok, c.name, c.args["id"], c.args["priority"]),
+                         (True, "priority", 7, "0"))
 
     def test_create_missing_field(self):
-        c = canon("создать поручение: Проект=Альфа; Описание=Сделать X")
+        c = canon("создать поручение: Контрагент=Альфа; Описание=Сделать X")
         self.assertFalse(c.ok)
 
     def test_create_bad_date(self):
-        c = canon("создать поручение: Проект=А; Описание=Б; "
+        c = canon("создать поручение: Контрагент=А; Описание=Б; "
                   "Ответственный=В; Срок=когда-нибудь")
         self.assertFalse(c.ok)
 

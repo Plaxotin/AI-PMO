@@ -359,6 +359,135 @@ def resolve_tg_login(name: str) -> Optional[str]:
     return None
 
 
+def _short_fio(fio: str) -> str:
+    """«Плахотин Константин Михайлович» → «Плахотин К.М.» (фамилия + инициалы)."""
+    parts = (fio or "").split()
+    if len(parts) < 2:
+        return (fio or "").strip()
+    surname = parts[0][0].upper() + parts[0][1:]
+    initials = ".".join(p[0].upper() for p in parts[1:] if p) + "."
+    return f"{surname} {initials}"
+
+
+def normalize_assignee_format(name: str) -> str:
+    """Единый формат записи ответственного в реестр: «Фамилия И.».
+    Никнеймы Telegram в реестр не пишем — они живут на листе «Контакты»."""
+    n = (name or "").strip()
+    if not n:
+        return n
+    # Указан логин — ищем ФИО по логину в «Контактах»
+    if n.startswith('@'):
+        login = n.lstrip('@').lower()
+        for c in load_contacts_full():
+            if c["tg"].lstrip('@').lower() == login and c["fio"]:
+                return _short_fio(c["fio"])
+        return n  # неизвестный логин — оставляем как есть
+    # Известен в «Контактах» — каноническая короткая форма оттуда
+    for c in load_contacts_full():
+        if c["fio"] and _person_matches_fio(n, c["fio"]):
+            return _short_fio(c["fio"])
+    # Одиночное слово латиницей — возможно, логин без «@»
+    if re.fullmatch(r"[A-Za-z0-9_]{4,32}", n):
+        for c in load_contacts_full():
+            if c["tg"].lstrip('@').lower() == n.lower() and c["fio"]:
+                return _short_fio(c["fio"])
+    # Не найден: считаем порядок «Фамилия Имя [Отчество]» (конвенция реестра)
+    # и сокращаем до «Фамилия И.». Если порядок обратный — админ поправит
+    # в предпросмотре, а после записи человек попадёт в «Контакты».
+    return _short_fio(n)
+
+
+def ensure_contact(fio: str, tg: str = "", company: str = ""):
+    """Дописывает нового ответственного на лист «Контакты» (ФИО | Telegram | Компания),
+    чтобы в следующий раз не уточнять. Существующим дозаполняет пустые логин/компанию."""
+    fio = (fio or "").strip()
+    if not fio:
+        return
+    tg = (tg or "").strip()
+    company = (company or "").strip()
+    try:
+        spreadsheet = _get_spreadsheet()
+        ws = spreadsheet.worksheet('Контакты')
+        rows = ws.get_all_values()
+        for i, row in enumerate(rows[1:], start=2):
+            ex_fio = row[0].strip() if len(row) > 0 else ""
+            ex_tg = row[1].strip() if len(row) > 1 else ""
+            ex_company = row[2].strip() if len(row) > 2 else ""
+            same_person = (ex_fio and _person_matches_fio(fio, ex_fio)) or \
+                          (tg and ex_tg and
+                           ex_tg.lstrip('@').lower() == tg.lstrip('@').lower())
+            if same_person:
+                # Человек уже есть — дозаполняем только пустые ячейки
+                if tg and not ex_tg:
+                    ws.update_cell(i, 2, tg)
+                    log(f"📇 Контакты: «{ex_fio}» дополнен логином {tg}")
+                if company and not ex_company:
+                    ws.update_cell(i, 3, company)
+                    log(f"📇 Контакты: «{ex_fio}» дополнен компанией {company}")
+                return
+        ws.append_row([fio, tg, company])
+        log(f"📇 Контакты: добавлен «{fio}» ({tg or 'без логина'}, {company or '—'})")
+    except Exception as e:
+        log(f"⚠️ Не удалось дописать контакт «{fio}»: {e}")
+
+
+_OPEN_STATUSES_EXCLUDE = ("Выполнено", "Отменено")
+
+
+def _open_tasks() -> List[Dict]:
+    return [t for t in get_all_tasks()
+            if (t.get('status') or '').strip() not in _OPEN_STATUSES_EXCLUDE]
+
+
+def find_semantic_duplicate(description: str) -> List[Dict]:
+    """LLM-проверка перед созданием: есть ли открытое поручение о том же деле
+    (по смыслу, не только по символам). Возвращает список задач-дублей."""
+    open_tasks = _open_tasks()
+    if not open_tasks or not (description or "").strip():
+        return []
+    listing = "\n".join(f"#{t['id']}: {t.get('description', '')}"
+                        for t in open_tasks)
+    data = llm.call_kimi_json(
+        llm.DUP_CHECK_SYSTEM,
+        f"Новое поручение: {description}\n\nОткрытые поручения:\n{listing}",
+        log_fn=log)
+    if not data:
+        return []
+    ids = set()
+    for i in (data.get("duplicates") or []):
+        try:
+            ids.add(int(str(i).strip().lstrip('#')))
+        except (ValueError, TypeError):
+            continue
+    return [t for t in open_tasks
+            if str(t.get('id', '')).isdigit() and int(t['id']) in ids]
+
+
+def find_semantic_duplicate_pairs() -> List[Tuple[Dict, Dict]]:
+    """LLM-аудит: пары открытых поручений-дублей по смыслу."""
+    open_tasks = _open_tasks()
+    if len(open_tasks) < 2:
+        return []
+    listing = "\n".join(
+        f"#{t['id']}: {t.get('description', '')} "
+        f"({t.get('contragent', '')}, {t.get('assignee', '')})"
+        for t in open_tasks)
+    data = llm.call_kimi_json(llm.DUP_AUDIT_SYSTEM, listing,
+                              log_fn=log, max_tokens=4000)
+    if not data:
+        return []
+    by_id = {str(t.get('id', '')): t for t in open_tasks}
+    pairs = []
+    for pair in (data.get("pairs") or []):
+        if not isinstance(pair, list) or len(pair) != 2:
+            continue
+        a = by_id.get(str(pair[0]).strip().lstrip('#'))
+        b = by_id.get(str(pair[1]).strip().lstrip('#'))
+        if a and b and a is not b:
+            pairs.append((a, b))
+    return pairs
+
+
 # ======== АНТИФЛУД ========
 
 class FloodControl:
@@ -996,25 +1125,39 @@ def cmd_close_task(task_id: int, username: str, user_id=None) -> str:
     return toast
 
 
-def cmd_create_preview(args: Dict, username: str) -> str:
-    return with_footer(
+def cmd_create_preview(args: Dict, username: str,
+                       sem_dups: List[Dict] = None) -> str:
+    priority = (args.get('priority') or '').strip()
+    text = (
         "📝 <b>Проверьте новое поручение:</b>\n\n"
         f"   📁 Контрагент: {html.escape(args['contragent'])}\n"
         f"   📝 Описание: {html.escape(args['description'])}\n"
         f"   👤 Ответственный: {html.escape(args['assignee'])}\n"
         f"   📅 Срок: <b>{args['deadline']}</b>\n"
-        f"   ✍️ Автор: @{html.escape(username or '?')}\n\n"
-        f"Напишите <b>да</b> для подтверждения (60 сек), любой другой текст — отмена."
     )
+    if priority:
+        text += f"   🚩 Приоритет: {html.escape(priority)}\n"
+    text += f"   ✍️ Автор: @{html.escape(username or '?')}\n"
+    if sem_dups:
+        dups = ", ".join(f"#{t['id']}" for t in sem_dups)
+        text += (f"\n⚠️ <b>Возможный дубль по смыслу:</b> {html.escape(dups)}. "
+                 f"Если это то же поручение — отмените создание.\n")
+    text += ("\nНапишите <b>да</b> для подтверждения (60 сек), "
+             "любой другой текст — отмена.")
+    return with_footer(text)
 
 
 def cmd_create_execute(args: Dict, username: str, first_name: str) -> str:
     author = f"{first_name} (@{username})" if username else first_name
+    # Единый формат ответственного: «Фамилия И.» (ники TG — только в «Контактах»)
+    norm_assignee = normalize_assignee_format(args.get("assignee", ""))
+    if norm_assignee:
+        args["assignee"] = norm_assignee
     # Контрагент = компания ответственного (вкладка «Контакты»)
     company = resolve_contragent(args.get("assignee", ""))
     if company:
         args["contragent"] = company
-    success, output = run_task_manager(
+    tm_args = [
         'add',
         '--author', author,
         '--contragent', args['contragent'],
@@ -1022,7 +1165,10 @@ def cmd_create_execute(args: Dict, username: str, first_name: str) -> str:
         '--assignee', args['assignee'],
         '--deadline', args['deadline'],
         '--status', 'В работе',
-    )
+    ]
+    if (args.get('priority') or '').strip():
+        tm_args += ['--priority', args['priority'].strip()]
+    success, output = run_task_manager(*tm_args)
     if success:
         invalidate_cache()
         new_id = ""
@@ -1034,11 +1180,21 @@ def cmd_create_execute(args: Dict, username: str, first_name: str) -> str:
               f"Контрагент={args['contragent']} | Описание={args['description']} | "
               f"Ответственный={args['assignee']} | Срок={args['deadline']}",
               username)
-        return with_footer(
+        # Фиксируем нового ответственного/компанию в «Контактах»,
+        # чтобы в следующий раз не уточнять
+        ensure_contact(args['assignee'],
+                       resolve_tg_login(args['assignee']) or "",
+                       args['contragent'])
+        priority = (args.get('priority') or '').strip()
+        text = (
             f"✅ Поручение <b>#{new_id or '?'}</b> создано!\n\n"
             f"   📁 {html.escape(args['contragent'])}\n"
             f"   📝 {html.escape(args['description'])}\n"
-            f"   👤 {html.escape(args['assignee'])}  📅 {args['deadline']}")
+            f"   👤 {html.escape(args['assignee'])}  📅 {args['deadline']}"
+        )
+        if priority:
+            text += f"  🚩 {html.escape(priority)}"
+        return with_footer(text)
     return f"❌ Не удалось создать поручение.\n<code>{html.escape(output[:300])}</code>"
 
 
@@ -1347,8 +1503,9 @@ def dispatch(cmd: "commands.ParsedCommand", username: str, first_name: str,
                     f"(#{dup[3]}, {dup[0]}, {dup[1]}).\n"
                     f"Контрагент и описание совпадают — дубль не создаю. "
                     f"Если это другое поручение, измените описание.")
+        sem_dups = find_semantic_duplicate(args["description"])
         _set_user_state(key, "confirm_create", args)
-        return cmd_create_preview(args, username)
+        return cmd_create_preview(args, username, sem_dups)
 
     if name == "deadline":
         return _cmd_update(args["id"], "--deadline", args["date"],
@@ -1359,9 +1516,10 @@ def dispatch(cmd: "commands.ParsedCommand", username: str, first_name: str,
                            f"статус изменён на <b>{html.escape(args['status'])}</b>",
                            username, f"Статус → {args['status']}")
     if name == "assignee":
-        return _cmd_update(args["id"], "--assignee", args["assignee"],
-                           f"ответственный изменён на <b>{html.escape(args['assignee'])}</b>",
-                           username, f"Ответственный → {args['assignee']}")
+        norm_assignee = normalize_assignee_format(args["assignee"])
+        return _cmd_update(args["id"], "--assignee", norm_assignee,
+                           f"ответственный изменён на <b>{html.escape(norm_assignee)}</b>",
+                           username, f"Ответственный → {norm_assignee}")
     if name == "description":
         return _cmd_update(args["id"], "--description", args["description"],
                            "описание обновлено",
@@ -1370,6 +1528,10 @@ def dispatch(cmd: "commands.ParsedCommand", username: str, first_name: str,
         return _cmd_update(args["id"], "--comment", args["comment"],
                            "комментарий добавлен",
                            username, f"Комментарий → {args['comment'][:100]}")
+    if name == "priority":
+        return _cmd_update(args["id"], "--priority", args["priority"],
+                           f"приоритет изменён на <b>{html.escape(args['priority'])}</b>",
+                           username, f"Приоритет → {args['priority']}")
     if name == "delete":
         task = get_task_info(args["id"])
         if not task:
@@ -1412,8 +1574,19 @@ def execute_admin_commands(cmds_batch, username, first_name, chat_id, key, user_
                         f"⚠️ Дубль (уже есть #{dup[3]}), не создаю: "
                         f"<code>{html.escape(c)}</code>")
                 else:
-                    responses.append(cmd_create_execute(
-                        check.args, username, first_name))
+                    result = cmd_create_execute(check.args, username, first_name)
+                    sem_dups = find_semantic_duplicate(
+                        check.args["description"])
+                    # Исключаем только что созданное поручение из списка дублей
+                    if result.startswith("✅"):
+                        sem_dups = [t for t in sem_dups
+                                    if f"#{t['id']}" not in result.split('\n')[0]]
+                    if sem_dups:
+                        dups = ", ".join(f"#{t['id']}" for t in sem_dups)
+                        result += (f"\n\n⚠️ <b>Возможный дубль по смыслу:</b> "
+                                   f"{html.escape(dups)} — проверьте, "
+                                   f"не то же ли это поручение.")
+                    responses.append(result)
             elif check.name == "delete":
                 if get_task_info(check.args["id"]):
                     responses.append(cmd_delete_execute(
@@ -1452,10 +1625,12 @@ def enrich_create_command(c: str) -> str:
     company = resolve_contragent(check.args.get("assignee", ""))
     if not company or check.args.get("contragent") == company:
         return c
+    extra = (f"; Приоритет={check.args['priority']}"
+             if check.args.get('priority') else "")
     return (f"создать поручение: Контрагент={company}; "
             f"Описание={check.args['description']}; "
             f"Ответственный={check.args['assignee']}; "
-            f"Срок={check.args['deadline']}")
+            f"Срок={check.args['deadline']}{extra}")
 
 
 
@@ -1528,7 +1703,11 @@ def run_registry_audit(chat_id, key, username: str):
         else:
             issues["unmapped"].append({"name": name, "task_id": info["task_id"], "description": info["description"]})
 
-    total = len(issues["unmapped"]) + len(issues["contacts_auto"]) + len(issues["empty_fields"]) + len(issues["spelling"])
+    # --- семантические дубли (LLM, по смыслу а не по символам) ---
+    dup_pairs = find_semantic_duplicate_pairs()
+    issues["duplicates"] = dup_pairs
+
+    total = len(issues["unmapped"]) + len(issues["contacts_auto"]) + len(issues["empty_fields"]) + len(issues["spelling"]) + len(dup_pairs)
     if total == 0:
         send_message(chat_id, "✅ <b>Проверка реестра завершена.</b>\n\nНарушений не найдено.")
         return
@@ -1554,6 +1733,13 @@ def run_registry_audit(chat_id, key, username: str):
         for it in issues["spelling"]:
             words_str = ", ".join(it['words'])
             lines.append(f"• ID {it['id']}: {html.escape(words_str)}")
+        lines.append("")
+    if dup_pairs:
+        lines.append(f"<b>Возможные дубли по смыслу</b> ({len(dup_pairs)}) — проверьте вручную:")
+        for a, b in dup_pairs:
+            lines.append(
+                f"• <b>#{a['id']}</b> {html.escape((a.get('description') or '')[:50])} "
+                f"≈ <b>#{b['id']}</b> {html.escape((b.get('description') or '')[:50])}")
         lines.append("")
 
     lines.append("Исправить найденные проблемы?")
@@ -2195,6 +2381,10 @@ def process_updates(updates: List[Dict]):
                         mapping = load_user_mapping()
                         for name, login in data["collected"].items():
                             mapping[name] = normalize_login(login)
+                            # Фиксируем человека на листе «Контакты»
+                            ensure_contact(normalize_assignee_format(name),
+                                           normalize_login(login),
+                                           resolve_contragent(name) or "")
                         save_user_mapping(mapping)
                         response = "✅ Привязки сохранены."
                         # Автопереход к следующему этапу
@@ -2410,6 +2600,17 @@ def process_updates(updates: List[Dict]):
                     mapping = load_user_mapping()
                     mapping[queue[idx]] = login_norm
                     save_user_mapping(mapping)
+                    # Фиксируем человека на листе «Контакты» (ФИО + логин +
+                    # компания из создаваемого поручения), чтобы не переспрашивать
+                    person_company = ""
+                    for c in data.get("commands", []):
+                        chk = commands.parse_canonical(c, today=now_msk().date())
+                        if chk.ok and chk.name == "create" and \
+                                chk.args.get("assignee", "").strip() == queue[idx]:
+                            person_company = chk.args.get("contragent", "")
+                            break
+                    ensure_contact(normalize_assignee_format(queue[idx]),
+                                   login_norm, person_company)
                     note = (f"✅ Привязка <b>{html.escape(queue[idx])}</b> → "
                             f"{html.escape(login_norm)} сохранена.\n\n")
                 else:
