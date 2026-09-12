@@ -691,7 +691,15 @@ def update_task_fields_in_sheet(task_id: str, fields: Dict[str, str]) -> bool:
         for field_name, value in fields.items():
             col = find_col(field_headers.get(field_name.lower(), []))
             if col:
-                ws.update_cell(row_idx, col, value)
+                # Даты — через USER_ENTERED, чтобы Sheets хранил их как даты,
+                # а не как текст с апострофом (условное форматирование)
+                if field_name.lower() == 'срок':
+                    from gspread.utils import rowcol_to_a1
+                    ws.update(range_name=rowcol_to_a1(row_idx, col),
+                              values=[[value]],
+                              value_input_option="USER_ENTERED")
+                else:
+                    ws.update_cell(row_idx, col, value)
                 log(f"📝 Обновлено: задача {task_id}, {field_name} = {value}")
         return True
     except Exception as e:
@@ -1661,7 +1669,7 @@ def run_registry_audit(chat_id, key, username: str):
                 name = name.strip()
                 if name and not any(k and k.lower() in name.lower() for k in mapping):
                     if name not in unmapped_map:
-                        unmapped_map[name] = {"task_id": tid, "description": description[:60]}
+                        unmapped_map[name] = {"task_id": tid, "description": description}
 
         # --- пустые поля ---
         empty = []
@@ -1672,7 +1680,7 @@ def run_registry_audit(chat_id, key, username: str):
         if not project:
             empty.append("контрагент")
         if empty:
-            issues["empty_fields"].append({"id": tid, "fields": empty, "desc": description[:40]})
+            issues["empty_fields"].append({"id": tid, "fields": empty, "desc": description})
 
         # --- орфография ---
         if description:
@@ -1683,7 +1691,7 @@ def run_registry_audit(chat_id, key, username: str):
                 if re.search(r"(.)\1{2,}", lw):
                     suspicious.append(w)
             if suspicious:
-                issues["spelling"].append({"id": tid, "words": suspicious[:5], "desc": description[:40]})
+                issues["spelling"].append({"id": tid, "words": suspicious[:5], "desc": description})
 
     # Разделяем unmapped: есть в Контактах vs нет
     # (мягкое сопоставление: "Плахотин" ↔ "Плахотин Константин")
@@ -1726,20 +1734,20 @@ def run_registry_audit(chat_id, key, username: str):
     if issues["empty_fields"]:
         lines.append(f"<b>Пустые поля</b> ({len(issues['empty_fields'])}):")
         for it in issues["empty_fields"]:
-            lines.append(f"• ID {it['id']}: {', '.join(it['fields'])}")
+            lines.append(f"• ID {it['id']}: {', '.join(it['fields'])} — {html.escape(it['desc'])}")
         lines.append("")
     if issues["spelling"]:
         lines.append(f"<b>Возможные опечатки</b> ({len(issues['spelling'])}):")
         for it in issues["spelling"]:
             words_str = ", ".join(it['words'])
-            lines.append(f"• ID {it['id']}: {html.escape(words_str)}")
+            lines.append(f"• ID {it['id']}: {html.escape(words_str)} — {html.escape(it['desc'])}")
         lines.append("")
     if dup_pairs:
         lines.append(f"<b>Возможные дубли по смыслу</b> ({len(dup_pairs)}) — проверьте вручную:")
         for a, b in dup_pairs:
             lines.append(
-                f"• <b>#{a['id']}</b> {html.escape((a.get('description') or '')[:50])} "
-                f"≈ <b>#{b['id']}</b> {html.escape((b.get('description') or '')[:50])}")
+                f"• <b>#{a['id']}</b> {html.escape(a.get('description') or '')} "
+                f"≈ <b>#{b['id']}</b> {html.escape(b.get('description') or '')}")
         lines.append("")
 
     lines.append("Исправить найденные проблемы?")
@@ -1765,7 +1773,7 @@ def _empty_fields_prompt(item: Dict, n: int, total: int) -> str:
     example = ', '.join(_FIELD_EXAMPLES.get(f, 'значение') for f in item['fields'])
     return (
         f"📝 <b>Исправление пустых полей</b> ({n}/{total})\n\n"
-        f"Задача <b>ID {item['id']}</b>\n"
+        f"Задача <b>ID {item['id']}</b>: {html.escape(item.get('desc', ''))}\n"
         f"Пустые поля: {', '.join(item['fields'])}\n\n"
         f"Введите значения через запятую в том же порядке, например:\n"
         f"<code>{example}</code>"
@@ -2050,7 +2058,7 @@ def process_callback(callback: Dict):
                 first = sp[0]
                 send_message(chat_id, (
                     f"✏️ <b>Исправление опечаток</b> ({1}/{len(sp)})\n\n"
-                    f"Задача <b>ID {first['id']}</b>\n"
+                    f"Задача <b>ID {first['id']}</b>: {html.escape(first.get('desc', ''))}\n"
                     f"Подозрительные слова: {', '.join(first['words'])}\n\n"
                     f"Введите правильные варианты через запятую в том же порядке."
                 ))
@@ -2344,7 +2352,7 @@ def process_updates(updates: List[Dict]):
                 it = items[nxt]
                 send_message(chat_id, (
                     f"✏️ <b>Исправление опечаток</b> ({nxt+1}/{len(items)})\n\n"
-                    f"Задача <b>ID {it['id']}</b>\n"
+                    f"Задача <b>ID {it['id']}</b>: {html.escape(it.get('desc', ''))}\n"
                     f"Подозрительные слова: {', '.join(it['words'])}\n\n"
                     f"Введите правильные варианты через запятую в том же порядке."
                 ))
@@ -2409,7 +2417,7 @@ def process_updates(updates: List[Dict]):
                             first = next_spell[0]
                             send_message(chat_id, (
                                 f"✏️ <b>Исправление опечаток</b> ({1}/{len(next_spell)})\n\n"
-                                f"Задача <b>ID {first['id']}</b>\n"
+                                f"Задача <b>ID {first['id']}</b>: {html.escape(first.get('desc', ''))}\n"
                                 f"Подозрительные слова: {', '.join(first['words'])}\n\n"
                                 f"Введите правильные варианты через запятую в том же порядке."
                             ))
@@ -2444,7 +2452,7 @@ def process_updates(updates: List[Dict]):
                             first = next_spell[0]
                             send_message(chat_id, (
                                 f"✏️ <b>Исправление опечаток</b> ({1}/{len(next_spell)})\n\n"
-                                f"Задача <b>ID {first['id']}</b>\n"
+                                f"Задача <b>ID {first['id']}</b>: {html.escape(first.get('desc', ''))}\n"
                                 f"Подозрительные слова: {', '.join(first['words'])}\n\n"
                                 f"Введите правильные варианты через запятую в том же порядке."
                             ))

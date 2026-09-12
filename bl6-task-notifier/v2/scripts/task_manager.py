@@ -366,7 +366,15 @@ def update_task(args):
             idx = col_map.get(field)
             col = idx + 1 if idx is not None else None
         if col:
-            worksheet.update_cell(row_idx, col, value)
+            # Даты пишем через USER_ENTERED, чтобы Sheets хранил их как ДАТЫ,
+            # а не как текст с апострофом (иначе ломается условное форматирование)
+            if field in ("deadline", "closed"):
+                from gspread.utils import rowcol_to_a1
+                worksheet.update(range_name=rowcol_to_a1(row_idx, col),
+                                 values=[[value]],
+                                 value_input_option="USER_ENTERED")
+            else:
+                worksheet.update_cell(row_idx, col, value)
             return True
         return False
 
