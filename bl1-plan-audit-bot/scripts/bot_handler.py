@@ -280,8 +280,9 @@ class Bot:
                     print(f'⚠️ не удалось загрузить предыдущую версию: {e}')
 
             facts = analytics.run_analysis(plan, baseline_plan=baseline_plan)
-            # Кэш для отчёта спонсору (в памяти, stateless при перезапуске)
+            # Кэш для drill-down и отчёта спонсору: память + диск
             self.last_run[chat_id] = {'plan_name': plan.name, 'facts': facts}
+            state.save_last_run(chat_id, plan.name, facts)
 
             self.send_text(chat_id, '🤖 Метрики посчитаны, запускаю '
                                     'ИИ-анализ (обычно 1–3 минуты)…')
@@ -299,14 +300,14 @@ class Bot:
                 buttons.append({'text': '📊 Конвертировать в Excel',
                                 'callback_data': 'xlsx'})
             detail_row = [
-                {'text': '🔎 Качество', 'callback_data': 'det_quality'},
-                {'text': '🔎 Замечания', 'callback_data': 'det_findings'},
-                {'text': '🔎 Рекомендации', 'callback_data': 'det_reco'},
+                {'text': '🔧 Улучшить качество', 'callback_data': 'det_quality'},
+                {'text': '🛠 Устранить замечания', 'callback_data': 'det_findings'},
+                {'text': '💡 Учесть рекомендации', 'callback_data': 'det_reco'},
             ]
             self.call('sendMessage', json={
                 'chat_id': chat_id,
-                'text': 'Что дальше? Кнопки «🔎 …» дают детальные списки '
-                        'задач по каждому направлению отчёта:',
+                'text': 'Что дальше? Кнопки ниже дают детальные списки задач '
+                        'с инструкциями по исправлению:',
                 'reply_markup': {'inline_keyboard': [detail_row, buttons]}})
 
             state.remember_plan(chat_id, doc['file_id'], file_name)
@@ -322,9 +323,18 @@ class Bot:
                 except Exception:
                     pass
 
+    # --- Кэш последнего аудита: память + диск (переживает рестарт) ---
+    def _cached_run(self, chat_id: int):
+        cached = self.last_run.get(chat_id)
+        if not cached:
+            cached = state.load_last_run(chat_id)
+            if cached:
+                self.last_run[chat_id] = cached
+        return cached
+
     # --- Drill-down по направлениям отчёта (v1.1) ---
     def send_detail(self, chat_id: int, direction: str):
-        cached = self.last_run.get(chat_id)
+        cached = self._cached_run(chat_id)
         if not cached:
             self.send_text(chat_id,
                            '⚠️ Нет данных аудита (бот перезапускался?) — '
@@ -356,7 +366,7 @@ class Bot:
 
     # --- Отчёт для спонсора (v1.1) ---
     def start_sponsor_flow(self, chat_id: int):
-        if chat_id not in self.last_run:
+        if not self._cached_run(chat_id):
             self.send_text(chat_id,
                            '⚠️ Нет данных аудита (бот перезапускался?) — '
                            'пришлите файл плана и прогоните аудит заново')
@@ -371,7 +381,7 @@ class Bot:
         })
 
     def run_sponsor(self, chat_id: int, context: str = None):
-        cached = self.last_run.get(chat_id)
+        cached = self._cached_run(chat_id)
         if not cached:
             self.send_text(chat_id,
                            '⚠️ Нет данных аудита — пришлите файл плана '

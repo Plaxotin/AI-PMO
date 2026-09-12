@@ -50,3 +50,34 @@ def previous_plan(chat_id: int) -> Optional[dict]:
     """Предпоследний присланный план — база для диффа."""
     items = _load().get(str(chat_id), [])
     return items[-2] if len(items) >= 2 else None
+
+
+# ---------- Кэш последнего аудита (drill-down, спонсорский отчёт) ----------
+# Факты анализа (метаданные, не файл плана) сохраняются на диск — кнопки
+# детализации и «Отчёт для спонсора» работают и после перезапуска бота
+# (решение 13.09.26: «сессия не должна устаревать»).
+
+LASTRUN_PATH = os.path.join(SCRIPT_DIR, 'last_run.json')
+
+
+def save_last_run(chat_id: int, plan_name: str, facts: dict) -> None:
+    try:
+        data = {}
+        if os.path.exists(LASTRUN_PATH):
+            with open(LASTRUN_PATH, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        data[str(chat_id)] = {
+            'plan_name': plan_name, 'facts': facts,
+            'ts': datetime.now().isoformat(timespec='seconds')}
+        with open(LASTRUN_PATH, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, default=str)
+    except Exception as e:
+        print(f'⚠️ не удалось сохранить last_run: {e}')
+
+
+def load_last_run(chat_id: int) -> Optional[dict]:
+    try:
+        with open(LASTRUN_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f).get(str(chat_id))
+    except Exception:
+        return None
