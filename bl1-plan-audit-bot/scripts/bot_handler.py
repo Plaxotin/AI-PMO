@@ -186,8 +186,10 @@ class Bot:
         action = cq.get('data')
         try:
             self.call('answerCallbackQuery', json={'id': cq['id']})
-            # убираем нажатую клавиатуру — защита от повторных запусков
-            if msg.get('message_id'):
+            # Убираем нажатую клавиатуру — защита от повторных запусков.
+            # ИСКЛЮЧЕНИЕ (13.09.26): кнопки детализации det_* должны
+            # нажиматься по очереди — клавиатуру оставляем.
+            if msg.get('message_id') and not (action or '').startswith('det_'):
                 self.call('editMessageReplyMarkup', json={
                     'chat_id': chat_id, 'message_id': msg['message_id'],
                     'reply_markup': {'inline_keyboard': []}})
