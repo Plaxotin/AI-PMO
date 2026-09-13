@@ -121,11 +121,8 @@ def _metrics_rows(facts: dict) -> list:
         rows.append(('Темп выполнения (SPI)', str(spi),
                      f'работы выполняются на {round(spi * 100)} % от графика — '
                      f'{verdict} ({basis})'))
-    bei = facts.get('schedule_health', {}).get('bei')
-    if bei is not None:
-        rows.append(('Выполнение базового плана (BEI)', str(bei),
-                     f'из задач, запланированных к сегодня, выполнено '
-                     f'{round(bei * 100)} % (норма ≥ 95 %)'))
+    # BEI выводится в таблице «Качество плана» следом за срывом базовых дат
+    # (решение 13.09.26), поэтому в сводной таблице цифр не дублируется.
     return rows
 
 
@@ -219,9 +216,14 @@ def generate_pdf(plan: Plan, facts: dict, llm_text: Optional[str],
 
     # 4.1 Качество плана (бывш. DCMA) — с легендой, как читать.
     # Проверки полноты модели (kind='model') сюда не входят — они выше
-    # вынесены в рекомендации (решение 12.09.26).
+    # вынесены в рекомендации (решение 12.09.26). Показатели-метрики
+    # (kind='metric', напр. BEI) не строка проверки — BEI идёт отдельной
+    # строкой сразу после «Срыв базовых дат окончания» (13.09.26).
+    from analytics import BEI_THRESHOLD
     sched = facts.get('schedule_health', {})
-    checks = [c for c in sched.get('checks', []) if c.get('kind') != 'model']
+    bei = sched.get('bei')
+    checks = [c for c in sched.get('checks', [])
+              if c.get('kind') not in ('model', 'metric')]
     if checks:
         story.append(Paragraph('Качество плана', h2))
         story.append(Paragraph(
@@ -242,6 +244,15 @@ def generate_pdf(plan: Plan, facts: dict, llm_text: Optional[str],
                          f"{c['percent']} %" if c['status'] != 'n/a' else 'н/д'])
             if c['status'] == 'fail':
                 row_colors.append(len(rows) - 1)
+            # BEI — следующим показателем после срыва базовых дат
+            if c['id'] == 'D-11' and bei is not None:
+                bei_ok = bei >= BEI_THRESHOLD
+                rows.append(['норма' if bei_ok else 'НАРУШЕНО',
+                             'Индекс выполнения базового плана (BEI)',
+                             family_names['performance'], '—',
+                             f'{bei} ({round(bei * 100)} %)'])
+                if not bei_ok:
+                    row_colors.append(len(rows) - 1)
         tbl = Table(rows, colWidths=[22 * mm, 62 * mm, 30 * mm, 22 * mm, 18 * mm],
                     repeatRows=1)
         style = [('TEXTCOLOR', (0, r), (0, r), colors.red)

@@ -13,6 +13,7 @@
 
 import os
 import tempfile
+import threading
 import time
 
 import requests
@@ -86,11 +87,20 @@ class Bot:
         # chat_id → {'plan_name', 'facts'} последнего аудита (в памяти,
         # stateless: после перезапуска бота отчёт для спонсора попросит файл заново)
         self.last_run = {}
+        # Keep-alive сессия: без неё каждый вызов API — новый TLS-handshake
+        self.session = requests.Session()
+        # Тяжёлая обработка идёт в потоках; busy — защита от дублей по чату
+        self.busy = set()
+        self.lock = threading.Lock()
 
     # --- Telegram API ---
     def call(self, method: str, **kwargs):
-        resp = requests.post(f'{self.api}/{method}', timeout=POLL_TIMEOUT + 10,
-                             **kwargs)
+        t0 = time.monotonic()
+        resp = self.session.post(f'{self.api}/{method}',
+                                 timeout=POLL_TIMEOUT + 10, **kwargs)
+        dt = time.monotonic() - t0
+        if dt > 2 and method != 'getUpdates':
+            print(f'⏱ медленный вызов {method}: {dt:.1f} с', flush=True)
         return resp.json()
 
     def send_text(self, chat_id: int, text: str):
@@ -107,7 +117,7 @@ class Bot:
                 res = self.call('sendMessage',
                                 json={'chat_id': chat_id, 'text': chunk})
             if not res.get('ok'):
-                print(f'⚠️ sendMessage не доставлено: {res}')
+                print(f'⚠️ sendMessage не доставлено: {res}', flush=True)
 
     def send_doc(self, chat_id: int, path: str, caption: str = ''):
         with open(path, 'rb') as f:
@@ -132,6 +142,36 @@ class Bot:
                 for chunk in r.iter_content(1 << 16):
                     f.write(chunk)
         return dest
+
+    def _dispatch(self, chat_id: int, fn, *args, **kwargs):
+        """Тяжёлая обработка (аудит/конвертация/спонсор) — в фоновом потоке.
+
+        Иначе цикл polling блокируется на 1–3 минуты LLM-анализа и бот
+        «молчит» на любые сообщения (фидбек 13.09.26: ответы по 10–15 с).
+        Одна тяжёлая задача на чат; повторный запрос — вежливый отказ.
+        """
+        with self.lock:
+            if chat_id in self.busy:
+                self.send_text(chat_id, '⏳ Уже обрабатываю ваш предыдущий '
+                                        'запрос — дождитесь результата '
+                                        '(аудит обычно занимает 1–3 минуты)')
+                return
+            self.busy.add(chat_id)
+
+        def worker():
+            try:
+                fn(*args, **kwargs)
+            except Exception as e:
+                print(f'❌ ошибка обработки: {e}', flush=True)
+                try:
+                    self.send_text(chat_id, f'❌ Не получилось: {e}')
+                except Exception:
+                    pass
+            finally:
+                with self.lock:
+                    self.busy.discard(chat_id)
+
+        threading.Thread(target=worker, daemon=True).start()
 
     # --- Пайплайн аудита ---
     def handle_document(self, chat_id: int, doc: dict):
@@ -203,9 +243,9 @@ class Bot:
                 self.send_text(chat_id, '⚠️ Сессия устарела — пришлите файл '
                                         'плана ещё раз')
             elif wait['purpose'] == 'audit':
-                self.run_audit(chat_id, wait['doc'])
+                self._dispatch(chat_id, self.run_audit, chat_id, wait['doc'])
             else:
-                self.run_sponsor(chat_id, context=None)
+                self._dispatch(chat_id, self.run_sponsor, chat_id)
             return
 
         if action == 'sponsor':
@@ -223,7 +263,7 @@ class Bot:
                                     'пришлите его ещё раз')
             return
         if action == 'xlsx':
-            self.convert_document(chat_id, doc)
+            self._dispatch(chat_id, self.convert_document, chat_id, doc)
         else:  # audit
             self.offer_comment(chat_id, doc)
 
@@ -247,7 +287,7 @@ class Bot:
                                   f'{len(plan.milestones())} вех)')
             self._offer(chat_id, 'audit', '🔍 Начать аудит плана')
         except Exception as e:
-            print(f'❌ ошибка конвертации: {e}')
+            print(f'❌ ошибка конвертации: {e}', flush=True)
             self.send_text(chat_id, f'❌ Не получилось: {e}')
         finally:
             for p in (local_path, xlsx_path):
@@ -279,7 +319,7 @@ class Bot:
                     baseline_plan = plan_parser.parse_plan(
                         prev_path, prev['file_name'])
                 except Exception as e:
-                    print(f'⚠️ не удалось загрузить предыдущую версию: {e}')
+                    print(f'⚠️ не удалось загрузить предыдущую версию: {e}', flush=True)
 
             facts = analytics.run_analysis(plan, baseline_plan=baseline_plan)
             # Кэш для drill-down и отчёта спонсору: память + диск
@@ -301,20 +341,25 @@ class Bot:
             if file_name.lower().endswith('.mpp'):
                 buttons.append({'text': '📊 Конвертировать в Excel',
                                 'callback_data': 'xlsx'})
+            # Короткие подписи (13.09.26: длинные не влезали на экран),
+            # полные формулировки — в тексте сообщения
             detail_row = [
-                {'text': '🔧 Улучшить качество', 'callback_data': 'det_quality'},
-                {'text': '🛠 Устранить замечания', 'callback_data': 'det_findings'},
-                {'text': '💡 Учесть рекомендации', 'callback_data': 'det_reco'},
+                {'text': '🔧 Качество', 'callback_data': 'det_quality'},
+                {'text': '🛠 Замечания', 'callback_data': 'det_findings'},
+                {'text': '💡 Рекомендации', 'callback_data': 'det_reco'},
             ]
             self.call('sendMessage', json={
                 'chat_id': chat_id,
-                'text': 'Что дальше? Кнопки ниже дают детальные списки задач '
-                        'с инструкциями по исправлению:',
+                'text': ('Что дальше? Могу дать детальные списки задач '
+                         'с инструкциями, что и как исправить:\n'
+                         '🔧 Качество — нарушения норм планирования\n'
+                         '🛠 Замечания — оформление плана\n'
+                         '💡 Рекомендации — что улучшить в данных плана'),
                 'reply_markup': {'inline_keyboard': [detail_row, buttons]}})
 
             state.remember_plan(chat_id, doc['file_id'], file_name)
         except Exception as e:
-            print(f'❌ ошибка аудита: {e}')
+            print(f'❌ ошибка аудита: {e}', flush=True)
             self.send_text(chat_id, f'❌ Не получилось: {e}')
         finally:
             # Stateless: файлы плана не храним на сервере
@@ -345,7 +390,7 @@ class Bot:
         try:
             text = build_detail(cached['facts'], direction)
         except Exception as e:
-            print(f'❌ ошибка детализации {direction}: {e}')
+            print(f'❌ ошибка детализации {direction}: {e}', flush=True)
             self.send_text(chat_id, f'❌ Не получилось собрать сводку: {e}')
             return
         if len(text) <= TG_MSG_LIMIT:
@@ -404,7 +449,7 @@ class Bot:
             self.send_doc(chat_id, pdf_path,
                           caption='Отчёт для спонсора (1 страница)')
         except Exception as e:
-            print(f'❌ ошибка спонсорского отчёта: {e}')
+            print(f'❌ ошибка спонсорского отчёта: {e}', flush=True)
             self.send_text(chat_id, f'❌ Не получилось: {e}')
         finally:
             try:
@@ -415,7 +460,7 @@ class Bot:
 
     # --- Цикл ---
     def run(self):
-        print('BL-1 plan-audit bot started')
+        print('BL-1 plan-audit bot started', flush=True)
         while True:
             try:
                 data = self.call('getUpdates', json={
@@ -442,11 +487,13 @@ class Bot:
                         # ответ на шаг комментария / контекста спонсора
                         wait = self.awaiting.pop(chat_id)
                         if wait['purpose'] == 'audit':
-                            self.run_audit(chat_id, wait['doc'], comment=text)
+                            self._dispatch(chat_id, self.run_audit, chat_id,
+                                           wait['doc'], comment=text)
                         else:
-                            self.run_sponsor(chat_id, context=text)
+                            self._dispatch(chat_id, self.run_sponsor, chat_id,
+                                           context=text)
             except Exception as e:
-                print(f'⚠️ polling error: {e}')
+                print(f'⚠️ polling error: {e}', flush=True)
                 time.sleep(5)
 
 

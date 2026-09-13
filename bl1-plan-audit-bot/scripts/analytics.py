@@ -128,18 +128,22 @@ RULE_TITLES = {
     'R-12': 'Отклонение даты окончания от базовой даты',
 }
 
-# Проверки «полноты модели» (решение 12.09.26): их отсутствие — не ошибка
-# исполнения, а незаполненность данных; многие команды сознательно не ведут
-# эти поля. В замечания и статус здоровья НЕ идут — выходят как рекомендации
-# с обоснованием пользы для качества аудита.
+# Проверки «полноты модели» (решение 12.09.26, доп. 13.09.26): их отсутствие —
+# не ошибка исполнения, а незаполненность/структура данных; многие команды
+# сознательно не ведут эти поля. В замечания и статус здоровья НЕ идут —
+# выходят как рекомендации с обоснованием пользы для качества аудита.
 MODEL_RULES = {'R-01', 'R-06', 'R-08'}
-MODEL_CHECKS = {'D-01', 'D-10'}
+MODEL_CHECKS = {'D-01', 'D-08', 'D-10'}
 
 MODEL_BENEFITS = {
-    'R-01': 'заполните предшественников и последователей — бот достоверно '
+    'R-01': 'заполните предшественников и последователей (в первую очередь — '
+            'связь с задачей-потребителем результата) — бот достоверно '
             'рассчитает критический путь, резервы и прогноз сроков',
-    'D-01': 'заполните предшественников и последователей — бот достоверно '
+    'D-01': 'заполните предшественников и последователей (в первую очередь — '
+            'связь с задачей-потребителем результата) — бот достоверно '
             'рассчитает критический путь, резервы и прогноз сроков',
+    'D-08': 'декомпозируйте задачи длиннее 30 дней на подзадачи — появится '
+            'контроль промежуточного прогресса и ранние сигналы отставания',
     'D-10': 'назначьте ответственных — аудит сможет указать владельца '
             'каждой просрочки и точку эскалации',
     'R-06': 'заполните веса задач (затраты) — темп выполнения будет считаться '
@@ -271,8 +275,8 @@ def compliance_score(violations: list) -> int:
 # Leads/lags/типы связей/жёсткие ограничения извлекаются из .mpp
 # (Task.pred_detail / Task.constraint_type); для xlsx/csv — status='n/a'.
 
-DCMA_HIGH_DAYS = 44          # high float / high duration: > 44 рабочих дней
 DCMA_THRESHOLD_PCT = 5.0     # типовой порог доли нарушений
+HIGH_DURATION_DAYS = 30      # рекомендация декомпозиции: задача > 30 раб. дней
 BEI_THRESHOLD = 0.95
 HARD_CONSTRAINTS = {'MUST_START_ON', 'MUST_FINISH_ON'}  # DCMA hard constraints
 
@@ -354,19 +358,25 @@ def schedule_health(plan: Plan, report_date: date, cpm: dict) -> dict:
                                     ' (доступно в .mpp)']})
 
     # --- realism ---
-    high_float = [t for t in incomplete if floats.get(t.uid, 0) > DCMA_HIGH_DAYS]
-    add('D-06', f'Резерв > {DCMA_HIGH_DAYS} дней', 'realism', high_float)
+    # D-06 «большой резерв» убрана (13.09.26): завышенный резерв — симптом
+    # отсутствия связи с задачей-потребителем результата, а это уже покрыто
+    # рекомендацией D-01 о заполнении связей.
     neg_float = [t for t in incomplete if floats.get(t.uid, 0) < 0]
     add('D-07', 'Отрицательный резерв', 'realism', neg_float, zero_tolerance=True)
-    high_dur = [t for t in incomplete if (t.duration_days or 0) > DCMA_HIGH_DAYS]
-    add('D-08', f'Длительность > {DCMA_HIGH_DAYS} дней', 'realism', high_dur)
-    # D-09 Invalid dates: окончание в прошлом при незавершённости,
-    # или начало в будущем при уже начатой задаче
-    invalid = [t for t in incomplete
-               if (t.finish and t.finish < report_date)
-               or (t.start and t.start > report_date and t.percent_complete > 0)]
-    add('D-09', 'Невалидные даты (прогноз в прошлом)', 'realism', invalid,
+    # D-08 (13.09.26): не замечание, а рекомендация декомпозиции (kind='model')
+    high_dur = [t for t in incomplete if (t.duration_days or 0) > HIGH_DURATION_DAYS]
+    add('D-08', f'Длительность > {HIGH_DURATION_DAYS} дней', 'realism', high_dur)
+    # D-09 Invalid dates (13.09.26 разделена на две):
+    #   D-09 — прогнозные даты в прошлом при незавершённости
+    #          (или начало в будущем при уже начатой задаче);
+    #   D-15 — даты не указаны вовсе.
+    past_dates = [t for t in incomplete
+                  if (t.finish and t.finish < report_date)
+                  or (t.start and t.start > report_date and t.percent_complete > 0)]
+    add('D-09', 'Невалидные даты (прогноз в прошлом)', 'realism', past_dates,
         zero_tolerance=True)
+    no_dates = [t for t in incomplete if not t.start or not t.finish]
+    add('D-15', 'Даты не указаны', 'realism', no_dates)
     # D-10 Resources: незавершённая задача без ответственного
     no_resp = [t for t in incomplete if not t.responsible]
     add('D-10', 'Задачи без ответственного', 'realism', no_resp)
@@ -376,8 +386,9 @@ def schedule_health(plan: Plan, report_date: date, cpm: dict) -> dict:
               if t.baseline_finish and t.finish and t.finish > t.baseline_finish]
     add('D-11', 'Срыв базовых дат окончания', 'performance', missed)
 
-    # D-14 BEI: выполненные задачи / задачи, которые по базе должны быть
-    # выполнены к дате отчёта
+    # D-14 BEI (13.09.26): не отдельное замечание, а показатель (kind='metric') —
+    # выводится в отчётах сразу после D-11 «Срыв базовых дат окончания»
+    # с расшифровкой словами.
     bei = None
     due = [t for t in plan.leaves()
            if t.baseline_finish and t.baseline_finish <= report_date]
@@ -385,18 +396,18 @@ def schedule_health(plan: Plan, report_date: date, cpm: dict) -> dict:
         done_due = [t for t in due if t.percent_complete >= 100]
         bei = round(len(done_due) / len(due), 3)
         checks.append({
-            'id': 'D-14', 'name': 'BEI (индекс выполнения базового плана)',
+            'id': 'D-14', 'name': 'Индекс выполнения базового плана (BEI)',
             'family': 'performance', 'count': len(due) - len(done_due),
             'percent': round(100.0 * (len(due) - len(done_due)) / max(1, len(due)), 1),
-            'threshold': BEI_THRESHOLD,
+            'threshold': BEI_THRESHOLD, 'kind': 'metric',
             'status': 'pass' if bei >= BEI_THRESHOLD else 'fail',
             'evidence': [f'BEI = {bei} (выполнено {len(done_due)} из {len(due)} '
                          f'запланированных к дате отчёта)'],
         })
     else:
-        checks.append({'id': 'D-14', 'name': 'BEI (индекс выполнения базового плана)',
+        checks.append({'id': 'D-14', 'name': 'Индекс выполнения базового плана (BEI)',
                        'family': 'performance', 'count': 0, 'percent': 0.0,
-                       'threshold': BEI_THRESHOLD, 'status': 'n/a',
+                       'threshold': BEI_THRESHOLD, 'kind': 'metric', 'status': 'n/a',
                        'evidence': ['нет базовых дат — BEI не вычисляется']})
 
     # D-13 CPLI — упрощённо: доля критического пути с нулевым резервом.
