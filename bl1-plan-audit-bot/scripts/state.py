@@ -81,3 +81,74 @@ def load_last_run(chat_id: int) -> Optional[dict]:
             return json.load(f).get(str(chat_id))
     except Exception:
         return None
+
+
+# ---------- История аудитов (v1.2): тренд для спонсорского дайджеста ----------
+# Каждый прогон аудита дописывает компактный снимок фактов (без списков
+# задач) в JSONL. Тренд считается между последними двумя снимками чата.
+# Файлы планов по-прежнему не храним — только метрики.
+
+HISTORY_PATH = os.path.join(SCRIPT_DIR, 'audit_history.jsonl')
+MAX_HISTORY = 26  # ~полгода при еженедельных аудитах
+
+
+def snapshot_run(chat_id: int, facts: dict) -> dict:
+    """Снимок ключевых метрик прогона. Возвращает снимок (и пишет в историю)."""
+    m = facts.get('metrics') or {}
+    evm = facts.get('evm') or {}
+    sched = facts.get('schedule_health') or {}
+    health = facts.get('health') or {}
+    snap = {
+        'chat_id': str(chat_id),
+        'ts': datetime.now().isoformat(timespec='seconds'),
+        'report_date': facts.get('report_date'),
+        'health_status': health.get('status'),
+        'health_label': health.get('label'),
+        'spi': evm.get('spi'),
+        'bei': sched.get('bei'),
+        'overdue': m.get('overdue'),
+        'tasks_total': m.get('tasks_total'),
+        'done_pct': round(100.0 * m.get('done', 0) / max(1, m.get('tasks_total', 1))),
+        'compliance_score': facts.get('compliance_score'),
+    }
+    try:
+        lines = []
+        if os.path.exists(HISTORY_PATH):
+            with open(HISTORY_PATH, 'r', encoding='utf-8') as f:
+                lines = [ln for ln in f.read().splitlines() if ln.strip()]
+        lines.append(json.dumps(snap, ensure_ascii=False))
+        # ротация: держим последние MAX_HISTORY снимков этого чата
+        mine, other = [], []
+        for ln in lines:
+            try:
+                (mine if json.loads(ln).get('chat_id') == str(chat_id)
+                 else other).append(ln)
+            except Exception:
+                other.append(ln)
+        mine = mine[-MAX_HISTORY:]
+        with open(HISTORY_PATH, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(other + mine) + '\n')
+    except Exception as e:
+        print(f'⚠️ не удалось записать audit_history: {e}', flush=True)
+    return snap
+
+
+def load_history(chat_id: int) -> list:
+    """Снимки чата от старых к новым (для расчёта тренда)."""
+    if not os.path.exists(HISTORY_PATH):
+        return []
+    out = []
+    try:
+        with open(HISTORY_PATH, 'r', encoding='utf-8') as f:
+            for ln in f.read().splitlines():
+                if not ln.strip():
+                    continue
+                try:
+                    rec = json.loads(ln)
+                except Exception:
+                    continue
+                if rec.get('chat_id') == str(chat_id):
+                    out.append(rec)
+    except Exception:
+        return []
+    return out

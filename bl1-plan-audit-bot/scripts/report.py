@@ -11,6 +11,7 @@
 """
 
 import re
+from typing import Optional
 
 from plan_model import Plan
 
@@ -306,3 +307,71 @@ def build_detail(facts: dict, direction: str) -> str:
             lines.append('План заполнен полностью, рекомендаций нет ✅')
 
     return '\n'.join(lines).strip()
+
+
+# ---------- Спонсорский дайджест (v1.2) ----------
+
+def build_sponsor_digest(plan_name: str, facts: dict, trend: dict,
+                         bl6: Optional[dict], decisions: Optional[list]) -> str:
+    """Дайджест здоровья проекта для C-level: статус, динамика, поручения,
+    3 решения недели. Компактно — под лимит сообщения TG."""
+    m = facts['metrics']
+    health = facts.get('health', {})
+    evm = facts.get('evm', {})
+
+    lines = [
+        f"📊 *Дайджест для спонсора · «{plan_name}»*",
+        f"*{health.get('label', '—')}* · дата отчёта: {facts['report_date']}",
+        '',
+    ]
+    for reason in health.get('reasons', [])[:2]:
+        lines.append(f'• {reason}')
+    lines.append('')
+
+    # Динамика vs прошлый аудит
+    if trend and trend.get('available'):
+        lines.append(f"*Динамика с {trend['prev_date']}:*")
+        for ln in trend.get('lines', []):
+            lines.append(f'• {ln}')
+        if trend.get('status_changed'):
+            lines.append('• изменился общий статус проекта')
+        lines.append('')
+    else:
+        lines.append('_Динамика: предыдущего аудита нет — сравнивать не с чем._')
+        lines.append('')
+
+    # Поручения (BL-6)
+    if bl6 and bl6.get('available'):
+        pct = bl6.get('done_on_time_pct')
+        pct_txt = (f"{pct} % закрыты в срок" if pct is not None
+                   else 'доля в срок не считается (нет дат закрытия)')
+        lines.append(f"*Поручения (реестр МТИ&PSI на {bl6['as_of']}):* "
+                     f"открыто {bl6['open']} из {bl6['total']}, "
+                     f"{pct_txt}, просрочено открытых: {bl6['open_overdue']}")
+        lines.append('')
+
+    # 3 решения недели
+    if decisions:
+        lines.append('*3 решения на этой неделе:*')
+        for i, d in enumerate(decisions[:3], 1):
+            lines.append(f"{i}. *{d['title']}*")
+            lines.append(f"   {d.get('why', '')}")
+            lines.append(f"   👉 {d.get('decision', '')}")
+        lines.append('')
+    else:
+        lines.append('_Решения недели не сформированы (ИИ-анализ недоступен)._')
+        lines.append('')
+
+    if evm.get('available'):
+        line = _spi_line(evm)
+        if line:
+            lines.append(line)
+    overdue_pct = round(100.0 * m['overdue'] / max(1, m['tasks_total']))
+    lines.append(f"⏰ Просрочено: {m['overdue']} из {m['tasks_total']} "
+                 f"({overdue_pct} %)")
+    lines.append('')
+    lines.append('Детали — в PDF ниже ⬇️ Детальные списки задач — '
+                 'кнопками 🔧 Качество / 🛠 Замечания / 💡 Рекомендации выше.')
+
+    text = '\n'.join(lines)
+    return text[:TG_LIMIT - 1] + '…' if len(text) > TG_LIMIT else text

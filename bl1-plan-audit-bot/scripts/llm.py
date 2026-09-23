@@ -252,3 +252,68 @@ def sponsor_report(facts: dict, context: Optional[str] = None,
                  'критерии успеха, приоритеты, ожидаемые решения):\n'
                  + context.strip())
     return _call_kimi(SPONSOR_PROMPT, user, log_fn)
+
+
+DIGEST_PROMPT = """Ты — доверенный советник спонсора проекта (C-level).
+Тебе передан ДЕТЕРМИНИРОВАННЫЙ аудит проектного плана (JSON): metrics, cpm,
+compliance, schedule_health, evm, health, а ниже — ДИНАМИКА к прошлому аудиту
+(дельты ключевых метрик) и МЕТРИКИ РЕЕСТРА ПОРУЧЕНИЙ (доля закрытых в срок,
+открытые просроченные). Спонсор занят: ЗАПРЕЩЕНЫ аббревиатуры и термины
+(SPI, BEI, CPM, EVM, DCMA) без перевода на бизнес-язык.
+
+Задача: выбери ТРИ самых важных решения, которые спонсору стоит принять
+на этой неделе. Опирайся только на переданные факты и динамику: приоритет —
+ухудшающиеся показатели, массовые просрочки, срывы базовых дат, риски
+критического пути, отставание поручений.
+
+Верни СТРОГО JSON-массив из трёх объектов (без markdown-огород, без текста
+вокруг):
+[{"title": "короткое название решения (до 10 слов)",
+  "why": "почему сейчас: 1–2 предложения с цифрами из фактов, простым языком",
+  "decision": "что конкретно решить/сделать: 1 предложение с кем и к какому сроку"}]
+
+ЖЁСТКИЕ ПРАВИЛА:
+- Только факты из переданных данных. Ничего не выдумывай.
+- Если данных хватает меньше чем на три решения — верни меньше (но минимум 1).
+- Пиши плотно, по-деловому."""
+
+
+def digest_decisions(facts: dict, trend: dict, bl6: Optional[dict],
+                     log_fn=print) -> Optional[list]:
+    """Факты + динамика + метрики поручений → до 3 решений для спонсора.
+
+    Возвращает список dict {title, why, decision} или None при сбое.
+    """
+    user = 'Детерминированный аудит плана (JSON):\n' + _facts_text(facts)
+    if trend and trend.get('available'):
+        user += ('\n\nДИНАМИКА к прошлому аудиту (от ' +
+                 str(trend.get('prev_date')) + '):\n' +
+                 '\n'.join(trend.get('lines', [])))
+    else:
+        user += '\n\nДИНАМИКА: предыдущий аудит отсутствует — сравнивать не с чем.'
+    if bl6 and bl6.get('available'):
+        pct = bl6.get('done_on_time_pct')
+        user += ('\n\nМЕТРИКИ РЕЕСТРА ПОРУЧЕНИЙ (на ' + str(bl6.get('as_of')) + '):\n'
+                 f"всего поручений: {bl6['total']} · открыто: {bl6['open']} · "
+                 f"выполнено: {bl6['done']} · отменено: {bl6['canceled']}\n"
+                 f"закрыто в срок: {bl6['done_on_time']} из "
+                 f"{bl6['done_on_time'] + bl6['done_late']}"
+                 + (f" ({pct} %)" if pct is not None else
+                    ' (у остальных нет даты закрытия — не считаем)') + "\n"
+                 f"открытые просроченные: {bl6['open_overdue']}")
+    else:
+        user += '\n\nМЕТРИКИ РЕЕСТРА ПОРУЧЕНИЙ: недоступны.'
+    raw = _call_kimi(DIGEST_PROMPT, user, log_fn)
+    if not raw:
+        return None
+    try:
+        text = raw.strip()
+        if text.startswith('```'):
+            text = text.split('\n', 1)[1].rsplit('```', 1)[0]
+        data = json.loads(text)
+        if isinstance(data, dict):
+            data = [data]
+        return [d for d in data if isinstance(d, dict) and d.get('title')]
+    except Exception as e:
+        log_fn(f'⚠️ не разобрал ответ дайджеста: {e}; сырой: {raw[:200]}')
+        return None

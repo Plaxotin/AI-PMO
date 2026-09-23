@@ -620,3 +620,64 @@ def run_analysis(plan: Plan, report_date: Optional[date] = None,
         from diff import diff_plans
         facts['diff'] = diff_plans(baseline_plan, plan)
     return facts
+
+
+# ---------- Тренд для спонсорского дайджеста (v1.2) ----------
+
+def _delta_word(delta: float, invert: bool = False) -> str:
+    """Слово направления изменения (invert=True — рост показателя это плохо,
+    например просрочка)."""
+    if delta is None or abs(delta) < 1e-9:
+        return 'без изменений'
+    good = delta < 0 if invert else delta > 0
+    return 'улучшилось' if good else 'ухудшилось'
+
+
+def build_trend(history: list) -> dict:
+    """Δ между последним и предыдущим снимками аудита (state.snapshot_run).
+
+    Возвращает {'available': False} если истории < 2. Иначе — текущий и
+    прошлый снимки, дельты и готовые человеческие формулировки.
+    """
+    if len(history) < 2:
+        return {'available': False}
+    prev, cur = history[-2], history[-1]
+
+    def d(key):
+        a, b = prev.get(key), cur.get(key)
+        return (round(b - a, 3) if a is not None and b is not None else None)
+
+    lines = []
+    spi_d = d('spi')
+    if spi_d is not None and spi_d != 0:
+        lines.append(f'темп выполнения (SPI) {spi_d:+.2f} — '
+                     f'{_delta_word(spi_d)}')
+    bei_d = d('bei')
+    if bei_d is not None and bei_d != 0:
+        lines.append(f'исполнение базового плана (BEI) {bei_d * 100:+.0f} п.п. — '
+                     f'{_delta_word(bei_d)}')
+    ov_d = d('overdue')
+    if ov_d is not None and ov_d != 0:
+        lines.append(f'просроченных задач {ov_d:+.0f} — '
+                     f'{_delta_word(ov_d, invert=True)}')
+    done_d = d('done_pct')
+    if done_d is not None and done_d != 0:
+        lines.append(f'готовность {done_d:+.0f} п.п. — {_delta_word(done_d)}')
+    cs_d = d('compliance_score')
+    if cs_d is not None and cs_d != 0:
+        lines.append(f'качество оформления плана {cs_d:+.0f} баллов — '
+                     f'{_delta_word(cs_d)}')
+    if not lines:
+        lines.append('ключевые метрики без изменений')
+    status_changed = prev.get('health_status') != cur.get('health_status')
+    return {
+        'available': True,
+        'prev_date': prev.get('report_date'),
+        'cur_date': cur.get('report_date'),
+        'prev': prev,
+        'cur': cur,
+        'deltas': {k: d(k) for k in ('spi', 'bei', 'overdue', 'done_pct',
+                                     'compliance_score')},
+        'status_changed': status_changed,
+        'lines': lines,
+    }
