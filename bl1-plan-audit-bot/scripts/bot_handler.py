@@ -42,6 +42,7 @@ HELP_TEXT = (
     'Для .mpp предложу на выбор: аудит или конвертацию в Excel.\n'
     'После аудита доступны: отчёт для спонсора (C-level) и дайджест '
     'здоровья проекта по запросу.\n'
+    'Дайджест можно получить и без полного аудита: /digest, затем файл.\n'
     'Пришлите новую версию позже — покажу, что изменилось.'
 )
 
@@ -474,13 +475,51 @@ class Bot:
                 pass
 
     # --- Дайджест для спонсора (v1.2): статус + тренд + поручения + 3 решения ---
+    DIGEST_OFFER = (
+        '📊 Дайджест для спонсора. Пришлите файл плана (.xlsx, .csv или .mpp) '
+        '— соберу дайджест сразу, без полного аудита: статус, динамика к '
+        'прошлому прогону, метрики поручений и 3 решения на неделю.'
+    )
+
     def run_digest(self, chat_id: int):
         cached = self._cached_run(chat_id)
         if not cached:
-            self.send_text(chat_id,
-                           '⚠️ Нет данных аудита — пришлите файл плана '
-                           'и прогоните аудит заново')
+            # Прямой путь (24.09.26): дайджест без предварительного аудита —
+            # ждём файл; факты посчитаем детерминированно (LLM-аудит не нужен).
+            self.awaiting[chat_id] = {'purpose': 'digest_file', 'doc': None}
+            self.send_text(chat_id, self.DIGEST_OFFER)
             return
+        # Мы уже в потоке _dispatch — вызываем пайплайн напрямую
+        self._send_digest(chat_id, cached['plan_name'], cached['facts'])
+
+    def run_digest_from_file(self, chat_id: int, doc: dict):
+        """Дайджест напрямую из файла: парсинг + детерминированный анализ.
+        Факты кэшируются как после обычного аудита (drill-down и спонсорский
+        отчёт остаются доступными)."""
+        file_name = doc.get('file_name', 'plan')
+        self.send_text(chat_id, f'📥 Принял «{file_name}», считаю метрики…')
+        tmpdir = tempfile.mkdtemp(prefix='bl1digestfile_')
+        local_path = os.path.join(tmpdir, file_name)
+        try:
+            self.download(doc['file_id'], local_path)
+            plan = plan_parser.parse_plan(local_path, file_name)
+            facts = analytics.run_analysis(plan)
+            self.last_run[chat_id] = {'plan_name': plan.name, 'facts': facts}
+            state.save_last_run(chat_id, plan.name, facts)
+            state.snapshot_run(chat_id, facts)
+            state.remember_plan(chat_id, doc['file_id'], file_name)
+            self._send_digest(chat_id, plan.name, facts)
+        except Exception as e:
+            print(f'❌ ошибка дайджеста из файла: {e}', flush=True)
+            self.send_text(chat_id, f'❌ Не получилось: {e}')
+        finally:
+            try:
+                if os.path.exists(local_path):
+                    os.unlink(local_path)
+            except Exception:
+                pass
+
+    def _send_digest(self, chat_id: int, plan_name: str, facts: dict):
         self.send_text(chat_id, '🤖 Формирую дайджест для спонсора '
                                 '(обычно до минуты)…')
         tmpdir = tempfile.mkdtemp(prefix='bl1digest_')
@@ -489,10 +528,10 @@ class Bot:
             history = state.load_history(chat_id)
             trend = analytics.build_trend(history)
             bl6 = bl6_metrics.load_bl6_metrics()
-            decisions = llm.digest_decisions(cached['facts'], trend, bl6)
+            decisions = llm.digest_decisions(facts, trend, bl6)
             self.send_text(chat_id, build_sponsor_digest(
-                cached['plan_name'], cached['facts'], trend, bl6, decisions))
-            generate_digest_pdf(cached['plan_name'], cached['facts'], trend,
+                plan_name, facts, trend, bl6, decisions))
+            generate_digest_pdf(plan_name, facts, trend,
                                 bl6, decisions, pdf_path)
             self.send_doc(chat_id, pdf_path,
                           caption='Дайджест для спонсора (1 страница)')
@@ -524,6 +563,13 @@ class Bot:
                         continue
                     text = msg.get('text') or ''
                     if msg.get('document'):
+                        # файл в режиме ожидания дайджеста — сразу в дайджест
+                        wait = self.awaiting.get(chat_id)
+                        if wait and wait.get('purpose') == 'digest_file':
+                            self.awaiting.pop(chat_id, None)
+                            self._dispatch(chat_id, self.run_digest_from_file,
+                                           chat_id, msg['document'])
+                            continue
                         # новый файл отменяет ожидание комментария
                         self.awaiting.pop(chat_id, None)
                         self.handle_document(chat_id, msg['document'])
@@ -534,6 +580,14 @@ class Bot:
                     elif text.startswith('/digest'):
                         self._dispatch(chat_id, self.run_digest, chat_id)
                     elif text and chat_id in self.awaiting:
+                        # текст в режиме ожидания файла дайджеста — не снимаем
+                        # ожидание, напоминаем, что ждём файл
+                        if self.awaiting[chat_id].get('purpose') == 'digest_file':
+                            self.send_text(chat_id,
+                                           '⏳ Жду файл плана (.xlsx, .csv или '
+                                           '.mpp) — дайджест соберу сразу '
+                                           'после приёма.')
+                            continue
                         # ответ на шаг комментария / контекста спонсора
                         wait = self.awaiting.pop(chat_id)
                         if wait['purpose'] == 'audit':
