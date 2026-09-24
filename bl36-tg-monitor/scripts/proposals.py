@@ -129,10 +129,21 @@ def handle_callback(cb, admin_ids):
     pr['status'] = new_status
 
     if action == 'ok':
-        # запись в реестр Google Sheets — фаза 3 (sheets_bridge)
+        decided_name = (cb.get('from') or {}).get('first_name') or 'РП'
+        try:
+            import sheets_bridge
+            result = sheets_bridge.write_to_registry(pr, decided_name)
+            payload = dict(pr['payload'] or {})
+            payload['registry_ref'] = result
+            db.update('bl36_proposals', {'id': 'eq.%s' % pid},
+                      {'payload': payload})
+            tail = '\n\n✅ ПРИНЯТО → %s' % result
+        except Exception as e:
+            print('sheets_bridge error: %s' % e, flush=True)
+            tail = ('\n\n✅ ПРИНЯТО, но запись в реестр не удалась: %s'
+                    % str(e)[:150])
         tg.edit_message(chat_id, msg.get('message_id'),
-                        _card_text(pr, sig) +
-                        '\n\n✅ ПРИНЯТО (запись в реестр — после фазы 3)')
+                        _card_text(pr, sig) + tail)
         tg.answer_callback(cb_id, 'Принято ✅')
     elif action == 'no':
         tg.edit_message(chat_id, msg.get('message_id'),
