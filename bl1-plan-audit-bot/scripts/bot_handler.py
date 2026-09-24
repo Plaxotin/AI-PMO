@@ -71,6 +71,22 @@ SPONSOR_FILE_OFFER = (
     'динамика, поручения и 3 решения на неделю.'
 )
 
+IDLE_HINT = (
+    '👋 Я аудирую проектные планы: риски, исполнение, качество сетевой '
+    'модели.\n\n'
+    'Пришлите файл плана (.xlsx, .csv или .mpp) — верну сводку и PDF-отчёт.\n'
+    '/sponsor — отчёт для спонсора (C-level)\n'
+    '/myusage — ваш остаток попыток\n'
+    '/help — подробнее о возможностях'
+)
+
+PHOTO_HINT = ('⚠️ Фото плана не обработаю — пришлите сам файл '
+              '(.xlsx, .csv или .mpp), разберу его целиком: связи, даты, '
+              'базовый план.')
+
+VOICE_HINT = ('⚠️ Голосовые не слушаю — пришлите файл плана (.xlsx, .csv '
+              'или .mpp) или напишите текстом.')
+
 
 def _split_text(text: str, limit: int) -> list:
     """Режет длинный текст на куски ≤limit, предпочитая границы строк."""
@@ -616,6 +632,14 @@ class Bot:
                         else:
                             self._dispatch(chat_id, self.run_sponsor, chat_id,
                                            context=text)
+                    elif msg.get('photo'):
+                        self.send_text(chat_id, PHOTO_HINT)
+                    elif msg.get('voice'):
+                        self.send_text(chat_id, VOICE_HINT)
+                    elif text.strip():
+                        # любой нераспознанный текст (приветствия, вопросы) —
+                        # не тишина, а короткая навигация (25.09.26)
+                        self.send_text(chat_id, IDLE_HINT)
             except Exception as e:
                 print(f'⚠️ polling error: {e}', flush=True)
                 time.sleep(5)
