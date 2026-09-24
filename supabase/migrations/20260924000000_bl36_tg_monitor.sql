@@ -66,23 +66,9 @@ CREATE TABLE bl36_proposals (
 CREATE INDEX bl36_proposals_pending_idx
   ON bl36_proposals (status, created_at) WHERE status = 'pending';
 
-CREATE TABLE bl36_decisions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  proposal_id uuid REFERENCES bl36_proposals (id) ON DELETE SET NULL,
-  text text NOT NULL,
-  decided_on date NOT NULL DEFAULT CURRENT_DATE,
-  source_links text[] NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TABLE bl36_risks (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  proposal_id uuid REFERENCES bl36_proposals (id) ON DELETE SET NULL,
-  text text NOT NULL,
-  status text NOT NULL DEFAULT 'open' CHECK (status IN ('open','mitigated','closed')),
-  source_links text[] NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
+-- Подтверждённые записи (решения, риски, поручения) — в Google Sheets BL-6
+-- (вкладки «Решения», «Риски», реестр поручений), решение 24.09.2026.
+-- В Supabase реестры не дублируются.
 
 CREATE TABLE bl36_participants (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -101,14 +87,10 @@ ALTER TABLE bl36_channels     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bl36_messages     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bl36_signals      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bl36_proposals    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE bl36_decisions    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE bl36_risks        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bl36_participants ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY bl36_channels_read     ON bl36_channels     FOR SELECT TO authenticated USING (true);
 CREATE POLICY bl36_signals_read      ON bl36_signals      FOR SELECT TO authenticated USING (true);
 CREATE POLICY bl36_proposals_read    ON bl36_proposals    FOR SELECT TO authenticated USING (true);
-CREATE POLICY bl36_decisions_read    ON bl36_decisions    FOR SELECT TO authenticated USING (true);
-CREATE POLICY bl36_risks_read        ON bl36_risks        FOR SELECT TO authenticated USING (true);
 CREATE POLICY bl36_participants_read ON bl36_participants FOR SELECT TO authenticated USING (true);
 -- bl36_messages: сырые сообщения (ПДн) — authenticated НЕ читает, только service role.
