@@ -160,7 +160,7 @@ class Bot:
             if chat_id in self.busy:
                 self.send_text(chat_id, '⏳ Уже обрабатываю ваш предыдущий '
                                         'запрос — дождитесь результата '
-                                        '(аудит обычно занимает 1–3 минуты)')
+                                        '(аудит обычно занимает 2–5 минут)')
                 return
             self.busy.add(chat_id)
 
@@ -345,7 +345,7 @@ class Bot:
             state.snapshot_run(chat_id, facts)
 
             self.send_text(chat_id, '🤖 Метрики посчитаны, запускаю '
-                                    'ИИ-анализ (обычно 1–3 минуты)…')
+                                    'ИИ-анализ (обычно 2–5 минут)…')
             llm_text = llm.analyze_plan(facts, user_comment=comment)
 
             self.send_text(chat_id, build_chat_summary(plan, facts))
