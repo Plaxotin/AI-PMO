@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""LLM-контур BL-1 (Kimi k2.6) — по образцу BL-6, но thinking ВКЛЮЧЁН.
+"""LLM-контур BL-1 — модель из kimi.json ('model'; с 24.09.26 аудит тоже
+на топовой kimi-k3, C-level выводы — на 'model_sponsor').
 
 Качество результата важнее времени и стоимости: большой max_tokens,
 длинный таймаут, retry с backoff.

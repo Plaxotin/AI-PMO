@@ -5,7 +5,9 @@
 Файлы:
   telegram.json — {"bot_token": "...", "admin_ids": [107227641]}
   kimi.json     — {"api_key": "...", "base_url": "https://api.moonshot.ai/v1",
-                   "model": "kimi-k2.6"}
+                   "model": "kimi-k3", "model_sponsor": "kimi-k3"}
+                  (model — аудит, model_sponsor — спонсорский отчёт и дайджест;
+                  с 24.09.26 оба на топовой k3)
 """
 
 import json

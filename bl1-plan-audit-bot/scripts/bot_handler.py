@@ -23,6 +23,7 @@ import bl6_metrics
 import llm
 import plan_parser
 import state
+import usage
 import xlsx_export
 from config import load_telegram_config
 from pdf import generate_pdf, generate_sponsor_pdf, generate_digest_pdf
@@ -43,7 +44,9 @@ HELP_TEXT = (
     'После аудита доступны: отчёт для спонсора (C-level) и дайджест '
     'здоровья проекта по запросу.\n'
     'Дайджест можно получить и без полного аудита: /digest, затем файл.\n'
-    'Пришлите новую версию позже — покажу, что изменилось.'
+    'Пришлите новую версию позже — покажу, что изменилось.\n\n'
+    'Бесплатно — 1 аудит плана и 1 отчёт для спонсора в месяц. '
+    'Дайджест и конвертация .mpp — без лимита.'
 )
 
 COMMENT_OFFER = (
@@ -306,6 +309,11 @@ class Bot:
                     pass
 
     def run_audit(self, chat_id: int, doc: dict, comment: str = None):
+        blocked = usage.check(chat_id, 'audit')
+        if blocked:
+            self.send_text(chat_id, blocked)
+            return
+        usage.record(chat_id, 'audit')
         file_name = doc.get('file_name', 'plan')
         self.send_text(chat_id, f'📥 Принял «{file_name}», начинаю аудит…')
         tmpdir = tempfile.mkdtemp(prefix='bl1_')
@@ -377,6 +385,7 @@ class Bot:
         except Exception as e:
             print(f'❌ ошибка аудита: {e}', flush=True)
             self.send_text(chat_id, f'❌ Не получилось: {e}')
+            usage.refund(chat_id, 'audit')  # сбой сервиса ≠ трата попытки
         finally:
             # Stateless: файлы плана не храним на сервере
             for p in (local_path, pdf_path):
@@ -450,6 +459,11 @@ class Bot:
                            '⚠️ Нет данных аудита — пришлите файл плана '
                            'и прогоните аудит заново')
             return
+        blocked = usage.check(chat_id, 'sponsor')
+        if blocked:
+            self.send_text(chat_id, blocked)
+            return
+        usage.record(chat_id, 'sponsor')
         self.send_text(chat_id, '🤖 Формирую отчёт для спонсора '
                                 '(обычно 1–2 минуты)…')
         tmpdir = tempfile.mkdtemp(prefix='bl1sponsor_')
@@ -457,6 +471,7 @@ class Bot:
         try:
             text = llm.sponsor_report(cached['facts'], context=context)
             if not text:
+                usage.refund(chat_id, 'sponsor')  # LLM недоступен — возврат
                 self.send_text(chat_id, '❌ ИИ-анализ недоступен, попробуйте '
                                         'позже')
                 return
@@ -467,6 +482,7 @@ class Bot:
         except Exception as e:
             print(f'❌ ошибка спонсорского отчёта: {e}', flush=True)
             self.send_text(chat_id, f'❌ Не получилось: {e}')
+            usage.refund(chat_id, 'sponsor')  # сбой сервиса ≠ трата попытки
         finally:
             try:
                 if os.path.exists(pdf_path):
@@ -579,6 +595,14 @@ class Bot:
                         self.start_sponsor_flow(chat_id)
                     elif text.startswith('/digest'):
                         self._dispatch(chat_id, self.run_digest, chat_id)
+                    elif text.startswith('/stats'):
+                        # статистика использования — только для владельца
+                        if usage.is_owner(chat_id):
+                            self.send_text(chat_id, usage.stats_text())
+                        else:
+                            self.send_text(chat_id,
+                                           '⚠️ Команда только для владельца '
+                                           'сервиса')
                     elif text and chat_id in self.awaiting:
                         # текст в режиме ожидания файла дайджеста — не снимаем
                         # ожидание, напоминаем, что ждём файл
