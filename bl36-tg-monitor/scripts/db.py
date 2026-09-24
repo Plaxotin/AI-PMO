@@ -75,14 +75,24 @@ def select(table, params=None):
     return r.json()
 
 
-def update(table, match_params, patch):
-    """UPDATE по фильтру (напр. {'id': 'eq.<uuid>'}), возвращает True/False."""
-    r = _session.patch(_url(table), headers=_headers(), params=match_params,
-                       json=patch, timeout=30)
+def update(table, match_params, patch, check_rows=False):
+    """UPDATE по фильтру (напр. {'id': 'eq.<uuid>'}).
+
+    check_rows=True — вернуть True только если затронута хотя бы одна строка
+    (атомарные захваты вида WHERE status='pending').
+    """
+    prefer = 'return=representation' if check_rows else None
+    r = _session.patch(_url(table), headers=_headers(prefer),
+                       params=match_params, json=patch, timeout=30)
     if r.status_code not in (200, 204):
         print('db.update %s -> %s: %s' % (table, r.status_code, r.text[:300]),
               flush=True)
         return False
+    if check_rows:
+        try:
+            return bool(r.json())
+        except Exception:
+            return False
     return True
 
 
