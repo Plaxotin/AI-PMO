@@ -170,8 +170,13 @@ def _facts_text(facts: dict) -> str:
 
 
 def _call_kimi(system_prompt: str, user_content: str,
-               log_fn=print) -> Optional[str]:
-    """Один вызов Kimi с retry/backoff. Ответ или None при сбое."""
+               log_fn=print, model: Optional[str] = None) -> Optional[str]:
+    """Один вызов Kimi с retry/backoff. Ответ или None при сбое.
+
+    model=None — модель из kimi.json ('model'); для C-level выводов
+    (спонсорский отчёт, дайджест) передаётся model_sponsor (24.09.26:
+    «максимально умный» — kimi-k3, как Pro-режим BL-28).
+    """
     cfg = load_kimi_config()
     if not cfg:
         log_fn('⚠️ kimi.json не настроен, LLM-анализ недоступен')
@@ -184,7 +189,7 @@ def _call_kimi(system_prompt: str, user_content: str,
 
     base_url = cfg.get('base_url', 'https://api.moonshot.ai/v1').rstrip('/')
     payload = {
-        'model': cfg.get('model', 'kimi-k2.6'),
+        'model': model or cfg.get('model', 'kimi-k2.6'),
         'messages': [
             {'role': 'system', 'content': system_prompt},
             {'role': 'user', 'content': user_content},
@@ -245,13 +250,18 @@ def analyze_plan(facts: dict, user_comment: Optional[str] = None,
 
 def sponsor_report(facts: dict, context: Optional[str] = None,
                    log_fn=print) -> Optional[str]:
-    """Факты анализа (+ бизнес-контекст) → отчёт для спонсора (Markdown)."""
+    """Факты анализа (+ бизнес-контекст) → отчёт для спонсора (Markdown).
+
+    Модель — model_sponsor из kimi.json (kimi-k3, «максимально умный»),
+    при отсутствии ключа — общая model (k2.6)."""
     user = 'Детерминированный аудит плана (JSON):\n' + _facts_text(facts)
     if context:
         user += ('\n\nКОНТЕКСТ ОТ ПРОЕКТНОГО МЕНЕДЖЕРА (бизнес-цели, '
                  'критерии успеха, приоритеты, ожидаемые решения):\n'
                  + context.strip())
-    return _call_kimi(SPONSOR_PROMPT, user, log_fn)
+    cfg = load_kimi_config() or {}
+    return _call_kimi(SPONSOR_PROMPT, user, log_fn,
+                      model=cfg.get('model_sponsor'))
 
 
 DIGEST_PROMPT = """Ты — доверенный советник спонсора проекта (C-level).
@@ -303,7 +313,9 @@ def digest_decisions(facts: dict, trend: dict, bl6: Optional[dict],
                  f"открытые просроченные: {bl6['open_overdue']}")
     else:
         user += '\n\nМЕТРИКИ РЕЕСТРА ПОРУЧЕНИЙ: недоступны.'
-    raw = _call_kimi(DIGEST_PROMPT, user, log_fn)
+    cfg = load_kimi_config() or {}
+    raw = _call_kimi(DIGEST_PROMPT, user, log_fn,
+                     model=cfg.get('model_sponsor'))
     if not raw:
         return None
     try:
