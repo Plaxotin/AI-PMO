@@ -309,18 +309,18 @@ def build_detail(facts: dict, direction: str) -> str:
     return '\n'.join(lines).strip()
 
 
-# ---------- Спонсорский дайджест (v1.2) ----------
+# ---------- C-level сводка к единому отчёту для спонсора (v1.4) ----------
 
 def build_sponsor_digest(plan_name: str, facts: dict, trend: dict,
                          bl6: Optional[dict], decisions: Optional[list]) -> str:
-    """Дайджест здоровья проекта для C-level: статус, динамика, поручения,
-    3 решения недели. Компактно — под лимит сообщения TG."""
+    """Чат-сводка к единому отчёту для спонсора: статус, динамика, поручения,
+    3 решения недели. Развёрнутая аналитика — на стр. 1 PDF."""
     m = facts['metrics']
     health = facts.get('health', {})
     evm = facts.get('evm', {})
 
     lines = [
-        f"📊 *Дайджест для спонсора · «{plan_name}»*",
+        f"📄 *Отчёт для спонсора · «{plan_name}»*",
         f"*{health.get('label', '—')}* · дата отчёта: {facts['report_date']}",
         '',
     ]
@@ -370,8 +370,7 @@ def build_sponsor_digest(plan_name: str, facts: dict, trend: dict,
     lines.append(f"⏰ Просрочено: {m['overdue']} из {m['tasks_total']} "
                  f"({overdue_pct} %)")
     lines.append('')
-    lines.append('Детали — в PDF ниже ⬇️ Детальные списки задач — '
-                 'кнопками 🔧 Качество / 🛠 Замечания / 💡 Рекомендации выше.')
+    lines.append('Полный отчёт — в PDF ниже ⬇️')
 
     text = '\n'.join(lines)
     return text[:TG_LIMIT - 1] + '…' if len(text) > TG_LIMIT else text

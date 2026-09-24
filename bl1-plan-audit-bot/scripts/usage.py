@@ -112,6 +112,23 @@ def check(chat_id, kind: str) -> Optional[str]:
             f'Если нужно больше — напишите владельцу сервиса: @plaxotin.')
 
 
+def myusage_text(chat_id) -> str:
+    """Остаток бесплатных попыток для команды /myusage (для любого юзера)."""
+    if is_owner(chat_id):
+        return ('✅ У вас безлимитный доступ — вы владелец сервиса.\n'
+                'Статистика по всем пользователям: /stats.')
+    now = datetime.now(MSK)
+    nxt = (now.replace(day=1) + timedelta(days=32)).replace(day=1)
+    u = _load().get(_month(), {}).get(str(chat_id), {})
+    a_left = max(0, LIMITS['audit'] - u.get('audit', 0))
+    s_left = max(0, LIMITS['sponsor'] - u.get('sponsor', 0))
+    return (f'📦 Ваш бесплатный пакет на {now.strftime("%m.%Y")}:\n'
+            f'• аудит плана — осталось {a_left} из {LIMITS["audit"]}\n'
+            f'• отчёт для спонсора — осталось {s_left} из {LIMITS["sponsor"]}\n'
+            f'Лимит обновится {nxt.strftime("%d.%m.%Y")}.\n'
+            'Конвертация .mpp в Excel — без лимита.')
+
+
 def stats_text() -> str:
     """Статистика использования для владельца (/stats)."""
     data = _load()

@@ -327,17 +327,21 @@ def generate_pdf(plan: Plan, facts: dict, llm_text: Optional[str],
 
 
 def generate_sponsor_pdf(plan_name: str, facts: dict, llm_text: str,
-                         out_path: str) -> str:
-    """Спонсорский отчёт (C-level) — 1 страница A4, 6 разделов (v1.1).
+                         out_path: str, trend: Optional[dict] = None,
+                         bl6: Optional[dict] = None,
+                         decisions: Optional[list] = None) -> str:
+    """Единый отчёт для спонсора (C-level, v1.4) — до 2 страниц A4.
 
-    Контент пишет LLM (sponsor-промпт в llm.py); здесь — рамка:
-    цветной статус-баннер + компактная вёрстка без приложений.
+    Стр. 1 — аналитическая часть (v1.1): статус-баннер + развёрнутый текст
+    от LLM (главное, бизнес-цели, риски, прогноз, решения спонсора).
+    Стр. 2 — панель здоровья (бывший дайджест v1.2): KPI-плитки, динамика
+    к прошлому аудиту, метрики реестра поручений, 3 решения на неделю.
     """
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib.units import mm
     from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
-                                    Table, TableStyle)
+                                    Table, TableStyle, PageBreak)
     from reportlab.lib import colors
 
     font, font_bold = _register_fonts()
@@ -387,137 +391,95 @@ def generate_sponsor_pdf(plan_name: str, facts: dict, llm_text: str,
             else:
                 story.append(Paragraph(_pdf_safe(_md_inline(s)), body))
 
+    # --- Стр. 2: панель здоровья (бывший дайджест) ---
+    if (trend and trend.get('available')) or (bl6 and bl6.get('available')) \
+            or decisions:
+        story.append(PageBreak())
+        story.append(Paragraph('Панель здоровья проекта', h2))
+        story.append(Spacer(1, 1 * mm))
+
+        # KPI-плитки
+        def pct(v):
+            return f'{round(v * 100)} %' if v is not None else '—'
+
+        m2 = facts.get('metrics') or {}
+        evm2 = facts.get('evm') or {}
+        sched2 = facts.get('schedule_health') or {}
+        overdue_pct = round(100.0 * m2.get('overdue', 0)
+                            / max(1, m2.get('tasks_total', 1)))
+        done_pct = round(100.0 * m2.get('done', 0)
+                         / max(1, m2.get('tasks_total', 1)))
+        tiles = [
+            ('Темп выполнения',
+             pct(evm2.get('spi')) if evm2.get('available') else '—',
+             'доля запланированного объёма, которая фактически сделана'),
+            ('Исполнение базы', pct(sched2.get('bei')),
+             'доля задач, которые по базовому плану должны быть готовы '
+             'к сегодня'),
+            ('Готовность', f'{done_pct} %', f"выполнено "
+             f"{m2.get('done', '—')} из {m2.get('tasks_total', '—')} задач"),
+            ('Просрочено', f"{m2.get('overdue', '—')} шт.",
+             f'{overdue_pct} % задач — срок вышел, работа не завершена'),
+        ]
+        cells = [[Paragraph(f'<b>{t}</b>', small) for t, _, _ in tiles],
+                 [Paragraph(v, ParagraphStyle('v', fontName=font_bold,
+                                              fontSize=13, leading=15))
+                  for _, v, _ in tiles],
+                 [Paragraph(d, small) for _, _, d in tiles]]
+        tbl = Table(cells, colWidths=[45.5 * mm] * 4)
+        tbl.setStyle(TableStyle([
+            ('BOX', (0, 0), (-1, -1), 0.5, colors.Color(0.8, 0.8, 0.8)),
+            ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.Color(0.85, 0.85, 0.85)),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.Color(0.94, 0.94, 0.94)),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        story.append(tbl)
+
+        # Динамика
+        if trend and trend.get('available'):
+            story.append(Paragraph(f"Динамика с {trend['prev_date']}", h2))
+            for ln in trend.get('lines', []):
+                story.append(Paragraph('• ' + _pdf_safe(ln), bullet))
+            if trend.get('status_changed'):
+                story.append(Paragraph('• изменился общий статус проекта',
+                                       bullet))
+
+        # Поручения
+        if bl6 and bl6.get('available'):
+            pct_txt = (f"{bl6['done_on_time_pct']} % закрыты в срок"
+                       if bl6.get('done_on_time_pct') is not None
+                       else 'доля в срок не считается (нет дат закрытия)')
+            story.append(Paragraph(_md_inline(
+                f"Поручения (реестр МТИ&PSI, на {bl6['as_of']})"), h2))
+            story.append(Paragraph(_pdf_safe(
+                f"открыто {bl6['open']} из {bl6['total']} · выполнено "
+                f"{bl6['done']} · отменено {bl6['canceled']} · {pct_txt} · "
+                f"просрочено открытых: {bl6['open_overdue']}"), body))
+
+        # 3 решения недели
+        if decisions:
+            story.append(Paragraph('3 решения на этой неделе', h2))
+            for i, d in enumerate(decisions[:3], 1):
+                story.append(Paragraph(
+                    _pdf_safe(_md_inline(f"{i}. **{d['title']}**")), bullet))
+                if d.get('why'):
+                    story.append(Paragraph(_pdf_safe(_md_inline(d['why'])),
+                                           bullet))
+                if d.get('decision'):
+                    story.append(Paragraph(
+                        _pdf_safe(_md_inline('👉 ' + d['decision'])), bullet))
+                story.append(Spacer(1, 0.8 * mm))
+
     story.append(Spacer(1, 3 * mm))
     story.append(Paragraph(
         'Подготовлено автоматическим аудитором проектных планов на основе '
-        'детерминированного анализа расписания. Файл плана не сохраняется '
-        'на сервере.', small))
-
-    doc.build(story)
-    return out_path
-
-
-def generate_digest_pdf(plan_name: str, facts: dict, trend: dict,
-                        bl6: Optional[dict], decisions: Optional[list],
-                        out_path: str) -> str:
-    """Спонсорский дайджест (v1.2) — 1 страница A4: статус-баннер, плитки
-    KPI, динамика к прошлому аудиту, метрики поручений, 3 решения недели."""
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import ParagraphStyle
-    from reportlab.lib.units import mm
-    from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
-                                    Table, TableStyle)
-    from reportlab.lib import colors
-
-    font, font_bold = _register_fonts()
-    h1 = ParagraphStyle('h1', fontName=font_bold, fontSize=14, spaceAfter=1 * mm)
-    h2 = ParagraphStyle('h2', fontName=font_bold, fontSize=10.5,
-                        spaceBefore=2.5 * mm, spaceAfter=1 * mm)
-    body = ParagraphStyle('body', fontName=font, fontSize=9, leading=12)
-    bullet = ParagraphStyle('bullet', parent=body, leftIndent=4 * mm,
-                            bulletIndent=1 * mm)
-    small = ParagraphStyle('small', fontName=font, fontSize=7.5, leading=9.5)
-
-    health = facts.get('health', {})
-    m = facts.get('metrics', {})
-    evm = facts.get('evm', {})
-    sched = facts.get('schedule_health', {})
-    status = health.get('status', 'at_risk')
-    sc = STATUS_COLORS.get(status, (0.5, 0.5, 0.5))
-
-    doc = SimpleDocTemplate(out_path, pagesize=A4,
-                            leftMargin=14 * mm, rightMargin=14 * mm,
-                            topMargin=12 * mm, bottomMargin=12 * mm)
-
-    story = [Paragraph(f'Дайджест для спонсора · проект «{plan_name}»', h1),
-             Paragraph(f"Дата отчёта: {facts['report_date']}", small),
-             Spacer(1, 2 * mm)]
-
-    status_label = STATUS_LABELS.get(status, '—')
-    rag = Table([[Paragraph(f"<font color='white'><b>{status_label}</b></font>",
-                            body)]], colWidths=[182 * mm])
-    rag.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (0, 0), colors.Color(*sc)),
-        ('LEFTPADDING', (0, 0), (-1, -1), 8),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-    ]))
-    story.append(rag)
-    story.append(Spacer(1, 2 * mm))
-
-    # --- Плитки KPI ---
-    def pct(v):
-        return f'{round(v * 100)} %' if v is not None else '—'
-
-    overdue_pct = round(100.0 * m.get('overdue', 0) / max(1, m.get('tasks_total', 1)))
-    done_pct = round(100.0 * m.get('done', 0) / max(1, m.get('tasks_total', 1)))
-    tiles = [
-        ('Темп выполнения', pct(evm.get('spi')) if evm.get('available') else '—',
-         'доля запланированного объёма, которая фактически сделана'),
-        ('Исполнение базы', pct(sched.get('bei')),
-         'доля задач, которые по базовому плану должны быть готовы к сегодня'),
-        ('Готовность', f'{done_pct} %', f"выполнено {m.get('done', '—')} из "
-         f"{m.get('tasks_total', '—')} задач"),
-        ('Просрочено', f"{m.get('overdue', '—')} шт.",
-         f'{overdue_pct} % задач — срок вышел, работа не завершена'),
-    ]
-    cells = [[Paragraph(f'<b>{t}</b>', small) for t, _, _ in tiles],
-             [Paragraph(v, ParagraphStyle('v', fontName=font_bold,
-                                          fontSize=13, leading=15))
-              for _, v, _ in tiles],
-             [Paragraph(d, small) for _, _, d in tiles]]
-    tbl = Table(cells, colWidths=[45.5 * mm] * 4)
-    tbl.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 0.5, colors.Color(0.8, 0.8, 0.8)),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.Color(0.85, 0.85, 0.85)),
-        ('BACKGROUND', (0, 0), (-1, 0), colors.Color(0.94, 0.94, 0.94)),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 3),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-        ('LEFTPADDING', (0, 0), (-1, -1), 4),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-    ]))
-    story.append(tbl)
-
-    # --- Динамика ---
-    if trend and trend.get('available'):
-        story.append(Paragraph(f"Динамика с {trend['prev_date']}", h2))
-        for ln in trend.get('lines', []):
-            story.append(Paragraph('• ' + _pdf_safe(ln), bullet))
-        if trend.get('status_changed'):
-            story.append(Paragraph('• изменился общий статус проекта', bullet))
-
-    # --- Поручения ---
-    if bl6 and bl6.get('available'):
-        pct_txt = (f"{bl6['done_on_time_pct']} % закрыты в срок"
-                   if bl6.get('done_on_time_pct') is not None
-                   else 'доля в срок не считается (нет дат закрытия)')
-        story.append(Paragraph(_md_inline(
-            f"Поручения (реестр МТИ&PSI, на {bl6['as_of']})"), h2))
-        story.append(Paragraph(_pdf_safe(
-            f"открыто {bl6['open']} из {bl6['total']} · выполнено {bl6['done']} · "
-            f"отменено {bl6['canceled']} · {pct_txt} · просрочено открытых: "
-            f"{bl6['open_overdue']}"), body))
-
-    # --- 3 решения недели ---
-    if decisions:
-        story.append(Paragraph('3 решения на этой неделе', h2))
-        for i, d in enumerate(decisions[:3], 1):
-            story.append(Paragraph(
-                _pdf_safe(_md_inline(f"{i}. **{d['title']}**")), bullet))
-            if d.get('why'):
-                story.append(Paragraph(_pdf_safe(_md_inline(d['why'])), bullet))
-            if d.get('decision'):
-                story.append(Paragraph(
-                    _pdf_safe(_md_inline('👉 ' + d['decision'])), bullet))
-            story.append(Spacer(1, 0.8 * mm))
-
-    story.append(Spacer(1, 3 * mm))
-    story.append(Paragraph(
-        'Подготовлено автоматически на основе детерминированного анализа '
-        'расписания и реестра поручений. Файл плана не сохраняется на сервере.',
-        small))
+        'детерминированного анализа расписания и реестра поручений. '
+        'Файл плана не сохраняется на сервере.', small))
 
     doc.build(story)
     return out_path

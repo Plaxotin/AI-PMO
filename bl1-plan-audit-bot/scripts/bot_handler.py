@@ -26,7 +26,7 @@ import state
 import usage
 import xlsx_export
 from config import load_telegram_config
-from pdf import generate_pdf, generate_sponsor_pdf, generate_digest_pdf
+from pdf import generate_pdf, generate_sponsor_pdf
 from report import build_chat_summary, build_detail, build_sponsor_digest
 
 POLL_TIMEOUT = 30
@@ -41,12 +41,13 @@ HELP_TEXT = (
     'Перед аудитом можно одним сообщением указать акценты — '
     'отвечу на них в отчёте.\n'
     'Для .mpp предложу на выбор: аудит или конвертацию в Excel.\n'
-    'После аудита доступны: отчёт для спонсора (C-level) и дайджест '
-    'здоровья проекта по запросу.\n'
-    'Дайджест можно получить и без полного аудита: /digest, затем файл.\n'
+    'После аудита доступен отчёт для спонсора (C-level): аналитика, '
+    'прогноз, динамика, поручения и 3 решения на неделю.\n'
+    'Отчёт можно получить и без полного аудита: /sponsor, затем файл.\n'
+    'Свой остаток попыток: /myusage.\n'
     'Пришлите новую версию позже — покажу, что изменилось.\n\n'
     'Бесплатно — 1 аудит плана и 1 отчёт для спонсора в месяц. '
-    'Дайджест и конвертация .mpp — без лимита.'
+    'Конвертация .mpp — без лимита.'
 )
 
 COMMENT_OFFER = (
@@ -56,10 +57,18 @@ COMMENT_OFFER = (
 )
 
 SPONSOR_CONTEXT_OFFER = (
-    '📄 Отчёт для спонсора. Чтобы связать выводы с бизнесом, напишите одним '
-    'сообщением: цель проекта для компании, критерии успеха, что важнее — '
-    'срок или содержание, какие решения ждёте от спонсора.\n'
+    '📄 Отчёт для спонсора (C-level): аналитика по плану, прогноз, динамика '
+    'к прошлому аудиту, метрики поручений и 3 решения на неделю.\n'
+    'Чтобы связать выводы с бизнесом, напишите одним сообщением: цель '
+    'проекта для компании, критерии успеха, что важнее — срок или '
+    'содержание, какие решения ждёте от спонсора.\n'
     'Или сформируйте отчёт только по данным плана:'
+)
+
+SPONSOR_FILE_OFFER = (
+    '📄 Отчёт для спонсора (C-level). Пришлите файл плана (.xlsx, .csv или '
+    '.mpp) — сформирую отчёт сразу, без полного аудита: аналитика, прогноз, '
+    'динамика, поручения и 3 решения на неделю.'
 )
 
 
@@ -258,9 +267,10 @@ class Bot:
             self.start_sponsor_flow(chat_id)
             return
 
-        # Дайджест здоровья для спонсора (v1.2) — строго по запросу
+        # Старые кнопки «Дайджест» (v1.2) в истории чатов — теперь это
+        # часть единого отчёта для спонсора (v1.4)
         if action == 'digest':
-            self._dispatch(chat_id, self.run_digest, chat_id)
+            self.start_sponsor_flow(chat_id)
             return
 
         # Drill-down по направлениям отчёта (v1.1): качество/замечания/рекомендации
@@ -356,8 +366,6 @@ class Bot:
 
             buttons = [{'text': '📄 Отчёт для спонсора',
                         'callback_data': 'sponsor'}]
-            digest_btn = [{'text': '📊 Дайджест для спонсора',
-                           'callback_data': 'digest'}]
             if file_name.lower().endswith('.mpp'):
                 buttons.append({'text': '📊 Конвертировать в Excel',
                                 'callback_data': 'xlsx'})
@@ -375,11 +383,10 @@ class Bot:
                          '🔧 Качество — нарушения норм планирования\n'
                          '🛠 Замечания — оформление плана\n'
                          '💡 Рекомендации — что улучшить в данных плана\n'
-                         '📄 Отчёт для спонсора — развёрнутый C-level отчёт\n'
-                         '📊 Дайджест для спонсора — статус, динамика и '
-                         '3 решения на неделю (по запросу)'),
-                'reply_markup': {'inline_keyboard': [detail_row, buttons,
-                                                     digest_btn]}})
+                         '📄 Отчёт для спонсора — C-level: аналитика, '
+                         'прогноз, динамика, поручения, 3 решения недели'),
+                'reply_markup': {'inline_keyboard': [detail_row,
+                                                     buttons]}})
 
             state.remember_plan(chat_id, doc['file_id'], file_name)
         except Exception as e:
@@ -436,12 +443,20 @@ class Bot:
             except Exception:
                 pass
 
-    # --- Отчёт для спонсора (v1.1) ---
+    # --- Отчёт для спонсора (v1.4): единый C-level документ ---
+    # Аналитика (v1.1) + панель здоровья (бывший дайджест v1.2) в одном PDF:
+    # стр. 1 — разбор и прогноз от LLM, стр. 2 — KPI, динамика, поручения,
+    # 3 решения недели. Два LLM-вызова (k3), один лимит 'sponsor'.
     def start_sponsor_flow(self, chat_id: int):
+        blocked = usage.check(chat_id, 'sponsor')
+        if blocked:
+            self.send_text(chat_id, blocked)
+            return
         if not self._cached_run(chat_id):
-            self.send_text(chat_id,
-                           '⚠️ Нет данных аудита (бот перезапускался?) — '
-                           'пришлите файл плана и прогоните аудит заново')
+            # Прямой путь без аудита: ждём файл, факты посчитаем
+            # детерминированно (LLM-аудит не нужен).
+            self.awaiting[chat_id] = {'purpose': 'sponsor_file', 'doc': None}
+            self.send_text(chat_id, SPONSOR_FILE_OFFER)
             return
         self.awaiting[chat_id] = {'purpose': 'sponsor', 'doc': None}
         self.call('sendMessage', json={
@@ -452,69 +467,16 @@ class Bot:
                  'callback_data': 'skip'}]]},
         })
 
-    def run_sponsor(self, chat_id: int, context: str = None):
-        cached = self._cached_run(chat_id)
-        if not cached:
-            self.send_text(chat_id,
-                           '⚠️ Нет данных аудита — пришлите файл плана '
-                           'и прогоните аудит заново')
-            return
+    def run_sponsor_from_file(self, chat_id: int, doc: dict):
+        """Прямой путь: файл → метрики → предложение контекста → единый отчёт.
+        Факты кэшируются как после аудита (drill-down остаётся доступным)."""
         blocked = usage.check(chat_id, 'sponsor')
         if blocked:
             self.send_text(chat_id, blocked)
             return
-        usage.record(chat_id, 'sponsor')
-        self.send_text(chat_id, '🤖 Формирую отчёт для спонсора '
-                                '(обычно 1–2 минуты)…')
-        tmpdir = tempfile.mkdtemp(prefix='bl1sponsor_')
-        pdf_path = os.path.join(tmpdir, 'sponsor_report.pdf')
-        try:
-            text = llm.sponsor_report(cached['facts'], context=context)
-            if not text:
-                usage.refund(chat_id, 'sponsor')  # LLM недоступен — возврат
-                self.send_text(chat_id, '❌ ИИ-анализ недоступен, попробуйте '
-                                        'позже')
-                return
-            generate_sponsor_pdf(cached['plan_name'], cached['facts'], text,
-                                 pdf_path)
-            self.send_doc(chat_id, pdf_path,
-                          caption='Отчёт для спонсора (1 страница)')
-        except Exception as e:
-            print(f'❌ ошибка спонсорского отчёта: {e}', flush=True)
-            self.send_text(chat_id, f'❌ Не получилось: {e}')
-            usage.refund(chat_id, 'sponsor')  # сбой сервиса ≠ трата попытки
-        finally:
-            try:
-                if os.path.exists(pdf_path):
-                    os.unlink(pdf_path)
-            except Exception:
-                pass
-
-    # --- Дайджест для спонсора (v1.2): статус + тренд + поручения + 3 решения ---
-    DIGEST_OFFER = (
-        '📊 Дайджест для спонсора. Пришлите файл плана (.xlsx, .csv или .mpp) '
-        '— соберу дайджест сразу, без полного аудита: статус, динамика к '
-        'прошлому прогону, метрики поручений и 3 решения на неделю.'
-    )
-
-    def run_digest(self, chat_id: int):
-        cached = self._cached_run(chat_id)
-        if not cached:
-            # Прямой путь (24.09.26): дайджест без предварительного аудита —
-            # ждём файл; факты посчитаем детерминированно (LLM-аудит не нужен).
-            self.awaiting[chat_id] = {'purpose': 'digest_file', 'doc': None}
-            self.send_text(chat_id, self.DIGEST_OFFER)
-            return
-        # Мы уже в потоке _dispatch — вызываем пайплайн напрямую
-        self._send_digest(chat_id, cached['plan_name'], cached['facts'])
-
-    def run_digest_from_file(self, chat_id: int, doc: dict):
-        """Дайджест напрямую из файла: парсинг + детерминированный анализ.
-        Факты кэшируются как после обычного аудита (drill-down и спонсорский
-        отчёт остаются доступными)."""
         file_name = doc.get('file_name', 'plan')
         self.send_text(chat_id, f'📥 Принял «{file_name}», считаю метрики…')
-        tmpdir = tempfile.mkdtemp(prefix='bl1digestfile_')
+        tmpdir = tempfile.mkdtemp(prefix='bl1sponsorfile_')
         local_path = os.path.join(tmpdir, file_name)
         try:
             self.download(doc['file_id'], local_path)
@@ -524,9 +486,17 @@ class Bot:
             state.save_last_run(chat_id, plan.name, facts)
             state.snapshot_run(chat_id, facts)
             state.remember_plan(chat_id, doc['file_id'], file_name)
-            self._send_digest(chat_id, plan.name, facts)
+            # как в обычном флоу — предлагаем бизнес-контекст
+            self.awaiting[chat_id] = {'purpose': 'sponsor', 'doc': None}
+            self.call('sendMessage', json={
+                'chat_id': chat_id,
+                'text': SPONSOR_CONTEXT_OFFER,
+                'reply_markup': {'inline_keyboard': [[
+                    {'text': '⏩ Пропустить — сформировать отчёт',
+                     'callback_data': 'skip'}]]},
+            })
         except Exception as e:
-            print(f'❌ ошибка дайджеста из файла: {e}', flush=True)
+            print(f'❌ ошибка приёма файла для отчёта: {e}', flush=True)
             self.send_text(chat_id, f'❌ Не получилось: {e}')
         finally:
             try:
@@ -535,25 +505,48 @@ class Bot:
             except Exception:
                 pass
 
-    def _send_digest(self, chat_id: int, plan_name: str, facts: dict):
-        self.send_text(chat_id, '🤖 Формирую дайджест для спонсора '
-                                '(обычно до минуты)…')
-        tmpdir = tempfile.mkdtemp(prefix='bl1digest_')
-        pdf_path = os.path.join(tmpdir, 'sponsor_digest.pdf')
+    def run_sponsor(self, chat_id: int, context: str = None):
+        cached = self._cached_run(chat_id)
+        if not cached:
+            self.start_sponsor_flow(chat_id)  # нет кэша — попросим файл
+            return
+        blocked = usage.check(chat_id, 'sponsor')
+        if blocked:
+            self.send_text(chat_id, blocked)
+            return
+        usage.record(chat_id, 'sponsor')
+        self.send_text(chat_id, '🤖 Формирую отчёт для спонсора (два ИИ-прогона, '
+                                'обычно 3–6 минут)…')
+        tmpdir = tempfile.mkdtemp(prefix='bl1sponsor_')
+        pdf_path = os.path.join(tmpdir, 'sponsor_report.pdf')
         try:
-            history = state.load_history(chat_id)
-            trend = analytics.build_trend(history)
-            bl6 = bl6_metrics.load_bl6_metrics()
-            decisions = llm.digest_decisions(facts, trend, bl6)
+            text = llm.sponsor_report(cached['facts'], context=context)
+            if not text:
+                usage.refund(chat_id, 'sponsor')  # LLM недоступен — возврат
+                self.send_text(chat_id, '❌ ИИ-анализ недоступен, попробуйте '
+                                        'позже')
+                return
+            # Панель здоровья (бывший дайджест): тренд + BL-6 + 3 решения.
+            # Сбой второго прогона не роняет отчёт — уходим без этой страницы.
+            trend, bl6, decisions = {}, {}, None
+            try:
+                history = state.load_history(chat_id)
+                trend = analytics.build_trend(history)
+                bl6 = bl6_metrics.load_bl6_metrics()
+                decisions = llm.digest_decisions(cached['facts'], trend, bl6)
+            except Exception as e:
+                print(f'⚠️ панель здоровья недоступна: {e}', flush=True)
             self.send_text(chat_id, build_sponsor_digest(
-                plan_name, facts, trend, bl6, decisions))
-            generate_digest_pdf(plan_name, facts, trend,
-                                bl6, decisions, pdf_path)
+                cached['plan_name'], cached['facts'], trend, bl6, decisions))
+            generate_sponsor_pdf(cached['plan_name'], cached['facts'], text,
+                                 pdf_path, trend=trend, bl6=bl6,
+                                 decisions=decisions)
             self.send_doc(chat_id, pdf_path,
-                          caption='Дайджест для спонсора (1 страница)')
+                          caption='Отчёт для спонсора (C-level, до 2 страниц)')
         except Exception as e:
-            print(f'❌ ошибка дайджеста: {e}', flush=True)
+            print(f'❌ ошибка спонсорского отчёта: {e}', flush=True)
             self.send_text(chat_id, f'❌ Не получилось: {e}')
+            usage.refund(chat_id, 'sponsor')  # сбой сервиса ≠ трата попытки
         finally:
             try:
                 if os.path.exists(pdf_path):
@@ -579,11 +572,11 @@ class Bot:
                         continue
                     text = msg.get('text') or ''
                     if msg.get('document'):
-                        # файл в режиме ожидания дайджеста — сразу в дайджест
+                        # файл в режиме ожидания отчёта для спонсора
                         wait = self.awaiting.get(chat_id)
-                        if wait and wait.get('purpose') == 'digest_file':
+                        if wait and wait.get('purpose') == 'sponsor_file':
                             self.awaiting.pop(chat_id, None)
-                            self._dispatch(chat_id, self.run_digest_from_file,
+                            self._dispatch(chat_id, self.run_sponsor_from_file,
                                            chat_id, msg['document'])
                             continue
                         # новый файл отменяет ожидание комментария
@@ -594,7 +587,10 @@ class Bot:
                     elif text.startswith('/sponsor'):
                         self.start_sponsor_flow(chat_id)
                     elif text.startswith('/digest'):
-                        self._dispatch(chat_id, self.run_digest, chat_id)
+                        # v1.4: дайджест объединён с отчётом для спонсора
+                        self.start_sponsor_flow(chat_id)
+                    elif text.startswith('/myusage'):
+                        self.send_text(chat_id, usage.myusage_text(chat_id))
                     elif text.startswith('/stats'):
                         # статистика использования — только для владельца
                         if usage.is_owner(chat_id):
@@ -604,13 +600,13 @@ class Bot:
                                            '⚠️ Команда только для владельца '
                                            'сервиса')
                     elif text and chat_id in self.awaiting:
-                        # текст в режиме ожидания файла дайджеста — не снимаем
+                        # текст в режиме ожидания файла отчёта — не снимаем
                         # ожидание, напоминаем, что ждём файл
-                        if self.awaiting[chat_id].get('purpose') == 'digest_file':
+                        if self.awaiting[chat_id].get('purpose') == 'sponsor_file':
                             self.send_text(chat_id,
                                            '⏳ Жду файл плана (.xlsx, .csv или '
-                                           '.mpp) — дайджест соберу сразу '
-                                           'после приёма.')
+                                           '.mpp) — отчёт для спонсора соберу '
+                                           'сразу после приёма.')
                             continue
                         # ответ на шаг комментария / контекста спонсора
                         wait = self.awaiting.pop(chat_id)
