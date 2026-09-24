@@ -66,3 +66,10 @@ def load_config() -> dict:
     merged = dict(DEFAULTS)
     merged.update(cfg)
     return merged
+
+
+def save_config(cfg: dict):
+    """Сохранить config.json (переключатели вроде digest_auto)."""
+    path = os.path.join(CREDS_DIR, 'config.json')
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=1)

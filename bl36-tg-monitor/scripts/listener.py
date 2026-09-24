@@ -19,6 +19,7 @@ import time
 
 import config
 import db
+import digest
 import proposals
 import sense
 import tg
@@ -215,9 +216,24 @@ def handle_command(chat_id, cmd):
                         '/status — подключённые чаты и счётчики\n'
                         '/proposals — переотправить ожидающие предложения\n'
                         '/sense — запустить анализ сейчас\n'
+                        '/digest — дайджест сейчас\n'
+                        '/digest_auto — вкл/выкл авто-дайджест\n'
                         '/usage — расход LLM')
     elif cmd == '/status':
         cmd_status(chat_id)
+    elif cmd == '/digest':
+        tg.send_message(chat_id, '⏳ Собираю дайджест…')
+        threading.Thread(
+            target=lambda: None if digest.send_digest(chat_id, force=True)
+            else tg.send_message(chat_id, '⚠️ Дайджест не отправлен — см. лог.'),
+            daemon=True).start()
+    elif cmd == '/digest_auto':
+        cfg = config.load_config()
+        cfg['digest_auto'] = not cfg.get('digest_auto', True)
+        config.save_config(cfg)
+        tg.send_message(chat_id, '⏰ Авто-дайджест: %s' %
+                        ('ВКЛ (ежедневно %s МСК)' % cfg['digest_time_msk']
+                         if cfg['digest_auto'] else 'ВЫКЛ'))
     elif cmd == '/proposals':
         proposals.send_pending(_tg.get('owner_id') or chat_id)
     elif cmd == '/sense':
@@ -306,6 +322,16 @@ def main():
 
     threading.Thread(target=sense_loop, daemon=True).start()
     print('sense scheduler: каждые %d с' % int(_cfg['sense_interval_sec']),
+          flush=True)
+
+    def _digest_chat_id():
+        cfg = config.load_config()
+        return cfg.get('digest_chat_id') or _tg.get('owner_id')
+
+    threading.Thread(target=digest.digest_loop,
+                     args=(config.load_config, _digest_chat_id),
+                     daemon=True).start()
+    print('digest scheduler: %s МСК' % _cfg.get('digest_time_msk', '09:17'),
           flush=True)
 
     global _offset
