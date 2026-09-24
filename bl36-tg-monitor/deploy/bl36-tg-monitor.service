@@ -1,0 +1,16 @@
+[Unit]
+Description=BL-36 TG Monitor Bot (@PMO_vision_bot)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/bl36-tg-monitor
+ExecStart=/usr/bin/python3 /opt/bl36-tg-monitor/scripts/listener.py
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=append:/var/log/bl36-tg-monitor.log
+StandardError=append:/var/log/bl36-tg-monitor.log
+
+[Install]
+WantedBy=multi-user.target
