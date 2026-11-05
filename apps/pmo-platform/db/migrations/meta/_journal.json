@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1793221835271,
+      "tag": "0000_bl40_proposal_audit",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1793225347317,
+      "tag": "0001_bl36_channel_migration",
+      "breakpoints": true
+    }
+  ]
+}

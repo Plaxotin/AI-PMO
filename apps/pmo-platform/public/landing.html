@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI PMO — от сигнала до решения за два клика</title>
+<meta name="description" content="AI PMO фиксирует риски по сигналам проекта, предлагает решения и создаёт поручения после подтверждения руководителя. Демонстрация целевого сценария на учебных данных.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --cream:#fffcf7; --paper:#ffffff; --ink:#121212; --ink-soft:#4a4a44; --ink-faint:#8a877c;
+  --hair:#e7e2d5; --accent:#5541EA; --gold:#FCCF00; --green:#15803d; --green-bg:#e9f7ee; --amber:#b45309;
+  --mono:'JetBrains Mono',monospace; --sans:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--cream);color:var(--ink);-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none}
+.bar{height:44px;background:var(--ink);color:#f5f3ec;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.bar .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);margin-right:8px;animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.bar-logo{color:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.tag{color:var(--gold);border:1px solid #3f3f38;padding:2px 8px;border-radius:99px;font-size:10px}
+.wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+/* hero */
+.hero{position:relative;overflow:hidden;padding:104px 0 76px;border-bottom:1px solid var(--hair)}
+.hero-in{position:relative;z-index:2}
+.giant{position:absolute;z-index:1;top:50%;left:63%;translate:-50% -50%;height:64%;width:auto;max-width:38.2vw;pointer-events:none;opacity:.5;filter:drop-shadow(0 18px 36px rgba(65,86,216,.12))}
+.giant-m{display:none}
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--accent);margin-bottom:18px}
+h1{font-size:46px;line-height:1.1;font-weight:700;letter-spacing:-.01em;max-width:600px}
+h1 .a{color:var(--accent)}
+.lede{margin-top:22px;font-size:17px;line-height:1.55;color:var(--ink-soft);max-width:520px}
+.cta-row{margin-top:36px;display:flex;flex-direction:column;gap:12px;align-items:flex-start;max-width:560px}
+.btn{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;border-radius:10px;padding:13px 22px;cursor:pointer;text-decoration:none;display:inline-block}
+.btn-p{background:var(--accent);color:#fff;border:1px solid var(--accent)}
+.btn-p:hover{background:#4635c9}
+.note{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);letter-spacing:.05em}
+/* секции */
+.sec{padding:64px 0;border-bottom:1px solid var(--hair)}
+.sec-h{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:26px}
+h2{font-size:30px;font-weight:700;letter-spacing:-.015em;line-height:1.18;max-width:640px;margin:0 0 14px}
+.lead{font-size:15.5px;line-height:1.6;color:var(--ink-soft);max-width:640px;margin:0}
+/* проблема → результат: строки, не карточки */
+.prows{margin-top:30px;border-top:1px solid var(--hair)}
+.prow{display:grid;grid-template-columns:1fr 44px 1fr;gap:18px;align-items:center;padding:20px 4px;border-bottom:1px solid var(--hair)}
+.prow .pr{font-size:15px;font-weight:600;line-height:1.4;color:var(--ink)}
+.prow .arr{color:var(--accent);font-size:18px;text-align:center}
+.prow .rs{font-size:13.5px;line-height:1.55;color:var(--ink-soft)}
+.prow .rs b{color:var(--ink)}
+/* схема */
+.scheme{margin:26px 0 6px;background:#fff;border:1px solid var(--hair);border-radius:16px;overflow:hidden;box-shadow:0 20px 44px rgba(18,18,18,.07)}
+.scheme img{display:block;width:100%;height:auto}
+.swipe-hint{display:none;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;color:var(--ink-faint);margin:8px 2px 0;text-align:right}
+.cap{margin-top:14px;font-size:13.5px;line-height:1.6;color:var(--ink-faint);max-width:640px}
+.cap b{color:var(--ink-soft)}
+/* демо: телефон в стиле Telegram */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:stretch;margin-top:30px}
+@media (max-width:820px){.duo{grid-template-columns:1fr}.ph-body{max-height:480px}}
+.phone{max-width:360px;margin:0 auto;background:#fff;border:1px solid var(--hair);border-radius:22px;overflow:hidden;box-shadow:0 18px 40px rgba(18,18,18,.10);display:flex;flex-direction:column}
+.ph-head{background:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #e6e6e6}
+.ph-ava{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#7a5cff,#4a7dff);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex:none}
+.ph-name{font-size:13.5px;font-weight:700;color:#000;line-height:1.2}
+.ph-sub{font-size:11px;color:#8a8a8a;margin-top:1px}
+.shot{position:relative}
+.shot .phone{position:absolute;top:0;bottom:0;left:50%;transform:translateX(-50%);width:min(360px,100%)}
+@media (max-width:820px){.shot .phone{position:static;transform:none;width:100%}}
+.ph-body{background:linear-gradient(180deg,#e9eddb,#dfe4d0);padding:14px 12px;display:flex;flex-direction:column;gap:10px;flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#c6cba9 transparent}
+.ph-body::-webkit-scrollbar{width:6px}
+.ph-body::-webkit-scrollbar-thumb{background:#c6cba9;border-radius:3px}
+.bub{background:#fff;border-radius:14px 14px 14px 5px;padding:10px 12px 7px;font-size:12.5px;line-height:1.45;color:#111;box-shadow:0 1px 2px rgba(0,0,0,.10);max-width:92%}
+.bub .bt{font-size:12.5px;font-weight:700;color:#111;margin-bottom:4px}
+.bub time{display:block;margin-top:4px;font-size:10px;color:#9aa38b;text-align:right}
+.bbtns{margin:8px -12px -7px;border-top:1px solid #eee}
+.bbtns button{display:block;width:100%;min-height:42px;background:none;border:none;border-top:1px solid #eee;text-align:center;font-family:inherit;font-size:12.5px;padding:9px 4px;color:#3390ec;cursor:pointer;transition:background .15s}
+.bbtns button:disabled{cursor:default}
+.srcbtn{border:0;background:none;padding:0;color:#2374ab;font:inherit;text-decoration:underline;cursor:pointer}
+.source-quote{display:none;margin-top:8px;padding:8px 10px;border-left:3px solid #b7c2a2;background:#f5f7ef;color:#4a4a44;font-size:12px}
+.source-quote.open{display:block}
+.demo-link{display:inline-block;margin-top:8px;color:#2374ec;font-weight:600;text-decoration:none}
+.btn:focus-visible,.bbtns button:focus-visible,.srcbtn:focus-visible,a:focus-visible{outline:3px solid rgba(85,65,234,.34);outline-offset:3px}
+.bbtns button:first-child{border-top:none}
+.bbtns button:hover{background:#f5f7ee}
+.bbtns button.on{color:#111;font-weight:700;background:#eef3df}
+.bbtns button.on::before{content:'✓ ';color:#4a7dff}
+.bub.pop{animation:pop .45s cubic-bezier(.2,.8,.3,1.08)}
+@keyframes pop{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+.bub.typing{padding:13px 16px}
+.dots{display:flex;gap:4px}
+.dots i{width:6px;height:6px;border-radius:50%;background:#b9c2a8;animation:bl 1s infinite}
+.dots i:nth-child(2){animation-delay:.15s}
+.dots i:nth-child(3){animation-delay:.3s}
+@keyframes bl{0%,60%,100%{opacity:.35;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+/* карточки-пояснения демо (обновляются по клику) */
+.pstep{background:var(--paper);border:1px solid var(--hair);border-radius:14px;padding:16px 18px}
+.pday{font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--accent);letter-spacing:.1em;text-transform:uppercase}
+.pstep h3{font-size:14.5px;margin:8px 0 6px;color:var(--ink)}
+.pstep p{font-size:12.5px;line-height:1.5;color:var(--ink-soft);margin:0}
+.pstep.ghost{border-style:dashed;background:transparent}
+.pstep.ghost .pday{color:var(--ink-faint)}
+.pstep.flash{animation:flash .7s ease}
+@keyframes flash{0%{border-color:var(--accent);box-shadow:0 0 0 3px rgba(85,65,234,.14)}100%{border-color:var(--hair);box-shadow:none}}
+/* возможности: 4 направления строками */
+.caps{margin-top:26px;border-top:1px solid var(--hair)}
+.capr{display:grid;grid-template-columns:250px 1fr;gap:24px;padding:22px 4px;border-bottom:1px solid var(--hair);align-items:baseline}
+.capr .ct{font-size:15.5px;font-weight:700;line-height:1.35}
+.capr .ct span{display:block;margin-top:4px;font-family:var(--mono);font-size:10px;font-weight:400;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)}
+.capr .cd{font-size:13.5px;line-height:1.6;color:var(--ink-soft)}
+.capr .cd b{color:var(--ink)}
+.capr .tools{margin-top:9px;display:flex;gap:8px;flex-wrap:wrap}
+.capr .tools span{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;border:1px solid var(--hair);background:var(--paper);border-radius:99px;padding:5px 12px;color:var(--ink-soft)}
+.capr .tools span.dev{border-style:dashed;color:var(--ink-faint)}
+/* финальный CTA */
+.final{padding:76px 0;text-align:center;border-bottom:1px solid var(--hair)}
+.final h2{margin:0 auto 14px}
+.final .lead{margin:0 auto}
+.final .btn{margin-top:30px}
+.final .note{display:block;margin-top:14px}
+.foot{padding:32px 0 44px;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);letter-spacing:.08em;text-transform:uppercase}
+.foot a{color:var(--accent);text-decoration:none}
+@media (max-width:1100px){.giant{left:66%;opacity:.34}h1{max-width:520px}.lede{max-width:480px}}
+@media (max-width:640px){
+  h1{font-size:30px}.hero{padding:60px 0 48px}
+  .giant{display:none}
+  .giant-m{display:block;float:right;height:260px;width:auto;margin:4px -62px 10px 6px;filter:drop-shadow(0 14px 28px rgba(65,86,216,.14))}
+  h2{font-size:23px}
+  .prow{grid-template-columns:1fr;gap:6px;padding:16px 2px}
+  .prow .arr{text-align:left;transform:rotate(90deg);font-size:15px}
+  .capr{grid-template-columns:1fr;gap:8px;padding:18px 2px}
+  .scheme{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .scheme::-webkit-scrollbar{display:none}
+  .scheme img{width:900px;max-width:none}
+  .swipe-hint{display:block}
+  .final{padding:56px 0}
+  .bub,.bub .bt,.bbtns button{font-size:14px}
+  .bbtns button{min-height:44px}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <a class="bar-logo" href="landing.html" title="AI PMO"><span class="dot"></span>AI PMO</a>
+  <span class="tag">alpha</span>
+</div>
+
+<section class="hero">
+  <img class="giant" src="matreshka-hero.png" alt="Матрёшка AI PMO — от сигнала в чате до поручения на исполнение">
+  <div class="wrap hero-in">
+    <div class="kicker">проактивное управление проектами</div>
+    <h1>Узнавайте о рисках проекта <span class="a">до того, как они станут проблемами</span></h1>
+    <img class="giant-m" src="matreshka-hero.png" alt="" aria-hidden="true">
+    <p class="lede">Пиэмка превращает сигналы переписки, плана и поручений в риски, предложения и решения. Руководителю остаётся два клика: открыть риск и принять предложение.</p>
+    <div class="cta-row">
+      <a class="btn btn-p" href="index.html">Открыть демо-проект →</a>
+      <span class="note">альфа · демо целевого сценария · учебные данные</span>
+    </div>
+  </div>
+</section>
+
+<div class="wrap">
+
+  <section class="sec">
+    <div class="sec-h">Проблема → результат</div>
+    <h2>Управленческий сигнал есть всегда. Доходит он — не всегда</h2>
+    <div class="prows">
+      <div class="prow">
+        <div class="pr">Важные сигналы теряются в переписке</div>
+        <div class="arr">→</div>
+        <div class="rs">Пиэмка <b>выделяет из рабочего потока то, что угрожает срокам</b>. Целевой порядок каналов: Telegram, затем почта и MAX; источник сигнала остаётся доступен для проверки.</div>
+      </div>
+      <div class="prow">
+        <div class="pr">Риски фиксируются слишком поздно</div>
+        <div class="arr">→</div>
+        <div class="rs">Запись в реестре рисков создаётся <b>автоматически сразу после сигнала</b> — с источником, прогнозом и обоснованием. Отдельное подтверждение фиксации не требуется.</div>
+      </div>
+      <div class="prow">
+        <div class="pr">Решения и поручения не доходят до исполнения</div>
+        <div class="arr">→</div>
+        <div class="rs">После решения руководителя Пиэмка создаёт <b>поручение с ответственным и сроком</b>; исполнение отслеживается, напоминания уходят в канал.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-h">Как работает AI PMO</div>
+    <h2>От сигнала в чате до поручения на исполнение</h2>
+    <p class="lead">Сигнал → автоматически зафиксированный риск → предложение → решение руководителя → поручение → результат. Ежедневные действия — в канале; веб — для проверки, исправления и аудита.</p>
+    <figure class="scheme">
+      <a href="matreshka-full-cycle.png" target="_blank" rel="noopener"><img src="matreshka-full-cycle.png" alt="Прежняя иллюстрация полного цикла управления риском; актуальная нумерация уровней приведена в подписи ниже"></a>
+    </figure>
+    <div class="swipe-hint">листайте ↔&nbsp;&nbsp;·&nbsp;&nbsp;нажмите, чтобы открыть в полный размер</div>
+    <p class="cap"><b>Актуальный порядок:</b> L0 надзор → L1 реестр рисков → L2 дайджест → L3 реестр решений → L4 реестр поручений. Поручение ссылается на решение, решение — на риск, риск — на исходный сигнал.</p>
+  </section>
+
+  <section class="sec" id="live">
+    <div class="sec-h">Демонстрация</div>
+    <h2>Утро руководителя: два клика до решения и поручения</h2>
+    <p class="lead">Пиэмка сама фиксирует риск и создаёт поручение. Руководитель только открывает риск и принимает предложение. Кнопки в демо настоящие — попробуйте.</p>
+    <div class="duo">
+      <figure class="shot">
+        <div class="phone">
+          <div class="ph-head"><div class="ph-ava">П</div><div><div class="ph-name">Пиэмка</div><div class="ph-sub">AI PMO · bot</div></div></div>
+          <div class="ph-body">
+            <div class="bub">
+              <div class="bt">☀️ Дайджест · 09:00</div>
+              Сводка по проекту сформирована автоматически из плана и реестра поручений.<br>
+              • Просроченные поручения: <b>3</b> (вчера — 5)<br>
+              • Дедлайны ближайших 7 дней: <b>2</b><br>
+              • План: отклонение от baseline <b>+4 дня</b><br>
+              • Новые риски: <b>1</b> — требует решения
+              <div class="bbtns"><button type="button" data-act="open" data-main-action="risk">⚠️ Открыть риск</button></div>
+              <time>09:00</time>
+            </div>
+            <div class="bub" id="bub2" style="display:none">
+              <div class="bt">⚠️ Риск зафиксирован автоматически · R-207</div>
+              Подрядчик сообщает об отсутствии обратной связи от заказчика. Прогноз: сдвиг старта опытной эксплуатации.<br>
+              <button class="srcbtn" type="button" data-act="source" aria-expanded="false">Источник: Telegram · сообщение подрядчика · 08:47</button>
+              <div class="source-quote" id="sourceQuote">«Проектное решение всё ещё без обратной связи от заказчика. Начать разработку по согласованной версии не можем».<br><b>Пиэмка · автоматически:</b> источник, прогноз и обоснование сохранены в риске.</div>
+              <div style="margin-top:9px"><b>Предложение:</b> эскалировать задержку согласования заказчику и установить крайний срок ответа.<br>
+              <b>Эффект:</b> снизить вероятность срыва старта опытной эксплуатации.</div>
+              <div class="bbtns"><button type="button" data-act="accept" data-main-action="decision">Принять предложение</button><button type="button" data-act="discuss">Обсудить</button><button type="button" data-act="decline">Отклонить</button></div>
+              <time>09:02</time>
+            </div>
+            <div class="bub" id="bub3" style="display:none">
+              <div class="bt" id="resultTitle"></div>
+              <span class="bb-txt" id="resultText"></span>
+              <time id="resultTime"></time>
+            </div>
+          </div>
+        </div>
+      </figure>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="pstep" style="margin:0"><div class="pday">09:00 · Дайджест</div><h3>Статус уже собран</h3><p>Просрочки, дедлайны недели, отклонение плана — без запросов к команде. Новый риск ждёт решения.</p></div>
+        <div class="pstep ghost" style="margin:0" id="card2"><div class="pday" id="card2-day">Клик 1 · Откройте риск</div><h3 id="card2-h">Риск уже в реестре</h3><p id="card2-p">Фиксация выполнена системой: источник, прогноз и обоснование доступны для проверки.</p></div>
+        <div class="pstep ghost" style="margin:0" id="card3"><div class="pday" id="card3-day">Клик 2 · Примите предложение</div><h3 id="card3-h">Решение остаётся за руководителем</h3><p id="card3-p">Предложение можно принять, обсудить или отклонить. Пиэмка не утверждает управленческие решения сама.</p></div>
+        <div class="pstep ghost" style="margin:0" id="card4"><div class="pday" id="card4-day">Автоматически · Решение и поручение</div><h3 id="card4-h">Система свяжет записи</h3><p id="card4-p">Решение получит атрибуцию руководителя, поручение — ответственного, срок и ссылку на решение.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-h">Возможности платформы</div>
+    <h2>Четыре направления — одна цепочка</h2>
+    <div class="caps">
+      <div class="capr">
+        <div class="ct">Мониторинг проектных коммуникаций<span>каналы</span></div>
+        <div class="cd">Целевой контур надзора: чаты, письма, дайджесты и лента сигналов с кнопками действий. В демо доступен интерактивный сценарий, подключение каналов не выполняется.
+          <div class="tools"><span>TG-надзор · демо сценария · волна 1</span><span class="dev">Email-надзор</span><span>дайджест поручений</span><span>пульс проекта</span></div>
+        </div>
+      </div>
+      <div class="capr">
+        <div class="ct">Выявление и ведение рисков<span>реестр рисков</span></div>
+        <div class="cd">Риски из плана, поручений и переписки — с источником, влиянием, вероятностью и мерой. Наступивший риск остаётся в реестре со статусом <b>«активный»</b> — отдельный журнал проблем не нужен.
+          <div class="tools"><span>реестр рисков</span><span>предложения ИИ с обоснованием</span><span>ссылка на источник</span></div>
+        </div>
+      </div>
+      <div class="capr">
+        <div class="ct">Решения и поручения<span>управленческий контур</span></div>
+        <div class="cd">Предложения с обоснованием и эффектом, подтверждение кнопками ✓/✕ прямо в канале. Поручения с ответственным и сроком, контроль исполнения и напоминания.
+          <div class="tools"><span>журнал решений</span><span>реестр поручений</span><span>напоминания в канал</span></div>
+        </div>
+      </div>
+      <div class="capr">
+        <div class="ct">Анализ планов и документов<span>инструменты PMO</span></div>
+        <div class="cd">Аудит плана (критический путь, DCMA 14, EVM), генерация ТЗ и RACI по шаблонам PMO, сверка артефактов Word/Excel/PowerPoint/PDF между версиями.
+          <div class="tools"><span>аудит плана</span><span>генератор ТЗ</span><span>RACI</span><span>артефакты</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="cap">В демо доступны реестры, предложения и интерактивный сценарий; каналы и автоматические уведомления показаны как целевой контур и не подключены. Данные учебные.</p>
+  </section>
+
+  <section class="final">
+    <h2>Откройте демо-проект</h2>
+    <p class="lead">В демо доступны реестры поручений, решений, рисков и стейкхолдеров, предложения с обоснованием и источником, а также интерактивный сценарий целевого канального контура.</p>
+    <a class="btn btn-p" href="index.html">Открыть демо-проект →</a>
+    <span class="note">альфа · учебные данные · без подключения внешних каналов</span>
+  </section>
+
+  <div class="foot">
+    <span>AI PMO · Пиэмка · alpha</span>
+    <span>внутренняя разработка PMO</span>
+    <span><a href="landing-a.html">→ прежняя версия лендинга</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="index.html">→ workspace</a></span>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  var bub2=document.getElementById('bub2'), bub3=document.getElementById('bub3'),
+      card2=document.getElementById('card2'), card3=document.getElementById('card3'), card4=document.getElementById('card4'),
+      body=document.querySelector('.ph-body'), typing=null, timer=null;
+  function scrollDown(){body.scrollTo({top:body.scrollHeight,behavior:'smooth'});}
+  function type(cb){
+    if(timer)clearTimeout(timer); if(typing)typing.remove();
+    typing=document.createElement('div'); typing.className='bub typing';
+    typing.innerHTML='<span class="dots"><i></i><i></i><i></i></span>'; body.appendChild(typing); scrollDown();
+    timer=setTimeout(function(){typing.remove();typing=null;cb();},450);
+  }
+  function flash(card){card.classList.remove('flash');void card.offsetWidth;card.classList.add('flash');}
+  document.querySelector('[data-act="open"]').addEventListener('click',function(){
+    this.classList.add('on');this.disabled=true;
+    card2.classList.remove('ghost');card3.classList.remove('ghost');
+    document.getElementById('card2-day').textContent='09:02 · Риск зафиксирован автоматически';
+    document.getElementById('card2-h').textContent='R-207 готов к решению';
+    document.getElementById('card2-p').textContent='Отдельное подтверждение не потребовалось: Пиэмка сохранила риск, источник и прогноз.';
+    flash(card2);flash(card3);
+    type(function(){bub2.style.display='';bub2.classList.add('pop');scrollDown();});
+  });
+  document.querySelector('[data-act="source"]').addEventListener('click',function(){
+    var q=document.getElementById('sourceQuote'),open=q.classList.toggle('open');
+    this.setAttribute('aria-expanded',String(open));
+  });
+  var R={
+    accept:{time:'09:03',title:'✅ Решение принято · поручение P-D-207 создано',
+      html:'<b>Решение D-207:</b> эскалировать задержку и установить крайний срок согласования.<br><b>Поручение:</b> руководителю проекта, срок — завтра; контроль исполнения автоматически.<br><b>Атрибуция:</b> Пиэмка от имени Плахотина К.<br><a class="demo-link" href="index.html">Проверить цепочку «риск → решение → поручение» в демо →</a>',
+      day:'09:03 · Решение и поручение созданы',head:'Цепочка замкнута',text:'D-207 ссылается на R-207, P-D-207 — на D-207. Источник и атрибуция сохранены.'},
+    discuss:{time:'09:03',title:'💬 Обсуждение открыто · решение не утверждено',
+      html:'Контекст R-207 приложен к обсуждению. Поручение не создано.<br><b>Атрибуция:</b> Пиэмка от имени Плахотина К.',
+      day:'09:03 · Открыто обсуждение',head:'Решение остаётся открытым',text:'Команда обсуждает предложение; автоматического поручения нет.'},
+    decline:{time:'09:03',title:'❌ Предложение отклонено · решение зафиксировано',
+      html:'D-207 сохранён со статусом «отклонено»; поручение не создано.<br><b>Атрибуция:</b> Пиэмка от имени Плахотина К.',
+      day:'09:03 · Предложение отклонено',head:'Наблюдение продолжается',text:'Отказ зафиксирован, риск остаётся в реестре и под наблюдением.'}
+  };
+  function react(act,btn){
+    if(bub3.style.display!=='none')return;
+    bub2.querySelectorAll('[data-act="accept"],[data-act="discuss"],[data-act="decline"]').forEach(function(b){b.disabled=true;b.classList.toggle('on',b===btn);});
+    var r=R[act];card4.classList.remove('ghost');
+    document.getElementById('card4-day').textContent=r.day;document.getElementById('card4-h').textContent=r.head;document.getElementById('card4-p').textContent=r.text;flash(card4);
+    type(function(){document.getElementById('resultTitle').textContent=r.title;document.getElementById('resultText').innerHTML=r.html;document.getElementById('resultTime').textContent=r.time;bub3.style.display='';bub3.classList.add('pop');scrollDown();});
+  }
+  bub2.querySelectorAll('[data-act="accept"],[data-act="discuss"],[data-act="decline"]').forEach(function(b){b.addEventListener('click',function(){react(b.dataset.act,b);});});
+})();
+</script>
+</body>
+</html>

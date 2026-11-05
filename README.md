@@ -2,22 +2,31 @@
 
 Landing page and product components for AI PMO.
 
-## Current AI PMO production
+## Product components
+
+- **AI PMO platform:** `apps/pmo-platform/` — актуальный контур лендинга, веб-реестра, server-side проектного состояния и реального Telegram-сценария. См. `apps/pmo-platform/README.md`.
+- **Landing (legacy Vercel):** static HTML/CSS/JS (`index.html`) — Vercel root.
+- **App (BL-1):** Next.js in `app/` — реестр поручений, API `/api/projects/:projectId/assignments`.
+- Fonts: DM Sans, Instrument Sans (Google Fonts).
+
+### AI PMO platform links
 
 - [Current landing](https://4nbbao3eiuuc6.kimi.pro/landing.html)
 - [Current workspace](https://4nbbao3eiuuc6.kimi.pro/workspace.html)
-- [Production status, source-sync note and next steps](docs/plans/PMO_PLATFORM_NEXT_STEPS.md)
-
-Новый production-контур включает веб-реестр, server-side проектное состояние и реальный Telegram-сценарий. Его исходники должны размещаться отдельно в `apps/pmo-platform/`; существующий `app/` не заменяется. Статус синхронизации кода честно зафиксирован в handoff выше.
-
-## Existing tech stack
-- **Landing:** static HTML/CSS/JS (`index.html`) — Vercel root
-- **App (BL-1):** Next.js in `app/` — реестр поручений, API `/api/projects/:projectId/assignments`
-- Fonts: DM Sans, Instrument Sans (Google Fonts)
+- [Handoff and next steps](docs/plans/PMO_PLATFORM_NEXT_STEPS.md)
 
 ## Development
 
-**Лендинг:** edit `index.html` → push to `main` → auto-deploy (Vercel root).
+**AI PMO platform:** работайте в `apps/pmo-platform/`; не переносите туда production `.env`, `.credentials/` или секреты каналов.
+
+```bash
+cd apps/pmo-platform
+cp .env.example .env
+npm install
+npm run dev
+```
+
+**Лендинг Vercel:** edit `index.html` → push to `main` → auto-deploy (Vercel root).
 
 **Документация:** продукт и бэклог — [Notion](https://app.notion.com/p/33a2fbb64c0e80baa2e4f8cac9adb618); спеки реализации и планы фаз — `docs/README.md` (`docs/specs/`, `docs/plans/`).
 
