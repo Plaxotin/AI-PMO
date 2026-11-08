@@ -22,7 +22,7 @@
 | [ADR-BL-18-02-production-decisions.md](specs/ADR-BL-18-02-production-decisions.md) | BL-18 — ADR: prod-решения |
 | [SPEC-BL-36-tg-monitoring.md](specs/SPEC-BL-36-tg-monitoring.md) | BL-36 — Telegram-надзор и невидимый бот-наблюдатель |
 | [SPEC-BL-54-first-value.md](specs/SPEC-BL-54-first-value.md) | **BL-54 v1.1 — принятый накопительный дайджест** |
-| [SPEC-BL-48-outcome-loop.md](specs/SPEC-BL-48-outcome-loop.md) | BL-48 — первый срез принят; v1.1-draft для автоматического KPI и Learning Loop |
+| [SPEC-BL-48-outcome-loop.md](specs/SPEC-BL-48-outcome-loop.md) | BL-48 — первый срез принят; v1.1-draft, isolated KPI/Learning 23/23 |
 
 ## Планы реализации (`docs/plans/`)
 

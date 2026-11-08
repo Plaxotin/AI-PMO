@@ -1,0 +1,66 @@
+{
+  "scope": "BL-48 v1.1-draft automatic KPI and Learning Loop isolated implementation; no production deployment or real-source acceptance",
+  "spec": "docs/specs/SPEC-BL-48-outcome-loop.md v1.1-draft",
+  "migration": {
+    "tag": "0010_bl48_kpi_learning_loop",
+    "additive": true,
+    "cleanApplyFrom0000Through0010": true,
+    "legacyRowsMarkedReal": false,
+    "productionApplied": false
+  },
+  "implementation": {
+    "readOnlySources": true,
+    "rpApprovedVersionedBindings": true,
+    "durableObservations": true,
+    "httpsGetRegistryJsonAdapter": true,
+    "collectionIntervalMinutes": 15,
+    "overlapLease": true,
+    "directionAwareEffectFormulas": true,
+    "primaryMetricSelection": true,
+    "targetStatusSeparatedFromConfirmation": true,
+    "learningContextAudit": true,
+    "causalityGuard": true,
+    "bl35ReadOnlyExposure": true,
+    "workspaceOriginDataClassComparability": true
+  },
+  "checks": {
+    "telegramContract": "18/18",
+    "restartReplay": "6/6",
+    "bl54": "14/14",
+    "bl42Sla": "24/24",
+    "previousBl48Outcome": "11/11",
+    "newBl48KpiLearning": "23/23",
+    "unit": "39/39",
+    "typecheck": true,
+    "productionBuild": true,
+    "workspaceJavaScriptSyntax": true,
+    "temporaryProcessesStopped": true
+  },
+  "defectsFoundAndFixed": [
+    "MySQL boolean 0/1 comparison broke binding idempotency",
+    "MySQL JSON key reorder broke source and binding idempotency",
+    "binding version change required a new measurement even with identical observations",
+    "invalid observation timestamps are stored as rejected with null observedAt instead of failing the collection"
+  ],
+  "evidence": [
+    "contract-results.json",
+    "restart-replay-results.json",
+    "sla-contract-summary.json",
+    "bl54-first-value-evidence.json",
+    "bl48-outcome-evidence.json",
+    "bl48-kpi-learning-evidence.json"
+  ],
+  "allIsolatedChecksPassed": true,
+  "realSourceConnected": false,
+  "realTelegramSignalsCreated": false,
+  "productionChanged": false,
+  "notionSynchronized": false,
+  "fullBl48Accepted": false,
+  "remaining": [
+    "Owner confirmation of the real source and metric mapping",
+    "Real read-only source acceptance without new Telegram signals",
+    "Production deployment as a separate owner-approved action",
+    "Notion synchronization through the plugin when available in this session"
+  ],
+  "realChatOrUserIdsIncluded": false
+}

@@ -1,0 +1,120 @@
+{
+  "mode": "BL-48 v1.1 automatic KPI and Learning Loop on isolated MySQL with synthetic read-only adapter; no production, real source, Telegram sends or real IDs",
+  "checks": {
+    "source_and_binding_require_rp_and_reject_secrets": true,
+    "source_and_binding_idempotent": true,
+    "no_binding_or_measurement_is_unconfirmed": true,
+    "read_only_adapter_has_no_write_method": true,
+    "automatic_real_measurement_confirmed": true,
+    "observations_and_retry_idempotent": true,
+    "overlap_is_blocked_without_adapter_call": true,
+    "synthetic_and_unknown_excluded_from_learning": true,
+    "invalid_unit_rejected_without_measurement": true,
+    "early_actual_is_incomparable": true,
+    "real_correction_restores_target_met": true,
+    "learning_usage_idempotent_and_auditable": true,
+    "binding_correction_preserves_versions": true,
+    "measurement_versions_preserved": true,
+    "source_failure_is_sanitized_and_isolated": true,
+    "primary_metric_never_selected_arbitrarily": true,
+    "schedule_formula": true,
+    "cost_formula_and_target": true,
+    "quality_formula_and_target": true,
+    "increasing_metric_formula_and_target": true,
+    "learning_excludes_legacy_and_has_causality_guard": true,
+    "bl35_exposes_real_origin_quality_and_sources": true,
+    "c_level_read_only_exposure": true,
+    "old_l3_not_duplicated_by_collection": true
+  },
+  "allChecksPassed": true,
+  "result": {
+    "firstAssessment": {
+      "expectedEffect": "Сократить срок до 8 дней",
+      "status": "confirmed",
+      "targetStatus": "not_met",
+      "actualEffectValue": "3",
+      "text": "Изменение срока: −3 дн. (baseline 12 → actual 9 days)",
+      "basis": "schedule_days · decrease_is_better · baseline 12 → actual 9 days · цель 8 · Synthetic read-only KPI registry · sourceId SRC-BL48K-001 · версия 1",
+      "measurementId": 3,
+      "measurementVersion": 1,
+      "bindingId": 1
+    },
+    "currentAssessment": {
+      "expectedEffect": "Сократить срок до 8 дней",
+      "status": "confirmed",
+      "targetStatus": "met",
+      "actualEffectValue": "4",
+      "text": "Изменение срока: −4 дн. (baseline 12 → actual 8 days)",
+      "basis": "schedule_days · decrease_is_better · baseline 12 → actual 8 days · цель 8 · Synthetic read-only KPI registry · sourceId SRC-BL48K-001 · версия 5",
+      "measurementId": 7,
+      "measurementVersion": 5,
+      "bindingId": 2
+    },
+    "measurementVersions": [
+      {
+        "version": 1,
+        "status": "superseded",
+        "dataClass": "real",
+        "comparabilityStatus": "comparable",
+        "bindingId": 1
+      },
+      {
+        "version": 2,
+        "status": "superseded",
+        "dataClass": "synthetic",
+        "comparabilityStatus": "incomparable",
+        "bindingId": 1
+      },
+      {
+        "version": 3,
+        "status": "superseded",
+        "dataClass": "real",
+        "comparabilityStatus": "incomparable",
+        "bindingId": 1
+      },
+      {
+        "version": 4,
+        "status": "superseded",
+        "dataClass": "real",
+        "comparabilityStatus": "comparable",
+        "bindingId": 1
+      },
+      {
+        "version": 5,
+        "status": "confirmed",
+        "dataClass": "real",
+        "comparabilityStatus": "comparable",
+        "bindingId": 2
+      }
+    ],
+    "observationCount": 9,
+    "rejectedObservationCount": 1,
+    "learningCount": 1,
+    "learningRefs": [
+      {
+        "measurementId": 6,
+        "measurementVersion": 4
+      }
+    ],
+    "learningUsageCount": 1,
+    "bindingVersions": [
+      {
+        "version": 1,
+        "status": "superseded"
+      },
+      {
+        "version": 2,
+        "status": "active"
+      }
+    ],
+    "scheduler": {
+      "claimed": 0,
+      "collected": 0,
+      "throttled": 1,
+      "failed": 1,
+      "inactive": 0
+    },
+    "readCallCount": 7,
+    "realChatOrUserIdsIncluded": false
+  }
+}

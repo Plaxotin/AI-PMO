@@ -10,6 +10,7 @@ import {
   json,
   index,
   uniqueIndex,
+  boolean,
 } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
@@ -309,6 +310,78 @@ export const telegramDigestDeliveries = mysqlTable("telegram_digest_deliveries",
   statusIdx: index("telegram_digest_status_idx").on(table.status, table.createdAt),
 }));
 
+export const outcomeSources = mysqlTable("outcome_sources", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  projectId: varchar("projectId", { length: 64 }).notNull(),
+  type: varchar("type", { length: 32 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  connectionRef: varchar("connectionRef", { length: 128 }).notNull(),
+  readOnly: boolean("readOnly").default(true).notNull(),
+  config: json("config").$type<Record<string, unknown>>().notNull(),
+  status: mysqlEnum("status", ["active", "paused", "error", "disabled"]).default("active").notNull(),
+  lastAttemptAt: timestamp("lastAttemptAt"),
+  lastSuccessAt: timestamp("lastSuccessAt"),
+  lastErrorCode: varchar("lastErrorCode", { length: 128 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => ({
+  projectIdx: index("outcome_sources_project_idx").on(table.projectId),
+}));
+
+export const outcomeMetricBindings = mysqlTable("outcome_metric_bindings", {
+  id: serial("id").primaryKey(),
+  key: varchar("bindingKey", { length: 64 }).notNull(),
+  projectId: varchar("projectId", { length: 64 }).notNull(),
+  sourceId: varchar("sourceId", { length: 64 }).notNull(),
+  decisionId: varchar("decisionId", { length: 64 }).notNull(),
+  taskId: varchar("taskId", { length: 64 }).notNull(),
+  metric: varchar("metric", { length: 64 }).notNull(),
+  unit: varchar("unit", { length: 24 }).notNull(),
+  direction: mysqlEnum("direction", ["decrease_is_better", "increase_is_better"]).notNull(),
+  currencyCode: varchar("currencyCode", { length: 3 }),
+  externalKey: varchar("externalKey", { length: 255 }).notNull(),
+  selectorConfig: json("selectorConfig").$type<Record<string, unknown>>().notNull(),
+  isPrimary: boolean("isPrimary").default(true).notNull(),
+  status: mysqlEnum("status", ["draft", "active", "paused", "superseded"]).default("draft").notNull(),
+  version: int("version", { unsigned: true }).default(1).notNull(),
+  approvedByUserId: bigint("approvedByUserId", { mode: "number", unsigned: true }),
+  approvedByName: varchar("approvedByName", { length: 255 }),
+  approvedAt: timestamp("approvedAt"),
+  collectingAt: timestamp("collectingAt"),
+  lastAttemptAt: timestamp("lastAttemptAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => ({
+  keyVersionUnique: uniqueIndex("outcome_bindings_key_version_unique").on(table.key, table.version),
+  taskIdx: index("outcome_bindings_task_idx").on(table.taskId),
+  sourceIdx: index("outcome_bindings_source_idx").on(table.sourceId),
+  projectIdx: index("outcome_bindings_project_idx").on(table.projectId),
+}));
+
+export const outcomeObservations = mysqlTable("outcome_observations", {
+  id: serial("id").primaryKey(),
+  projectId: varchar("projectId", { length: 64 }).notNull(),
+  sourceId: varchar("sourceId", { length: 64 }).notNull(),
+  bindingId: bigint("bindingId", { mode: "number", unsigned: true }).notNull(),
+  externalObservationId: varchar("externalObservationId", { length: 255 }).notNull(),
+  payloadHash: varchar("payloadHash", { length: 64 }).notNull(),
+  role: mysqlEnum("role", ["baseline", "target", "actual"]).notNull(),
+  value: varchar("value", { length: 32 }),
+  unit: varchar("unit", { length: 24 }).notNull(),
+  currencyCode: varchar("currencyCode", { length: 3 }),
+  observedAt: timestamp("observedAt"),
+  collectedAt: timestamp("collectedAt").defaultNow().notNull(),
+  dataClass: mysqlEnum("dataClass", ["real", "synthetic", "unknown"]).default("unknown").notNull(),
+  validationStatus: mysqlEnum("validationStatus", ["validated", "rejected"]).default("rejected").notNull(),
+  validationErrors: json("validationErrors").$type<string[]>().notNull(),
+  sourceRecordUrl: text("sourceRecordUrl"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  observationUnique: uniqueIndex("outcome_observations_source_external_role_hash_unique").on(table.sourceId, table.externalObservationId, table.role, table.payloadHash),
+  bindingIdx: index("outcome_observations_binding_idx").on(table.bindingId),
+  projectIdx: index("outcome_observations_project_idx").on(table.projectId),
+}));
+
 export const outcomeMeasurements = mysqlTable("outcome_measurements", {
   id: serial("id").primaryKey(),
   projectId: varchar("projectId", { length: 64 }).notNull(),
@@ -328,11 +401,37 @@ export const outcomeMeasurements = mysqlTable("outcome_measurements", {
   recordedByUserId: bigint("recordedByUserId", { mode: "number", unsigned: true }).notNull(),
   recordedByName: varchar("recordedByName", { length: 255 }).notNull(),
   recordedByRole: varchar("recordedByRole", { length: 24 }).notNull(),
+  origin: mysqlEnum("origin", ["manual", "automatic", "legacy"]).default("legacy").notNull(),
+  bindingId: bigint("bindingId", { mode: "number", unsigned: true }),
+  baselineObservationId: bigint("baselineObservationId", { mode: "number", unsigned: true }),
+  targetObservationId: bigint("targetObservationId", { mode: "number", unsigned: true }),
+  actualObservationId: bigint("actualObservationId", { mode: "number", unsigned: true }),
+  baselineObservedAt: timestamp("baselineObservedAt"),
+  actualObservedAt: timestamp("actualObservedAt"),
+  direction: mysqlEnum("direction", ["decrease_is_better", "increase_is_better"]),
+  currencyCode: varchar("currencyCode", { length: 3 }),
+  dataClass: mysqlEnum("dataClass", ["real", "synthetic", "unknown"]).default("unknown").notNull(),
+  comparabilityStatus: mysqlEnum("comparabilityStatus", ["comparable", "incomparable", "unknown"]).default("unknown").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => ({
   taskMetricVersionUnique: uniqueIndex("outcome_measurements_task_metric_version_unique").on(table.taskId, table.metric, table.version),
   decisionIdx: index("outcome_measurements_decision_idx").on(table.decisionId),
   projectIdx: index("outcome_measurements_project_idx").on(table.projectId),
+  bindingIdx: index("outcome_measurements_binding_idx").on(table.bindingId),
+}));
+
+export const learningContextUsages = mysqlTable("learning_context_usages", {
+  id: serial("id").primaryKey(),
+  projectId: varchar("projectId", { length: 64 }).notNull(),
+  proposalId: varchar("proposalId", { length: 64 }).notNull(),
+  proposalVersion: int("proposalVersion", { unsigned: true }).notNull(),
+  contextHash: varchar("contextHash", { length: 64 }).notNull(),
+  modelId: varchar("modelId", { length: 255 }).notNull(),
+  measurementRefs: json("measurementRefs").$type<{ measurementId: number; measurementVersion: number }[]>().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  proposalContextUnique: uniqueIndex("learning_usage_proposal_version_hash_unique").on(table.proposalId, table.proposalVersion, table.contextHash),
+  projectIdx: index("learning_context_usages_project_idx").on(table.projectId),
 }));
 
 export const auditEvents = mysqlTable("audit_events", {

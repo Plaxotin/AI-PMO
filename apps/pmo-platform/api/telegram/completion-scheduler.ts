@@ -24,6 +24,7 @@ import { telegramSourceLink } from "../queries/proposal-audit";
 import { runSlaChecks } from "./escalation-scheduler";
 import { runFirstValueChecks } from "./first-value";
 import { assessTaskOutcome } from "../queries/outcome";
+import { runOutcomeKpiCollection } from "../queries/outcome-kpi";
 
 function projectTimeZone() {
   return process.env.PROJECT_TIME_ZONE || DEFAULT_PROJECT_TIME_ZONE;
@@ -125,7 +126,14 @@ export async function runCompletionSchedulerTick(now = new Date()) {
     const completion = await runDueCompletionChecks(now);
     const sla = await runSlaChecks(now);
     const firstValue = await runFirstValueChecks(now);
-    return { ...completion, sla, firstValue };
+    let outcomeKpi: Awaited<ReturnType<typeof runOutcomeKpiCollection>> | { failed: true };
+    try {
+      outcomeKpi = await runOutcomeKpiCollection(now);
+    } catch (error) {
+      log.error("Outcome KPI scheduler failed", { error: error instanceof Error ? error.message : String(error) });
+      outcomeKpi = { failed: true };
+    }
+    return { ...completion, sla, firstValue, outcomeKpi };
   } finally {
     schedulerTickRunning = false;
   }

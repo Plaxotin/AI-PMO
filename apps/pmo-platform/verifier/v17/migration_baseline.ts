@@ -11,6 +11,10 @@ const migrations = [
 
 const db = getDb();
 try {
+  await db.execute(sql.raw("DROP TABLE IF EXISTS learning_context_usages"));
+  await db.execute(sql.raw("DROP TABLE IF EXISTS outcome_observations"));
+  await db.execute(sql.raw("DROP TABLE IF EXISTS outcome_metric_bindings"));
+  await db.execute(sql.raw("DROP TABLE IF EXISTS outcome_sources"));
   await db.execute(sql.raw("DROP TABLE IF EXISTS outcome_measurements"));
   await db.execute(sql.raw("DROP TABLE IF EXISTS project_counters"));
   await db.execute(sql.raw("DROP TABLE IF EXISTS telegram_pending_edits"));
@@ -25,7 +29,7 @@ try {
     const hash = createHash("sha256").update(payload).digest("hex");
     await db.execute(sql`INSERT INTO __drizzle_migrations (hash, created_at) VALUES (${hash}, ${createdAt})`);
   }
-  console.log(JSON.stringify({ baseline: migrations.map(([tag]) => tag), targets: ["0003_bl42_sla_notifications", "0004_bl35_project_roles", "0005_bl54_first_value", "0006_bl41_telegram_edits", "0007_short_task_ids", "0008_short_decision_ids", "0009_bl48_outcome_measurements"] }));
+  console.log(JSON.stringify({ baseline: migrations.map(([tag]) => tag), targets: ["0003_bl42_sla_notifications", "0004_bl35_project_roles", "0005_bl54_first_value", "0006_bl41_telegram_edits", "0007_short_task_ids", "0008_short_decision_ids", "0009_bl48_outcome_measurements", "0010_bl48_kpi_learning_loop"] }));
 } finally {
   if (typeof db.$client?.end === "function") await db.$client.end();
 }

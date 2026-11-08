@@ -19,14 +19,18 @@
     "firstAssessment": {
       "expectedEffect": "Сократить срок на 2 дня",
       "status": "confirmed",
+      "targetStatus": "met",
+      "actualEffectValue": "2",
       "text": "Изменение срока: −2 дн. (baseline 10 → actual 8 days)",
-      "basis": "schedule_days · baseline 10 → actual 8 days · цель 8 · Synthetic project schedule measurement · sourceId BL48-SYNTHETIC-001 · версия 1"
+      "basis": "schedule_days · decrease_is_better · baseline 10 → actual 8 days · цель 8 · Synthetic project schedule measurement · sourceId BL48-SYNTHETIC-001 · версия 1"
     },
     "correctedAssessment": {
       "expectedEffect": "Сократить срок на 2 дня",
       "status": "confirmed",
+      "targetStatus": "met",
+      "actualEffectValue": "3",
       "text": "Изменение срока: −3 дн. (baseline 10 → actual 7 days)",
-      "basis": "schedule_days · baseline 10 → actual 7 days · цель 8 · Synthetic project schedule measurement · sourceId BL48-SYNTHETIC-001 · версия 2"
+      "basis": "schedule_days · decrease_is_better · baseline 10 → actual 7 days · цель 8 · Synthetic project schedule measurement · sourceId BL48-SYNTHETIC-001 · версия 2"
     },
     "versions": [
       {

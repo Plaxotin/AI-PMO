@@ -1,6 +1,6 @@
 # BL-48 · Project Impact / Outcome Loop
 
-**Статус:** v1.1-draft — подготовлено 09.11.2026. Первый срез v1.0 принят; следующий срез требует подтверждения владельца до изменения продуктового кода.  
+**Статус:** v1.1-draft — изолированная реализация проверена 09.11.2026; реальный источник, production и приёмка владельцем не закрыты.  
 **Основания:** Product Contract v1 (результат ≠ эффект), SPEC-P0 v1.0 §§1, 4, 8, 11.  
 **Граница:** один проект. BL-48 не заменяет P0 и не объявляет эффект по факту выполнения поручения без фактических данных.
 
@@ -238,25 +238,25 @@ Baseline и actual должны иметь одинаковые metric, unit, cu
 
 Все проверки выполняются на отдельной тестовой БД, synthetic Source и mock AI/Telegram:
 
-- [ ] Нет Source/Binding — автоматический сбор не выполняется и эффект остаётся `unconfirmed`.
-- [ ] Read-only адаптер не содержит вызовов записи во внешний источник.
-- [ ] Валидное real baseline/target/actual создаёт одно подтверждённое измерение с корректной формулой.
-- [ ] Четыре стандартные метрики и обе direction-проверки вычисляются корректно.
-- [ ] `met`, `not_met`, `not_set` не смешиваются с достоверностью `confirmed`.
-- [ ] Несовпадение unit/currency/scope/project/Task ↔ Decision запрещает подтверждение.
-- [ ] Actual раньше `task.completedAt` и некорректный baseline не подтверждаются.
-- [ ] Synthetic/unknown/rejected/superseded исключены из Learning Context.
-- [ ] Повтор observation не дублирует Observation, Measurement, audit, L3 или learning usage.
-- [ ] Изменение observation создаёт новую версию и сохраняет исходную.
-- [ ] Overlap/restart не создаёт параллельный сбор и дубли.
-- [ ] Ошибка источника видна, sanitized и не останавливает остальные Binding/scheduler.
-- [ ] Без primary Binding разные метрики не выбираются произвольно для одного L3.
-- [ ] PMO/аудитор/C-level/member/anonymous/чужой проект не могут менять Source/Binding/Measurement.
-- [ ] Learning Context содержит только допустимые версии и ссылки на источник.
-- [ ] AI не получает synthetic/unknown данные и не может заявить причинность по инструкции контракта.
-- [ ] `learning.context.used` восстанавливается после restart и не дублируется.
-- [ ] Прежние P0/BL-54/BL-41/BL-42/BL-35 regressions, unit, typecheck и build проходят.
-- [ ] Production `.env`, webhook/gateway, рабочие чаты и canonical PNG не изменяются.
+- [x] Нет Source/Binding — автоматический сбор не выполняется и эффект остаётся `unconfirmed`.
+- [x] Read-only адаптер не содержит вызовов записи во внешний источник.
+- [x] Валидное real baseline/target/actual создаёт одно подтверждённое измерение с корректной формулой.
+- [x] Четыре стандартные метрики и обе direction-проверки вычисляются корректно.
+- [x] `met`, `not_met`, `not_set` не смешиваются с достоверностью `confirmed`.
+- [x] Несовпадение unit/currency/scope/project/Task ↔ Decision запрещает подтверждение.
+- [x] Actual раньше `task.completedAt` и некорректный baseline не подтверждаются.
+- [x] Synthetic/unknown/rejected/superseded исключены из Learning Context.
+- [x] Повтор observation не дублирует Observation, Measurement, audit, L3 или learning usage.
+- [x] Изменение observation создаёт новую версию и сохраняет исходную.
+- [x] Overlap/restart не создаёт параллельный сбор и дубли.
+- [x] Ошибка источника видна, sanitized и не останавливает остальные Binding/scheduler.
+- [x] Без primary Binding разные метрики не выбираются произвольно для одного L3.
+- [x] PMO/аудитор/C-level/member/anonymous/чужой проект не могут менять Source/Binding/Measurement.
+- [x] Learning Context содержит только допустимые версии и ссылки на источник.
+- [x] AI не получает synthetic/unknown данные и не может заявить причинность по инструкции контракта.
+- [x] `learning.context.used` восстанавливается после restart и не дублируется.
+- [x] Прежние P0/BL-54/BL-41/BL-42/BL-35 regressions, unit, typecheck и build проходят.
+- [x] Production `.env`, webhook/gateway, рабочие чаты и canonical PNG не изменяются.
 
 ## 13. Реальная приёмка
 

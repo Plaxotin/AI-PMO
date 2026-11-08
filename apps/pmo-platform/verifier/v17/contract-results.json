@@ -38,7 +38,6 @@
     "answerCallbackQuery",
     "sendMessage",
     "editMessageText",
-    "sendMessage",
     "answerCallbackQuery",
     "sendMessage",
     "getMe",
@@ -70,10 +69,10 @@
     "status": "done",
     "source": "решение R-01 · Пиэмка от имени РП",
     "result": "Выполнение подтверждено РП РП.",
-    "completedAt": "2026-11-08T20:32:25.000Z",
+    "completedAt": "2026-11-08T22:17:44.000Z",
     "completedByName": "РП",
-    "createdAt": "2026-11-08T23:32:02.000Z",
-    "updatedAt": "2026-11-08T20:32:25.000Z"
+    "createdAt": "2026-11-09T01:17:27.000Z",
+    "updatedAt": "2026-11-08T22:17:44.000Z"
   },
   "all_checks_passed": true
 }

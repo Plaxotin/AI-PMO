@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { log } from "../lib/logger";
-import { analyzeProjectSignal } from "../ai/risk";
+import { analyzeProjectSignalDetailed } from "../ai/risk";
+import { buildLearningContext, recordLearningContextUsage } from "../queries/learning-context";
 import { getTelegramConfig, telegramCredentialDiagnostics, telegramRole } from "../telegram/config";
 import { getTelegramChatMigration } from "../telegram/migration";
 import { answerTelegramCallback, editTelegramMessage, sendTelegramMessage, type TelegramButton } from "../telegram/client";
@@ -120,9 +121,10 @@ async function handleMessage(message: TelegramMessage, updateId: number, channel
 
   const { signal, created } = await createTelegramSignal({ updateId, channelId, chatId, messageId: message.message_id, authorId: String(user.id), authorName: person(user), authorRole: role, text });
   if (!created) return "processed" as const;
-  let analysis: Awaited<ReturnType<typeof analyzeProjectSignal>>;
+  const learningContext = await buildLearningContext();
+  let analysisResult: Awaited<ReturnType<typeof analyzeProjectSignalDetailed>>;
   try {
-    analysis = await analyzeProjectSignal(text, person(user));
+    analysisResult = await analyzeProjectSignalDetailed(text, person(user), learningContext);
   } catch (error) {
     const messageText = error instanceof Error ? error.message : String(error);
     await markTelegramSignal(signal.id, "error", messageText);
@@ -130,11 +132,13 @@ async function handleMessage(message: TelegramMessage, updateId: number, channel
     await notifyRp(`Сигнал ${signal.id} сохранён, но AI-анализ сейчас недоступен. Риск и предложение не созданы. Повторите отправку позже или проверьте сигнал в веб-реестре.`);
     return "error" as const;
   }
+  const { analysis, modelId } = analysisResult;
   if (!analysis.isRisk || analysis.confidence < 0.6) {
     await markTelegramSignal(signal.id, "ignored");
     return "ignored" as const;
   }
   const ids = await createRiskProposal(signal.id, updateId, analysis);
+  await recordLearningContextUsage({ proposalId: ids.decisionId, proposalVersion: 1, modelId, context: learningContext });
   const bundle = await getRiskProposal(ids.decisionId);
   if (!bundle) throw new Error("Не удалось прочитать созданное предложение");
   await notifyRp(proposalText(bundle), proposalButtons(ids.decisionId, ids.riskId));

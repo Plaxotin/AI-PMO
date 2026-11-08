@@ -2469,7 +2469,7 @@ const AI_PROPOSALS = {
   ],
   'PRJ-02': []
 };
-let SERVER_EVENTS=[],SERVER_SIGNALS=[],SERVER_PROPOSAL_VERSIONS=[],SERVER_USER=null,SERVER_OVERVIEW=null,SERVER_READY=false,SERVER_ERROR='',SERVER_DATA_AT=null;
+let SERVER_EVENTS=[],SERVER_SIGNALS=[],SERVER_PROPOSAL_VERSIONS=[],SERVER_OUTCOME_MEASUREMENTS=[],SERVER_OUTCOME_SOURCES=[],SERVER_OUTCOME_BINDINGS=[],SERVER_OUTCOME_OBSERVATIONS=[],SERVER_LEARNING_USAGES=[],SERVER_USER=null,SERVER_OVERVIEW=null,SERVER_READY=false,SERVER_ERROR='',SERVER_DATA_AT=null;
 function persistDemoState(){/* P0: связанные решения и поручения сохраняются только на сервере */}
 async function pmoApi(path,input,method,namespace){
   let url='/api/trpc/'+(namespace||'pmo')+'.'+path;
@@ -2499,6 +2499,7 @@ function applyServerState(state){
   DECISIONS['PRJ-01'].splice(0,DECISIONS['PRJ-01'].length,...state.decisions);
   RISKS['PRJ-01'].splice(0,RISKS['PRJ-01'].length,...state.risks);
   SERVER_EVENTS=state.events||[];SERVER_SIGNALS=state.signals||[];SERVER_PROPOSAL_VERSIONS=state.proposalVersions||[];SERVER_OVERVIEW=state.overview||null;
+  SERVER_OUTCOME_MEASUREMENTS=state.outcomeMeasurements||[];SERVER_OUTCOME_SOURCES=state.outcomeSources||[];SERVER_OUTCOME_BINDINGS=state.outcomeBindings||[];SERVER_OUTCOME_OBSERVATIONS=state.outcomeObservations||[];SERVER_LEARNING_USAGES=state.learningContextUsages||[];
   SERVER_USER=state.user;USER_ROLE=state.role;SERVER_READY=true;SERVER_ERROR='';SERVER_DATA_AT=new Date();
   document.body.dataset.projectRole=state.role;
   const accountName=document.querySelector('.acct-name');if(accountName)accountName.textContent=state.user.name;
@@ -2798,16 +2799,31 @@ function loadTasksLive(manual){
     .then(apply)
     .catch(jsonp);
 }
+function outcomeAssessmentHTML(task){
+  if(!SERVER_READY)return '';
+  const a=task.effectAssessment;
+  const rows=SERVER_OUTCOME_MEASUREMENTS.filter(m=>m.taskId===task.id).sort((x,y)=>y.version-x.version);
+  const m=rows.find(x=>x.id===a?.measurementId)||rows[0];
+  if(!a&&!m)return '';
+  const origin={manual:'ручное измерение РП',automatic:'автоматический сбор',legacy:'legacy'}[m?.origin]||'не указано';
+  const dataClass={real:'real',synthetic:'synthetic',unknown:'unknown'}[m?.dataClass]||'unknown';
+  const comparability={comparable:'сопоставимо',incomparable:'несопоставимо',unknown:'сопоставимость не подтверждена'}[m?.comparabilityStatus]||'не подтверждена';
+  const target={met:'цель достигнута',not_met:'цель не достигнута',not_set:'цель не задана'}[a?.targetStatus]||'цель не задана';
+  const assessment=a?`<b>Оценка эффекта:</b> ${escAudit(a.text)}<div style="margin-top:3px">${escAudit(target)} · ${escAudit(a.basis)}</div>`:'<b>Оценка эффекта:</b> данных пока недостаточно';
+  const measurement=m?`<div style="margin-top:4px">Измерение v${escAudit(m.version)} · ${escAudit(origin)} · ${escAudit(dataClass)} · ${escAudit(comparability)}<br>Источник: ${escAudit(m.source)} · ${escAudit(m.sourceId)}${m.actualObservedAt?' · actual '+new Date(m.actualObservedAt).toLocaleString('ru-RU'):''}</div>`:'';
+  return `<div style="margin-top:7px;padding:8px 10px;background:var(--cream);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;font-size:11px;line-height:1.5">${assessment}${measurement}</div>`;
+}
 function renderTasksView(t){
   if(!SERVER_READY&&!tasksSync.tried&&!tasksLoading)loadTasksLive(false);
   const list = TASKS[t.proj] || [];
   const over = list.filter(x=>x.st==='over').length;
   const rows = list.map(x=>{
     const result=x.result?`<div style="margin-top:7px;padding-top:7px;border-top:1px solid var(--hair);color:var(--ink-soft)"><b>Результат:</b> ${escAudit(x.result)}<div style="margin-top:3px;font-size:10px;color:var(--ink-faint)">${escAudit(x.completedByName||'участник')} · ${x.completedAt?new Date(x.completedAt).toLocaleString('ru-RU'):'время не указано'}</div></div>`:'';
+    const outcome=outcomeAssessmentHTML(x);
     const decision=x.decisionId?chainNavButton('decision',x.decisionId):'';
     const signal=x.sourceLink?`<div style="margin-top:4px">${sourceLinkHTML(x.sourceLink,x.signalId)}</div>`:'';
     const source=decision||signal?`${decision}${signal}`:escAudit(x.src||(SERVER_READY?'источник не указан':'Google Sheets'));
-    return `<tr${FLASH_TASK===x.id?' class="tr-flash"':''}><td style="white-space:nowrap;font-family:var(--mono);font-size:10px;color:var(--accent)">${escAudit(x.id||'—')}</td><td>${escAudit(x.t)}${result}</td><td style="white-space:nowrap">${escAudit(x.who)}</td><td style="white-space:nowrap">${escAudit(x.due)}</td><td style="color:var(--ink-faint)">${source}</td><td><span class="tk-st ${escAudit(x.st)}">${TASK_ST[x.st]||escAudit(x.st)}</span></td></tr>`;
+    return `<tr${FLASH_TASK===x.id?' class="tr-flash"':''}><td style="white-space:nowrap;font-family:var(--mono);font-size:10px;color:var(--accent)">${escAudit(x.id||'—')}</td><td>${escAudit(x.t)}${result}${outcome}</td><td style="white-space:nowrap">${escAudit(x.who)}</td><td style="white-space:nowrap">${escAudit(x.due)}</td><td style="color:var(--ink-faint)">${source}</td><td><span class="tk-st ${escAudit(x.st)}">${TASK_ST[x.st]||escAudit(x.st)}</span></td></tr>`;
   }).join('');
   FLASH_TASK = null;
   const pendTasks = pendRowsHTML('tasks',t.proj,6);

@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { auditEvents, decisions, outcomeMeasurements, projectCounters, projects, proposalVersions, risks, signals, tasks, type User } from "@db/schema";
+import { auditEvents, decisions, learningContextUsages, outcomeMeasurements, outcomeMetricBindings, outcomeObservations, outcomeSources, projectCounters, projects, proposalVersions, risks, signals, tasks, type User } from "@db/schema";
 import { assessTaskOutcome } from "./outcome";
 import { getDb } from "./connection";
 import { buildProposalDiff, telegramSourceLink, type ProposalSnapshot } from "./proposal-audit";
@@ -60,7 +60,7 @@ export async function ensureSeed() {
 
 export async function getProjectState(user: User) {
   const db = getDb();
-  const [role, riskRows, decisionRows, versionRows, taskRows, signalRows, eventRows, outcomeRows] = await Promise.all([
+  const [role, riskRows, decisionRows, versionRows, taskRows, signalRows, eventRows, outcomeRows, sourceRows, bindingRows, observationRows, learningRows] = await Promise.all([
     resolveProjectRole(user),
     db.select().from(risks).where(eq(risks.projectId, DEMO_PROJECT_ID)).orderBy(asc(risks.id)),
     db.select().from(decisions).where(eq(decisions.projectId, DEMO_PROJECT_ID)).orderBy(asc(decisions.id)),
@@ -69,6 +69,10 @@ export async function getProjectState(user: User) {
     db.select().from(signals).where(eq(signals.projectId, DEMO_PROJECT_ID)).orderBy(desc(signals.createdAt), desc(signals.id)).limit(100),
     db.select().from(auditEvents).where(eq(auditEvents.projectId, DEMO_PROJECT_ID)).orderBy(desc(auditEvents.id)).limit(40),
     db.select().from(outcomeMeasurements).where(eq(outcomeMeasurements.projectId, DEMO_PROJECT_ID)).orderBy(desc(outcomeMeasurements.createdAt), desc(outcomeMeasurements.id)).limit(100),
+    db.select().from(outcomeSources).where(eq(outcomeSources.projectId, DEMO_PROJECT_ID)).orderBy(asc(outcomeSources.id)),
+    db.select().from(outcomeMetricBindings).where(eq(outcomeMetricBindings.projectId, DEMO_PROJECT_ID)).orderBy(desc(outcomeMetricBindings.createdAt), desc(outcomeMetricBindings.id)).limit(100),
+    db.select().from(outcomeObservations).where(eq(outcomeObservations.projectId, DEMO_PROJECT_ID)).orderBy(desc(outcomeObservations.createdAt), desc(outcomeObservations.id)).limit(100),
+    db.select().from(learningContextUsages).where(eq(learningContextUsages.projectId, DEMO_PROJECT_ID)).orderBy(desc(learningContextUsages.createdAt), desc(learningContextUsages.id)).limit(100),
   ]);
   const outcomeAssessments = new Map(await Promise.all(taskRows.map(async (task) => [task.id, await assessTaskOutcome(task.id)] as const)));
   const chain = buildProjectChain(signalRows, riskRows, decisionRows, taskRows);
@@ -88,7 +92,11 @@ export async function getProjectState(user: User) {
     decisions: decisionRows.map((x) => ({ id: x.id, t: x.title, why: x.rationale, effect: x.effect, st: x.status, date: x.displayDate, risk: x.riskId || "—", attribution: x.attribution || undefined, proposalVersion: x.proposalVersion, signalId: chain.decisionSources.get(x.id)?.signalId, sourceLink: chain.decisionSources.get(x.id)?.sourceLink })),
     proposalVersions: versionRows.map((x) => ({ id: x.id, proposalId: x.proposalId, version: x.version, title: x.title, rationale: x.rationale, effect: x.effect, owner: x.owner, due: x.due, sourceVersionId: x.sourceVersionId, actorName: x.actorName, actorRole: x.actorRole, attribution: x.attribution, editDistance: x.editDistance, diff: x.diff, createdAt: x.createdAt })),
     tasks: taskRows.map((x) => ({ id: x.id, t: x.title, who: x.owner, due: x.due, st: x.status, decisionId: x.decisionId || undefined, riskId: x.riskId || undefined, src: x.source || undefined, result: x.result || undefined, completedByName: x.completedByName || undefined, completedAt: x.completedAt || undefined, signalId: chain.taskSources.get(x.id)?.signalId, sourceLink: chain.taskSources.get(x.id)?.sourceLink, effectAssessment: outcomeAssessments.get(x.id) || undefined })),
-    outcomeMeasurements: outcomeRows.map((x) => ({ id: x.id, taskId: x.taskId, decisionId: x.decisionId, metric: x.metric, unit: x.unit, baselineValue: x.baselineValue, targetValue: x.targetValue, actualValue: x.actualValue, source: x.source, sourceId: x.sourceId, sourceUrl: x.sourceUrl, status: x.status, version: x.version, previousVersionId: x.previousVersionId, recordedByName: x.recordedByName, recordedByRole: x.recordedByRole, createdAt: x.createdAt })),
+    outcomeMeasurements: outcomeRows.map((x) => ({ id: x.id, taskId: x.taskId, decisionId: x.decisionId, metric: x.metric, unit: x.unit, baselineValue: x.baselineValue, targetValue: x.targetValue, actualValue: x.actualValue, source: x.source, sourceId: x.sourceId, sourceUrl: x.sourceUrl, status: x.status, version: x.version, previousVersionId: x.previousVersionId, recordedByName: x.recordedByName, recordedByRole: x.recordedByRole, origin: x.origin, bindingId: x.bindingId, baselineObservationId: x.baselineObservationId, targetObservationId: x.targetObservationId, actualObservationId: x.actualObservationId, baselineObservedAt: x.baselineObservedAt, actualObservedAt: x.actualObservedAt, direction: x.direction, currencyCode: x.currencyCode, dataClass: x.dataClass, comparabilityStatus: x.comparabilityStatus, createdAt: x.createdAt })),
+    outcomeSources: sourceRows.map((x) => ({ id: x.id, type: x.type, name: x.name, connectionRef: x.connectionRef, readOnly: x.readOnly, config: x.config, status: x.status, lastAttemptAt: x.lastAttemptAt, lastSuccessAt: x.lastSuccessAt, lastErrorCode: x.lastErrorCode })),
+    outcomeBindings: bindingRows.map((x) => ({ id: x.id, key: x.key, sourceId: x.sourceId, decisionId: x.decisionId, taskId: x.taskId, metric: x.metric, unit: x.unit, direction: x.direction, currencyCode: x.currencyCode, externalKey: x.externalKey, selectorConfig: x.selectorConfig, isPrimary: x.isPrimary, status: x.status, version: x.version, approvedByName: x.approvedByName, approvedAt: x.approvedAt, collectingAt: x.collectingAt, lastAttemptAt: x.lastAttemptAt })),
+    outcomeObservations: observationRows.map((x) => ({ id: x.id, sourceId: x.sourceId, bindingId: x.bindingId, externalObservationId: x.externalObservationId, payloadHash: x.payloadHash, role: x.role, value: x.value, unit: x.unit, currencyCode: x.currencyCode, observedAt: x.observedAt, collectedAt: x.collectedAt, dataClass: x.dataClass, validationStatus: x.validationStatus, validationErrors: x.validationErrors, sourceRecordUrl: x.sourceRecordUrl })),
+    learningContextUsages: learningRows.map((x) => ({ id: x.id, proposalId: x.proposalId, proposalVersion: x.proposalVersion, contextHash: x.contextHash, modelId: x.modelId, measurementRefs: x.measurementRefs, createdAt: x.createdAt })),
     events: eventRows.map((x) => ({ id: x.id, entityType: x.entityType, entityId: x.entityId, eventType: x.eventType, relatedId: x.relatedId, actorName: x.actorName, actorRole: x.actorRole, attribution: x.attribution, channel: x.channel, version: x.version, sourceLinks: x.sourceLinks, diff: x.diff, metadata: x.metadata, detail: x.detail, createdAt: x.createdAt })),
   };
 }
