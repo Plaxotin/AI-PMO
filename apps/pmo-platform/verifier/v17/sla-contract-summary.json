@@ -1,0 +1,34 @@
+{
+  "date": "2026-11-07",
+  "scope": "BL-42 SLA on isolated MySQL with synthetic fixtures and mock Telegram fetch; no production migration and no real Telegram sends",
+  "migration0003CleanApply": true,
+  "existingContractChecks": {
+    "passed": 18,
+    "total": 18,
+    "evidence": "contract-results.json"
+  },
+  "existingRestartReplayChecks": {
+    "passed": 6,
+    "total": 6,
+    "evidence": "restart-replay-results.json"
+  },
+  "slaChecks": {
+    "passed": 24,
+    "total": 24,
+    "scenarios": {
+      "decision-first": 6,
+      "decision-restart": 4,
+      "decision-late": 1,
+      "task-first": 7,
+      "owner-mapping": 3,
+      "delivery-errors": 2,
+      "schema": 1
+    }
+  },
+  "allChecksPassed": true,
+  "productionActivation": {
+    "performed": false,
+    "reason": "Existing pending decisions older than 24 hours and one overdue open task would trigger real notifications",
+    "stagedEvidence": "staged-release-evidence.json"
+  }
+}

@@ -1,25 +1,53 @@
 import { getTelegramConfig } from "./config";
 
 export type TelegramButton = { text: string; callback_data: string };
+export type TelegramDeliveryOutcome = "failed" | "unknown";
+
+export class TelegramDeliveryError extends Error {
+  readonly outcome: TelegramDeliveryOutcome;
+
+  constructor(message: string, outcome: TelegramDeliveryOutcome) {
+    super(message);
+    this.name = "TelegramDeliveryError";
+    this.outcome = outcome;
+  }
+}
+
+export function telegramDeliveryOutcome(error: unknown): TelegramDeliveryOutcome {
+  return error instanceof TelegramDeliveryError ? error.outcome : "unknown";
+}
 
 async function call<T>(method: string, payload: Record<string, unknown>): Promise<T> {
   const config = getTelegramConfig();
-  if (!config.token) throw new Error("Telegram-бот не настроен");
+  if (!config.token) throw new TelegramDeliveryError("Telegram-бот не настроен", "failed");
   const useGateway = Boolean(config.gatewaySecret);
   const url = useGateway
     ? `${config.apiBaseUrl}/v1/telegram/${method}`
     : `${config.apiBaseUrl}/bot${config.token}/${method}`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(useGateway ? { "x-gateway-key": config.gatewaySecret } : {}),
-    },
-    body: JSON.stringify(useGateway ? { ...payload, token: config.token } : payload),
-    signal: AbortSignal.timeout(15_000),
-  });
-  const body = await response.json() as { ok?: boolean; result?: T; description?: string };
-  if (!response.ok || !body.ok) throw new Error(body.description || `Telegram API ${method}: HTTP ${response.status}`);
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(useGateway ? { "x-gateway-key": config.gatewaySecret } : {}),
+      },
+      body: JSON.stringify(useGateway ? { ...payload, token: config.token } : payload),
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (error) {
+    throw new TelegramDeliveryError(error instanceof Error ? error.message : String(error), "unknown");
+  }
+  let body: { ok?: boolean; result?: T; description?: string };
+  try {
+    body = await response.json() as { ok?: boolean; result?: T; description?: string };
+  } catch {
+    throw new TelegramDeliveryError(`Telegram API ${method}: нечитаемый ответ HTTP ${response.status}`, "unknown");
+  }
+  if (!response.ok || !body.ok) {
+    const outcome = response.status >= 400 && response.status < 500 ? "failed" : "unknown";
+    throw new TelegramDeliveryError(body.description || `Telegram API ${method}: HTTP ${response.status}`, outcome);
+  }
   return body.result as T;
 }
 

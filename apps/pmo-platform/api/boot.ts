@@ -11,6 +11,7 @@ import { log } from "./lib/logger";
 import { handleClientLog } from "./lib/clientlog";
 import { REQUEST_ID_HEADER, runWithRequestId } from "./lib/requestcontext";
 import { telegramRoutes } from "./routes/telegram";
+import { contactRoutes } from "./routes/contact";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -79,6 +80,7 @@ app.post(
   handleClientLog,
 );
 app.route("/api/telegram", telegramRoutes);
+app.route("/api/contact", contactRoutes);
 app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));
 
 // Unhandled request errors must reach /tmp/kimi-logs/app.log, not just stdout:
@@ -100,7 +102,9 @@ export default app;
 if (env.isProduction) {
   const { serve } = await import("@hono/node-server");
   const { serveStaticFiles } = await import("./lib/vite");
+  const { startCompletionScheduler } = await import("./telegram/completion-scheduler");
   serveStaticFiles(app);
+  startCompletionScheduler();
 
   const port = parseInt(process.env.PORT || "3000");
   serve({ fetch: app.fetch, port }, () => {

@@ -1,8 +1,12 @@
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { auditEvents, decisions, projects, proposalVersions, risks, signals, tasks, type User } from "@db/schema";
+import { auditEvents, decisions, outcomeMeasurements, projectCounters, projects, proposalVersions, risks, signals, tasks, type User } from "@db/schema";
+import { assessTaskOutcome } from "./outcome";
 import { getDb } from "./connection";
 import { buildProposalDiff, telegramSourceLink, type ProposalSnapshot } from "./proposal-audit";
+import { buildProjectChain } from "./project-chain";
+import { resolveProjectRole } from "./project-access";
+import { buildAuditOverview } from "./audit-overview";
 
 export const DEMO_PROJECT_ID = "PRJ-01";
 
@@ -55,35 +59,48 @@ export async function ensureSeed() {
 }
 
 export async function getProjectState(user: User) {
-  await ensureSeed();
   const db = getDb();
-  const [riskRows, decisionRows, versionRows, taskRows, eventRows] = await Promise.all([
+  const [role, riskRows, decisionRows, versionRows, taskRows, signalRows, eventRows, outcomeRows] = await Promise.all([
+    resolveProjectRole(user),
     db.select().from(risks).where(eq(risks.projectId, DEMO_PROJECT_ID)).orderBy(asc(risks.id)),
     db.select().from(decisions).where(eq(decisions.projectId, DEMO_PROJECT_ID)).orderBy(asc(decisions.id)),
     db.select().from(proposalVersions).where(eq(proposalVersions.projectId, DEMO_PROJECT_ID)).orderBy(desc(proposalVersions.proposalId), desc(proposalVersions.version)).limit(100),
     db.select().from(tasks).where(eq(tasks.projectId, DEMO_PROJECT_ID)).orderBy(desc(tasks.createdAt), desc(tasks.id)),
+    db.select().from(signals).where(eq(signals.projectId, DEMO_PROJECT_ID)).orderBy(desc(signals.createdAt), desc(signals.id)).limit(100),
     db.select().from(auditEvents).where(eq(auditEvents.projectId, DEMO_PROJECT_ID)).orderBy(desc(auditEvents.id)).limit(40),
+    db.select().from(outcomeMeasurements).where(eq(outcomeMeasurements.projectId, DEMO_PROJECT_ID)).orderBy(desc(outcomeMeasurements.createdAt), desc(outcomeMeasurements.id)).limit(100),
   ]);
+  const outcomeAssessments = new Map(await Promise.all(taskRows.map(async (task) => [task.id, await assessTaskOutcome(task.id)] as const)));
+  const chain = buildProjectChain(signalRows, riskRows, decisionRows, taskRows);
+  const overview = buildAuditOverview(
+    { signals: signalRows, risks: riskRows, decisions: decisionRows, tasks: taskRows, events: eventRows },
+    chain,
+  );
   return {
     projectId: DEMO_PROJECT_ID,
     server: true,
-    role: user.role === "admin" ? "rp" as const : "member" as const,
+    role,
+    readOnly: role !== "rp",
     user: { id: user.id, name: user.name || "Пользователь", platformRole: user.role },
-    risks: riskRows.map((x) => ({ id: x.id, t: x.title, type: x.recordType, ch: x.channel || undefined, impact: x.impact, prob: x.probability, confidence: x.confidence ?? undefined, measure: x.measure, src: x.source })),
-    decisions: decisionRows.map((x) => ({ id: x.id, t: x.title, why: x.rationale, effect: x.effect, st: x.status, date: x.displayDate, risk: x.riskId || "—", attribution: x.attribution || undefined, proposalVersion: x.proposalVersion })),
+    overview,
+    signals: chain.signals,
+    risks: riskRows.map((x) => ({ id: x.id, t: x.title, type: x.recordType, ch: x.channel || undefined, impact: x.impact, prob: x.probability, confidence: x.confidence ?? undefined, measure: x.measure, src: x.source, signalId: chain.riskSources.get(x.id)?.signalId, sourceLink: chain.riskSources.get(x.id)?.sourceLink })),
+    decisions: decisionRows.map((x) => ({ id: x.id, t: x.title, why: x.rationale, effect: x.effect, st: x.status, date: x.displayDate, risk: x.riskId || "—", attribution: x.attribution || undefined, proposalVersion: x.proposalVersion, signalId: chain.decisionSources.get(x.id)?.signalId, sourceLink: chain.decisionSources.get(x.id)?.sourceLink })),
     proposalVersions: versionRows.map((x) => ({ id: x.id, proposalId: x.proposalId, version: x.version, title: x.title, rationale: x.rationale, effect: x.effect, owner: x.owner, due: x.due, sourceVersionId: x.sourceVersionId, actorName: x.actorName, actorRole: x.actorRole, attribution: x.attribution, editDistance: x.editDistance, diff: x.diff, createdAt: x.createdAt })),
-    tasks: taskRows.map((x) => ({ id: x.id, t: x.title, who: x.owner, due: x.due, st: x.status, decisionId: x.decisionId || undefined, riskId: x.riskId || undefined, src: x.source || undefined, result: x.result || undefined, completedByName: x.completedByName || undefined, completedAt: x.completedAt || undefined })),
-    events: eventRows.map((x) => ({ id: x.id, entityType: x.entityType, entityId: x.entityId, eventType: x.eventType, relatedId: x.relatedId, actorName: x.actorName, actorRole: x.actorRole, attribution: x.attribution, channel: x.channel, version: x.version, sourceLinks: x.sourceLinks, diff: x.diff, metadata: x.metadata, detail: x.detail, createdAt: x.createdAt })), 
+    tasks: taskRows.map((x) => ({ id: x.id, t: x.title, who: x.owner, due: x.due, st: x.status, decisionId: x.decisionId || undefined, riskId: x.riskId || undefined, src: x.source || undefined, result: x.result || undefined, completedByName: x.completedByName || undefined, completedAt: x.completedAt || undefined, signalId: chain.taskSources.get(x.id)?.signalId, sourceLink: chain.taskSources.get(x.id)?.sourceLink, effectAssessment: outcomeAssessments.get(x.id) || undefined })),
+    outcomeMeasurements: outcomeRows.map((x) => ({ id: x.id, taskId: x.taskId, decisionId: x.decisionId, metric: x.metric, unit: x.unit, baselineValue: x.baselineValue, targetValue: x.targetValue, actualValue: x.actualValue, source: x.source, sourceId: x.sourceId, sourceUrl: x.sourceUrl, status: x.status, version: x.version, previousVersionId: x.previousVersionId, recordedByName: x.recordedByName, recordedByRole: x.recordedByRole, createdAt: x.createdAt })),
+    events: eventRows.map((x) => ({ id: x.id, entityType: x.entityType, entityId: x.entityId, eventType: x.eventType, relatedId: x.relatedId, actorName: x.actorName, actorRole: x.actorRole, attribution: x.attribution, channel: x.channel, version: x.version, sourceLinks: x.sourceLinks, diff: x.diff, metadata: x.metadata, detail: x.detail, createdAt: x.createdAt })),
   };
 }
 
 export type ManagementActor = { userId?: number; name: string; channel?: "telegram" | "web" };
 
 export async function decideProposalRecord(
-  input: { decisionId: string; action: "ok" | "no"; title?: string; owner?: string; due?: string },
+  input: { decisionId: string; action: "ok" | "no"; title?: string; owner?: string; due?: string; expectedVersion?: number },
   actor: ManagementActor,
 ) {
-  await ensureSeed();
+  await getDb().insert(projects).values({ id: DEMO_PROJECT_ID, name: "АСУП · внедрение" })
+    .onDuplicateKeyUpdate({ set: { id: sql`id` } });
   const attribution = `Пиэмка от имени ${actor.name}`;
   const channel = actor.channel || "web";
 
@@ -101,6 +118,9 @@ export async function decideProposalRecord(
         status: decision.status,
         alreadyDecided: true,
       };
+    }
+    if (input.expectedVersion !== undefined && decision.proposalVersion !== input.expectedVersion) {
+      throw new TRPCError({ code: "CONFLICT", message: "Предложение изменилось после формирования предпросмотра" });
     }
 
     const [signal] = decision.riskId
@@ -210,7 +230,16 @@ export async function decideProposalRecord(
     let taskId: string | undefined;
     if (input.action === "ok") {
       const [existingTask] = await tx.select().from(tasks).where(eq(tasks.decisionId, decision.id)).limit(1);
-      taskId = existingTask?.id || `P-${decision.id}`;
+      if (!existingTask) {
+        await tx.insert(projectCounters).values({ projectId: DEMO_PROJECT_ID, counterName: "task", nextValue: 1 })
+          .onDuplicateKeyUpdate({ set: { nextValue: sql`LAST_INSERT_ID(nextValue) + 1` } });
+        const [counter] = await tx.select().from(projectCounters)
+          .where(and(eq(projectCounters.projectId, DEMO_PROJECT_ID), eq(projectCounters.counterName, "task"))).limit(1);
+        if (!counter) throw new Error("Не удалось получить следующий номер поручения");
+        taskId = `P-${String(counter.nextValue).padStart(2, "0")}`;
+      } else {
+        taskId = existingTask.id;
+      }
       if (!existingTask) {
         await tx.insert(tasks).values({
           id: taskId,

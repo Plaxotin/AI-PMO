@@ -1,0 +1,45 @@
+{
+  "scope": "Staged release and additive production migrations only; current release not switched, scheduler not activated, no Telegram sends",
+  "stagedRelease": "/opt/aipmo-platform/releases/p0-bl54-bl41-20261107",
+  "currentRelease": "/opt/aipmo-platform/releases/bl42-completion-feedback-20261107",
+  "archiveSha256": "a3e9579f75afcc1e72a6eb583e6f6de64dc78abb2f44bd438c1d1c99eac11901",
+  "bootSha256": "4d9b22764c96c6688657999bb14a0cdf8cc13e50407660a9f9e4e93ab66f7ca6",
+  "productionEnvSha256": "1b93c5c881f1451f6081c48d5ceefad4e62531f90d585082f9a1fac390176715",
+  "backup": {
+    "path": "/opt/aipmo-platform/backups/aipmo-bl42-pre-20261107_110316.sql.gz",
+    "bytes": 9911,
+    "tables": 14,
+    "sha256": "01805914763b5514923e4e2df42709425cbfd25a2ca9597fd61a6cb1435bc744",
+    "gzipIntegrity": true
+  },
+  "migration": {
+    "journalRows": 7,
+    "range": "0000-0006",
+    "newTablesPresent": [
+      "telegram_sla_notifications",
+      "project_memberships",
+      "telegram_onboardings",
+      "telegram_digest_deliveries",
+      "telegram_pending_edits"
+    ],
+    "existingSlaOrDeliveryEventsBeforeActivation": {},
+    "initialConnectionFailure": "Drizzle used the .env URL instead of the service EnvironmentFiles URL and stopped with ETIMEDOUT before schema change",
+    "successfulRetry": "Same /etc/aipmo-platform/local-db.env EnvironmentFiles path as the running service"
+  },
+  "checks": {
+    "archiveHashExact": true,
+    "bootHashExact": true,
+    "packageLockMatchesCurrent": true,
+    "controlledSourcesPresent": true,
+    "productionEnvUnchanged": true,
+    "backupReadable": true,
+    "migrations0003To0006Applied": true,
+    "currentReleaseUnchanged": true,
+    "existingServiceStillRunning": true,
+    "noTelegramSendsOrNewSignals": true,
+    "activationNotReadyWithoutSponsorFounder": true
+  },
+  "allChecksPassed": true,
+  "activationPerformed": false,
+  "realChatOrUserIdsIncluded": false
+}

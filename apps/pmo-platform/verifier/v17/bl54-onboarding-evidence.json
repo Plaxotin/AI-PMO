@@ -1,0 +1,16 @@
+{
+  "onboardingId": 1,
+  "created": true,
+  "connectedAt": "2026-11-08T00:05:09.000Z",
+  "firstDigestDueAt": "2026-11-08T01:05:09.000Z",
+  "delivery": {
+    "claimed": 2,
+    "sent": 2,
+    "duplicates": 0,
+    "failed": 0,
+    "unknown": 0
+  },
+  "scope": "Real BL-54 onboarding of the existing test channel; first digest scheduled after one actual hour",
+  "newTelegramGroupCreated": false,
+  "realChatOrUserIdsIncluded": false
+}

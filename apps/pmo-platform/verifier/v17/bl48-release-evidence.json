@@ -1,0 +1,42 @@
+{
+  "scope": "BL-48 first Outcome Loop slice: isolated contract and production acceptance on completed P-06",
+  "spec": "docs/specs/SPEC-BL-48-outcome-loop.md",
+  "currentRelease": "/opt/aipmo-platform/releases/p0-outcome-20261108",
+  "archiveSha256": "b8af36ce0e32e828114dedbee713f3c698a990ab51c5b06acd62323926c048f9",
+  "bootSha256": "0597db83b80060ee454a29e73ebcc777d7fe858b0e036a83baac178507786b0a",
+  "migration0009Sha256": "494b77412fda2161877020da75b8e2d54ef9b27fabc543dd5a290a12a6d1b532",
+  "backup": {
+    "path": "/opt/aipmo-platform/backups/aipmo-bl42-pre-20261108_003222.sql.gz",
+    "tables": 20,
+    "bytes": 18791,
+    "sha256": "275ace9872fc97813e34fd2d04154501df8860c3191ecb674a445f42aae23f68",
+    "gzipIntegrity": true
+  },
+  "isolatedChecks": {
+    "outcomeContract": "11/11",
+    "telegramContract": "18/18",
+    "restartReplay": "6/6",
+    "bl54": "14/14",
+    "bl41": "14/14",
+    "sla": "24/24",
+    "roles": "11/11",
+    "unit": "35/35",
+    "typecheckAndBuild": true
+  },
+  "productionChecks": {
+    "migrationJournalRows": 10,
+    "outcomeMeasurementsPresent": true,
+    "firstSyntheticAssessment": "confirmed · −2 days",
+    "correctedAssessment": "confirmed · −3 days · version 2",
+    "idempotentRetry": true,
+    "versionsPreserved": true,
+    "bl35MeasuredEffect": true,
+    "duplicateL3Sent": false,
+    "workspaceHttp": 200,
+    "landingHttp": 200,
+    "latestLandingPreserved": true
+  },
+  "allChecksPassed": true,
+  "newRealOutcomeMeasurementIsSynthetic": true,
+  "realChatOrUserIdsIncluded": false
+}

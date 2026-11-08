@@ -1,0 +1,40 @@
+{
+  "scope": "BL-48 production acceptance on completed P-06 with explicitly synthetic measurement; no duplicate L3",
+  "checks": {
+    "firstConfirmed": true,
+    "correctedVersionTwo": true,
+    "idempotentRetry": true,
+    "versionsPreserved": true,
+    "bl35MeasuredEffect": true,
+    "noDuplicateL3": true,
+    "migration0009Applied": true
+  },
+  "firstAssessment": {
+    "expectedEffect": "Срыв проверки интеграции 12.11.2026 и сдвиг сроков тестирования при несогласовании доступа до 10.11.2026",
+    "status": "confirmed",
+    "text": "Изменение срока: −2 дн. (baseline 10 → actual 8 days)",
+    "basis": "schedule_days · baseline 10 → actual 8 days · цель 8 · Synthetic BL-48 production acceptance measurement · sourceId BL48-P06-SYNTHETIC · версия 1"
+  },
+  "correctedAssessment": {
+    "expectedEffect": "Срыв проверки интеграции 12.11.2026 и сдвиг сроков тестирования при несогласовании доступа до 10.11.2026",
+    "status": "confirmed",
+    "text": "Изменение срока: −3 дн. (baseline 10 → actual 7 days)",
+    "basis": "schedule_days · baseline 10 → actual 7 days · цель 8 · Synthetic BL-48 production acceptance measurement · sourceId BL48-P06-SYNTHETIC · версия 2"
+  },
+  "versions": [
+    {
+      "version": 2,
+      "status": "confirmed",
+      "previousVersionId": 1
+    },
+    {
+      "version": 1,
+      "status": "superseded",
+      "previousVersionId": null
+    }
+  ],
+  "effectSentAgain": false,
+  "migrationJournalRows": 10,
+  "allChecksPassed": true,
+  "realChatOrUserIdsIncluded": false
+}

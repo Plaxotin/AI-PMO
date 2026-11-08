@@ -1,0 +1,46 @@
+{
+  "scope": "Production BL-54 management digest release restart/replay; no new Telegram send expected or performed",
+  "repeatAfterRestart": {
+    "claimed": 0,
+    "sent": 0,
+    "duplicates": 2,
+    "failed": 0,
+    "unknown": 0
+  },
+  "deliveries": [
+    {
+      "kind": "welcome",
+      "status": "sent",
+      "count": 1
+    },
+    {
+      "kind": "first",
+      "status": "sent",
+      "count": 1
+    },
+    {
+      "kind": "daily",
+      "status": "sent",
+      "count": 1
+    },
+    {
+      "kind": "founder",
+      "status": "sent",
+      "count": 1
+    }
+  ],
+  "digestAuditByKind": {
+    "daily": 1,
+    "first": 1
+  },
+  "checks": {
+    "restart_repeat_no_resend": true,
+    "existing_first_and_daily_deduplicated": true,
+    "delivery_rows_unchanged": true,
+    "audit_rows_unchanged": true,
+    "first_digest_audit_exactly_once": true,
+    "daily_digest_audit_exactly_once": true
+  },
+  "allChecksPassed": true,
+  "realChatOrUserIdsIncluded": false
+}

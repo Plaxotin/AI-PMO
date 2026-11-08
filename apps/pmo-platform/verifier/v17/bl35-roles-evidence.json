@@ -1,0 +1,74 @@
+{
+  "mode": "BL-35 project roles and audit overview through real tRPC middleware on isolated MySQL; synthetic users and fixtures; no production connection or Telegram sends",
+  "checks": {
+    "project_roles_exposed_with_read_only_flag": true,
+    "anonymous_requests_unauthorized": true,
+    "read_only_roles_cannot_correct": true,
+    "read_only_roles_cannot_decide": true,
+    "platform_admin_does_not_override_project_read_only": true,
+    "denied_mutations_leave_state_unchanged": true,
+    "explicit_rp_membership_can_correct_without_platform_admin": true,
+    "project_rp_can_read_telegram_status_without_platform_admin": true,
+    "overview_has_freshness_sources_and_recent_chain": true,
+    "overview_detects_conflicts_and_unsourced_auto_risk": true,
+    "overview_exposes_pending_and_delivery_review": true
+  },
+  "allChecksPassed": true,
+  "result": {
+    "roles": {
+      "rp": {
+        "platformRole": "user",
+        "projectRole": "rp",
+        "readOnly": false,
+        "correctDenied": null,
+        "decideDenied": null
+      },
+      "pmo": {
+        "platformRole": "admin",
+        "projectRole": "pmo",
+        "readOnly": true,
+        "correctDenied": true,
+        "decideDenied": true
+      },
+      "auditor": {
+        "platformRole": "user",
+        "projectRole": "auditor",
+        "readOnly": true,
+        "correctDenied": true,
+        "decideDenied": true
+      },
+      "cLevel": {
+        "platformRole": "admin",
+        "projectRole": "c_level",
+        "readOnly": true,
+        "correctDenied": true,
+        "decideDenied": true
+      },
+      "member": {
+        "platformRole": "user",
+        "projectRole": "member",
+        "readOnly": true,
+        "correctDenied": true,
+        "decideDenied": true
+      }
+    },
+    "anonymousStateDenied": true,
+    "anonymousCorrectDenied": true,
+    "correctedVersion": 2,
+    "tasksCreatedByCorrection": 0,
+    "overview": {
+      "freshness": {
+        "latestAt": "2026-11-08T23:33:09.000Z",
+        "status": "fresh"
+      },
+      "sources": {
+        "available": 2,
+        "unavailable": 0,
+        "missing": 1
+      },
+      "recentChains": 1,
+      "conflicts": 1,
+      "requiresReview": 8
+    }
+  }
+}

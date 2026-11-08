@@ -1,0 +1,41 @@
+{
+  "scope": "Actual delivery of the original BL-54 first digest and owner visual confirmation; precedes SPEC-BL-54 v1.0 format update",
+  "firstDigest": {
+    "status": "sent",
+    "sentAtUtc": "2026-11-08T01:05:26Z",
+    "telegramMessageReturned": true,
+    "auditCount": 1
+  },
+  "dailyDigest": {
+    "status": "sent",
+    "sentAtUtc": "2026-11-08T06:00:05Z",
+    "telegramMessageReturned": true,
+    "auditCount": 1
+  },
+  "recipient": {
+    "chatType": "private",
+    "matchesCurrentRpConfiguration": true,
+    "expectedRpUsernameMatches": true
+  },
+  "ownerVisualConfirmation": {
+    "confirmed": true,
+    "confirmedAtLocal": "2026-11-08T11:55:00+03:00",
+    "ownerMessage": "вот он"
+  },
+  "restartRepeat": {
+    "sent": 0,
+    "claimed": 0,
+    "deliveryAndAuditRowsChanged": false
+  },
+  "checks": {
+    "firstDigestDelivered": true,
+    "dailyDigestDelivered": true,
+    "correctPrivateRpRecipient": true,
+    "ownerFoundDigest": true,
+    "restartRepeatNoResend": true,
+    "perKindAuditExactlyOnce": true
+  },
+  "allChecksPassed": true,
+  "newManagementDigestVisualAccepted": false,
+  "realChatOrUserIdsIncluded": false
+}

@@ -20,6 +20,9 @@
 | [SPEC-BL-18-official-letter-generator.md](specs/SPEC-BL-18-official-letter-generator.md) | BL-18 — Генератор официальных писем |
 | [ADR-BL-18-01-tenant-model.md](specs/ADR-BL-18-01-tenant-model.md) | BL-18 — ADR: модель тенанта |
 | [ADR-BL-18-02-production-decisions.md](specs/ADR-BL-18-02-production-decisions.md) | BL-18 — ADR: prod-решения |
+| [SPEC-BL-36-tg-monitoring.md](specs/SPEC-BL-36-tg-monitoring.md) | BL-36 — Telegram-надзор и невидимый бот-наблюдатель |
+| [SPEC-BL-54-first-value.md](specs/SPEC-BL-54-first-value.md) | **BL-54 v1.1 — принятый накопительный дайджест** |
+| [SPEC-BL-48-outcome-loop.md](specs/SPEC-BL-48-outcome-loop.md) | BL-48 — первый срез Outcome Loop |
 
 ## Планы реализации (`docs/plans/`)
 
@@ -32,6 +35,16 @@
 | [BL18_PLAN.md](plans/BL18_PLAN.md) | BL-18 — план реализации |
 | [BL18-PROD-RUNBOOK.md](plans/BL18-PROD-RUNBOOK.md) | BL-18 — runbook |
 | [BL1-0_BL18-ALIGNMENT.md](plans/BL1-0_BL18-ALIGNMENT.md) | BL-6 ↔ BL-18 выравнивание |
+| [PMO_PLATFORM_NEXT_STEPS.md](plans/PMO_PLATFORM_NEXT_STEPS.md) | Текущий production, статусы P0 и порядок срезов |
+| [PMO_REMAINING_WORK_2026-11-08.md](plans/PMO_REMAINING_WORK_2026-11-08.md) | **Оставшиеся работы после принятия SPEC-P0** |
+
+## Отчёты и приёмка (`docs/reports/`)
+
+| Файл | Содержание |
+|------|------------|
+| [2026-11-08-ai-pmo-p0-bl48-final.md](reports/2026-11-08-ai-pmo-p0-bl48-final.md) | Итоговый отчёт: SPEC-P0 и BL-54 приняты, BL-48 первый срез |
+| [2026-11-05-2026-11-08-p0-acceptance-journal.md](reports/2026-11-05-2026-11-08-p0-acceptance-journal.md) | Полный журнал проверок и production evidence |
+| [2026-11-07-ai-pmo-p0-6h-plan-report.md](reports/2026-11-07-ai-pmo-p0-6h-plan-report.md) | Предыдущий отчёт по автономному 6-часовому плану |
 
 ## Процесс разработки
 

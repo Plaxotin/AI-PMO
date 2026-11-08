@@ -1,0 +1,129 @@
+{
+  "mode": "isolated MySQL with synthetic fixtures and mock fetch; no real Telegram connection",
+  "scenario": "owner-mapping",
+  "checks": {
+    "task_missing_owner_mapping_observable": true,
+    "task_missing_owner_no_blind_retry": true,
+    "task_late_owner_mapping_separate_key": true
+  },
+  "allChecksPassed": true,
+  "calls": [
+    {
+      "chatId": "202",
+      "text": "Напоминание ответственному: поручение просрочено.\n\nПоручение P-SLA-1: Synthetic overdue task\nРиск: Synthetic risk 1\nОтветственный: Владелец теста\nСрок: 07.11.2026\nПросрочка: 0 ч.\nИсточник: https://t.me/c/800/949\nИстория событий: delivery.failed\nПоручение остаётся открытым.",
+      "payload": {
+        "chat_id": "202",
+        "text": "Напоминание ответственному: поручение просрочено.\n\nПоручение P-SLA-1: Synthetic overdue task\nРиск: Synthetic risk 1\nОтветственный: Владелец теста\nСрок: 07.11.2026\nПросрочка: 0 ч.\nИсточник: https://t.me/c/800/949\nИстория событий: delivery.failed\nПоручение остаётся открытым."
+      }
+    }
+  ],
+  "database": {
+    "notifications": [
+      {
+        "id": 17,
+        "objectType": "task",
+        "objectId": "P-SLA-1",
+        "objectVersion": "v7d16d649a670162c6e37d19c",
+        "step": "reminder",
+        "recipientRole": "owner",
+        "recipientConfigured": false,
+        "status": "failed",
+        "messageId": null,
+        "error": "Не настроен личный получатель с ролью owner"
+      },
+      {
+        "id": 19,
+        "objectType": "task",
+        "objectId": "P-SLA-1",
+        "objectVersion": "v7d16d649a670162c6e37d19c",
+        "step": "reminder",
+        "recipientRole": "owner",
+        "recipientConfigured": true,
+        "status": "sent",
+        "messageId": 8001,
+        "error": null
+      }
+    ],
+    "events": [
+      {
+        "entityType": "proposal",
+        "entityId": "D-SLA-1",
+        "eventType": "proposal.created",
+        "relatedId": "R-SLA-1",
+        "version": 1,
+        "sourceLinks": null,
+        "metadata": null
+      },
+      {
+        "entityType": "task",
+        "entityId": "P-SLA-1",
+        "eventType": "delivery.failed",
+        "relatedId": "D-SLA-1",
+        "version": 1,
+        "sourceLinks": [
+          {
+            "url": "https://t.me/c/800/949",
+            "type": "telegram_message",
+            "status": "available",
+            "sourceId": "Telegram · чат -100800 · сообщение 949"
+          }
+        ],
+        "metadata": {
+          "error": "Не настроен личный получатель с ролью owner",
+          "slaStep": "reminder",
+          "delivery": "sla",
+          "objectVersion": "v7d16d649a670162c6e37d19c",
+          "recipientRole": "owner",
+          "deliveryStatus": "failed",
+          "notificationId": 17
+        }
+      },
+      {
+        "entityType": "task",
+        "entityId": "P-SLA-1",
+        "eventType": "task.reminded",
+        "relatedId": "D-SLA-1",
+        "version": 1,
+        "sourceLinks": [
+          {
+            "url": "https://t.me/c/800/949",
+            "type": "telegram_message",
+            "status": "available",
+            "sourceId": "Telegram · чат -100800 · сообщение 949"
+          }
+        ],
+        "metadata": {
+          "slaStep": "reminder",
+          "delivery": "sla",
+          "messageId": 8001,
+          "objectVersion": "v7d16d649a670162c6e37d19c",
+          "recipientRole": "owner",
+          "notificationId": 19
+        }
+      }
+    ]
+  },
+  "summaries": {
+    "missing": {
+      "claimed": 1,
+      "sent": 0,
+      "duplicates": 0,
+      "failed": 1,
+      "unknown": 0
+    },
+    "repeat": {
+      "claimed": 0,
+      "sent": 0,
+      "duplicates": 1,
+      "failed": 0,
+      "unknown": 0
+    },
+    "configured": {
+      "claimed": 1,
+      "sent": 1,
+      "duplicates": 0,
+      "failed": 0,
+      "unknown": 0
+    }
+  }
+}

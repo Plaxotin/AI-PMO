@@ -1,8 +1,9 @@
-import { and, desc, eq, sql } from "drizzle-orm";
-import { auditEvents, channelExternalIds, channels, decisions, proposalVersions, risks, signals, tasks, telegramPendingResults, telegramUpdates } from "@db/schema";
+import { and, eq, sql } from "drizzle-orm";
+import { auditEvents, channelExternalIds, channels, decisions, projectCounters, proposalVersions, risks, signals, tasks, telegramUpdates } from "@db/schema";
 import { DEMO_PROJECT_ID } from "./pmo";
 import { getDb } from "./connection";
 import { telegramSourceLink } from "./proposal-audit";
+import { ensureTelegramOnboarding, getTelegramOnboarding } from "./first-value";
 import type { RiskAnalysis } from "../ai/risk";
 
 function isDuplicateEntry(error: unknown) {
@@ -22,14 +23,15 @@ async function ensureTelegramChatBinding(chatId: string) {
     .limit(1);
   if (!binding) throw new Error("Не удалось привязать Telegram-чат к каналу проекта");
   await db.update(signals).set({ channelId: binding.channelId }).where(eq(signals.chatId, chatId));
-  return binding;
+  const onboarding = await ensureTelegramOnboarding(binding.channelId);
+  return { ...binding, onboarding: onboarding.onboarding };
 }
 
 export async function resolveTelegramProjectChat(chatId: string, configuredChatIds: Set<string>) {
   const [existing] = await getDb().select().from(channelExternalIds)
     .where(and(eq(channelExternalIds.projectId, DEMO_PROJECT_ID), eq(channelExternalIds.externalId, chatId)))
     .limit(1);
-  if (existing) return existing;
+  if (existing) return { ...existing, onboarding: await getTelegramOnboarding() };
   if (!configuredChatIds.has(chatId)) return null;
   return ensureTelegramChatBinding(chatId);
 }
@@ -143,13 +145,22 @@ export async function markTelegramSignal(id: string, status: "ignored" | "error"
 
 export async function createRiskProposal(signalId: string, updateId: number, analysis: RiskAnalysis) {
   const riskId = `R-TG-${updateId}`;
-  const decisionId = `D-TG-${updateId}`;
-  const [existing] = await getDb().select().from(decisions).where(eq(decisions.id, decisionId));
-  if (existing) return { riskId, decisionId };
+  let decisionId = "";
   const [signal] = await getDb().select().from(signals).where(eq(signals.id, signalId));
   if (!signal) throw new Error("Сигнал не найден");
   const now = new Date();
   await getDb().transaction(async (tx) => {
+    const [existing] = await tx.select().from(decisions).where(eq(decisions.riskId, riskId)).for("update").limit(1);
+    if (existing) {
+      decisionId = existing.id;
+      return;
+    }
+    await tx.insert(projectCounters).values({ projectId: DEMO_PROJECT_ID, counterName: "decision", nextValue: 1 })
+      .onDuplicateKeyUpdate({ set: { nextValue: sql`LAST_INSERT_ID(nextValue) + 1` } });
+    const [counter] = await tx.select().from(projectCounters)
+      .where(and(eq(projectCounters.projectId, DEMO_PROJECT_ID), eq(projectCounters.counterName, "decision"))).limit(1);
+    if (!counter) throw new Error("Не удалось получить следующий номер решения");
+    decisionId = `R-${String(counter.nextValue).padStart(2, "0")}`;
     await tx.insert(risks).values({
       id: riskId,
       projectId: DEMO_PROJECT_ID,
@@ -233,56 +244,17 @@ export async function getRiskProposal(decisionId: string) {
   return { decision, risk, signal };
 }
 
+export async function getRiskProposalByRiskId(riskId: string) {
+  const [decision] = await getDb().select().from(decisions)
+    .where(and(eq(decisions.riskId, riskId), eq(decisions.projectId, DEMO_PROJECT_ID))).limit(1);
+  if (!decision) return null;
+  return getRiskProposal(decision.id);
+}
+
 export async function getTaskWithDecision(taskId: string) {
   const db = getDb();
   const [task] = await db.select().from(tasks).where(and(eq(tasks.id, taskId), eq(tasks.projectId, DEMO_PROJECT_ID)));
   if (!task) return null;
   const [decision] = task.decisionId ? await db.select().from(decisions).where(eq(decisions.id, task.decisionId)) : [];
   return { task, decision };
-}
-
-export async function requestTaskResult(input: { taskId: string; chatId: string; userId: string }) {
-  await getDb().update(telegramPendingResults).set({ status: "cancelled" }).where(and(eq(telegramPendingResults.chatId, input.chatId), eq(telegramPendingResults.userId, input.userId), eq(telegramPendingResults.status, "pending")));
-  const [row] = await getDb().insert(telegramPendingResults).values({ ...input, status: "pending" }).$returningId();
-  return row.id;
-}
-
-export async function setResultPromptMessage(id: number, promptMessageId: number) {
-  await getDb().update(telegramPendingResults).set({ promptMessageId }).where(eq(telegramPendingResults.id, id));
-}
-
-export async function findPendingResult(input: { chatId: string; userId: string; replyToMessageId: number }) {
-  const [row] = await getDb().select().from(telegramPendingResults)
-    .where(and(eq(telegramPendingResults.chatId, input.chatId), eq(telegramPendingResults.userId, input.userId), eq(telegramPendingResults.promptMessageId, input.replyToMessageId), eq(telegramPendingResults.status, "pending")))
-    .orderBy(desc(telegramPendingResults.id)).limit(1);
-  return row;
-}
-
-export async function completeTaskResult(input: { pendingId: number; taskId: string; result: string; actorUserId?: number; actorName: string; actorRole: "rp" | "member" }) {
-  return getDb().transaction(async (tx) => {
-    const [task] = await tx.select().from(tasks).where(eq(tasks.id, input.taskId)).for("update");
-    if (!task) throw new Error("Поручение не найдено");
-    if (task.status === "done" && task.result) return { alreadyCompleted: true };
-    const [decision] = task.decisionId ? await tx.select().from(decisions).where(eq(decisions.id, task.decisionId)).limit(1) : [];
-    const [signal] = decision?.riskId ? await tx.select().from(signals).where(eq(signals.riskId, decision.riskId)).limit(1) : [];
-    await tx.update(tasks).set({ status: "done", result: input.result, completedAt: new Date(), completedByName: input.actorName }).where(eq(tasks.id, task.id));
-    await tx.update(telegramPendingResults).set({ status: "done" }).where(eq(telegramPendingResults.id, input.pendingId));
-    await tx.insert(auditEvents).values({
-      projectId: DEMO_PROJECT_ID,
-      entityType: "result",
-      entityId: task.id,
-      eventType: "result.recorded",
-      relatedId: task.decisionId,
-      actorUserId: input.actorUserId,
-      actorName: input.actorName,
-      actorRole: input.actorRole,
-      attribution: `Пиэмка от имени ${input.actorName}`,
-      channel: "telegram",
-      version: decision?.proposalVersion,
-      sourceLinks: signal ? [telegramSourceLink(signal.chatId, signal.messageId)] : undefined,
-      metadata: { signalId: signal?.id || null, channelId: signal?.channelId || null, taskId: task.id },
-      detail: input.result.slice(0, 3000),
-    });
-    return { alreadyCompleted: false };
-  });
 }

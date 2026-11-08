@@ -1,0 +1,29 @@
+{
+  "scope": "R-04 rejected and controlled 72h stop verification; no new signals or tasks",
+  "decisionStatus": "no",
+  "taskCount": 0,
+  "rejectAuditCount": 1,
+  "notificationRowsBeforeAndAfter": [
+    3,
+    3
+  ],
+  "sentRowsBeforeAndAfter": [
+    2,
+    2
+  ],
+  "schedulerAfter72h": {
+    "claimed": 0,
+    "sent": 0,
+    "duplicates": 3,
+    "failed": 0,
+    "unknown": 0
+  },
+  "checks": {
+    "rejectedStatus": true,
+    "noTaskCreated": true,
+    "exactlyOneRejectAudit": true,
+    "slaStoppedAfterReject": true
+  },
+  "allChecksPassed": true,
+  "realChatOrUserIdsIncluded": false
+}

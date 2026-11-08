@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AI PMO Toolbox — Workspace</title>
+<link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -2468,7 +2469,7 @@ const AI_PROPOSALS = {
   ],
   'PRJ-02': []
 };
-let SERVER_EVENTS=[],SERVER_USER=null,SERVER_READY=false,SERVER_ERROR='';
+let SERVER_EVENTS=[],SERVER_SIGNALS=[],SERVER_PROPOSAL_VERSIONS=[],SERVER_USER=null,SERVER_OVERVIEW=null,SERVER_READY=false,SERVER_ERROR='',SERVER_DATA_AT=null;
 function persistDemoState(){/* P0: связанные решения и поручения сохраняются только на сервере */}
 async function pmoApi(path,input,method,namespace){
   let url='/api/trpc/'+(namespace||'pmo')+'.'+path;
@@ -2477,17 +2478,32 @@ async function pmoApi(path,input,method,namespace){
   else{opts.headers['Content-Type']='application/json';opts.body=JSON.stringify({json:input});}
   const res=await fetch(url,opts);
   const body=await res.json().catch(()=>({}));
-  if(res.status===401){location.href='/login';throw new Error('Требуется вход через Kimi');}
+  if(res.status===401){const e=new Error('Демо-просмотр: серверное состояние недоступно без входа');e.status=res.status;throw e;}
   if(!res.ok||body.error){const e=new Error(body.error?.json?.message||body.error?.message||'Ошибка сервера');e.status=res.status;throw e;}
   const data=body.result?.data;
   return data&&Object.prototype.hasOwnProperty.call(data,'json')?data.json:data;
 }
+function auditOverviewHTML(o){
+  if(!o)return '<span style="color:var(--ink-faint)">Серверный audit-обзор загружается…</span>';
+  const latest=o.freshness.latestAt?new Date(o.freshness.latestAt).toLocaleString('ru-RU'):'данных пока нет';
+  const freshLabel=o.freshness.status==='empty'?'пустое состояние':o.freshness.status==='fresh'?'свежесть ≤ 24 ч':'требуется обновление · старше 24 ч';
+  const chains=o.recentChains.map(x=>`<div style="padding:6px 0;border-top:1px solid var(--hair)">${chainNavButton('task',x.taskId)}${x.decisionId?chainNavButton('decision',x.decisionId):''}${x.riskId?chainNavButton('risk',x.riskId):''}${x.sourceLink?sourceLinkHTML(x.sourceLink,x.signalId):'<span style="color:var(--ink-faint)">источник не связан</span>'}</div>`).join('');
+  const conflicts=o.conflicts.slice(0,5).map(x=>`<div>⚠ ${escAudit(x.entityId)} → отсутствует ${escAudit(x.relatedId)}</div>`).join('')||'<span style="color:var(--ink-faint)">Конфликтов связей не обнаружено.</span>';
+  const review=o.requiresReview.slice(0,8).map(x=>`<div>• ${escAudit(x.entityId)} — ${escAudit(x.reason)}</div>`).join('')||'<span style="color:var(--ink-faint)">Объектов, требующих проверки, нет.</span>';
+  return `<div class="dv-note" style="margin:12px 0;text-align:left"><b>Audit-обзор · реальные данные BL-40</b><div style="margin-top:6px">${escAudit(freshLabel)} · последнее изменение: ${escAudit(latest)}</div><div style="margin-top:4px">Источники: доступны ${o.sources.available} · недоступны ${o.sources.unavailable} · не связаны ${o.sources.missing}</div><details style="margin-top:8px" ${o.recentChains.length?'open':''}><summary style="cursor:pointer">Последние цепочки · ${o.recentChains.length}</summary>${chains||'Цепочек поручений пока нет.'}</details><details style="margin-top:8px"><summary style="cursor:pointer">Конфликты · ${o.conflicts.length}</summary>${conflicts}</details><details style="margin-top:8px" ${o.requiresReview.length?'open':''}><summary style="cursor:pointer">Требуют проверки · ${o.requiresReview.length}</summary>${review}</details></div>`;
+}
+function renderAuditOverviewHome(){const el=document.getElementById('auditOverviewHome');if(el)el.innerHTML=auditOverviewHTML(SERVER_OVERVIEW);}
 function applyServerState(state){
   if(!state||state.projectId!=='PRJ-01')throw new Error('Некорректный ответ сервера');
   TASKS['PRJ-01'].splice(0,TASKS['PRJ-01'].length,...state.tasks);
   DECISIONS['PRJ-01'].splice(0,DECISIONS['PRJ-01'].length,...state.decisions);
   RISKS['PRJ-01'].splice(0,RISKS['PRJ-01'].length,...state.risks);
-  SERVER_EVENTS=state.events||[];SERVER_USER=state.user;USER_ROLE=state.role;SERVER_READY=true;SERVER_ERROR='';
+  SERVER_EVENTS=state.events||[];SERVER_SIGNALS=state.signals||[];SERVER_PROPOSAL_VERSIONS=state.proposalVersions||[];SERVER_OVERVIEW=state.overview||null;
+  SERVER_USER=state.user;USER_ROLE=state.role;SERVER_READY=true;SERVER_ERROR='';SERVER_DATA_AT=new Date();
+  document.body.dataset.projectRole=state.role;
+  const accountName=document.querySelector('.acct-name');if(accountName)accountName.textContent=state.user.name;
+  const accountRole=document.querySelector('.acct-role');if(accountRole)accountRole.textContent=roleLabel(state.role)+(state.readOnly?' · только чтение':' · исправление и решения');
+  tasksSync={mode:'server',at:SERVER_DATA_AT,tried:true};renderAuditOverviewHome();
 }
 async function restoreServerState(){
   try{applyServerState(await pmoApi('state'));rerenderActive();restoreTelegramStatus();}
@@ -2576,6 +2592,24 @@ function refLinks(txt){
   });
 }
 let FLASH_RISK = null; /* однократная подсветка связанного риска при переходе из журнала решений */
+function jsQuote(value){return escAudit("'"+String(value).replace(/\\/g,'\\\\').replace(/'/g,"\\'")+"'");}
+function sourceLinkHTML(link,signalId,fallback){
+  if(!link)return `<span style="color:var(--ink-faint)">${escAudit(fallback||'источник не указан')}</span>`;
+  const label=signalId?`Signal ${signalId} ↗`:'исходное сообщение ↗';
+  if(link.url)return `<a class="src-link" href="${escAudit(link.url)}" target="_blank" rel="noopener" title="${escAudit(link.sourceId)}" onclick="event.stopPropagation()">${escAudit(label)}</a>`;
+  return `<span style="color:var(--ink-faint)" title="${escAudit(link.sourceId)}">источник недоступен · ${escAudit(signalId||link.sourceId)}</span>`;
+}
+function chainNavButton(kind,id){
+  const config=kind==='task'?['FLASH_TASK','ensureTasksTab','Поручение']:kind==='risk'?['FLASH_RISK','ensureRisksTab','Риск']:['FLASH_DEC','ensureDecisionsTab','Решение'];
+  return `<button class="ai-act edit" style="margin:3px 4px 0 0" onclick="event.stopPropagation();${config[0]}=${jsQuote(id)};activateTab(${config[1]}(curProj))">${config[2]} ${escAudit(id)} ↗</button>`;
+}
+function riskChainHTML(riskId){
+  if(!SERVER_READY)return '';
+  const decisions=(DECISIONS[curProj]||[]).filter(x=>x.risk===riskId);
+  const tasks=(TASKS[curProj]||[]).filter(x=>x.riskId===riskId||decisions.some(d=>d.id===x.decisionId));
+  const links=decisions.map(x=>chainNavButton('decision',x.id)).concat(tasks.map(x=>chainNavButton('task',x.id))).join('');
+  return links?`<div style="margin-top:4px">${links}</div>`:'';
+}
 function renderRisksView(t){
   const list = RISKS[t.proj] || [];
   const pendRisks = pendRowsHTML('risks',t.proj,7);
@@ -2595,30 +2629,32 @@ function renderRisksView(t){
         </td>
         <td style="font-size:11.5px;color:var(--ink-faint)">${x.src}</td><td style="white-space:nowrap"><span class="tk-st ${x.type==='auto'?'week':'none'}">${x.type==='auto'?'авто':'ручной'}</span></td></tr>`;
     }
-    const srcHtml = x.type==='auto' ? srcBadgeHTML({ch:x.ch||'chat', src:x.src}) : '<span style="color:var(--ink-faint)">вручную</span>';
+    const srcHtml = x.sourceLink ? sourceLinkHTML(x.sourceLink,x.signalId) : x.type==='auto' ? (SERVER_READY?'<span style="color:var(--ink-faint)">источник недоступен</span>':srcBadgeHTML({ch:x.ch||'chat',src:x.src})) : '<span style="color:var(--ink-faint)">вручную</span>';
+    const confidence=x.confidence==null?'':`<div style="margin-top:4px;font-family:var(--mono);font-size:9.5px;color:var(--ink-faint)">confidence: ${escAudit(x.confidence)}%</div>`;
     const typeCell = x.type==='auto' ? '<span class="tk-st week">авто</span>' : '<span class="tk-st none">ручной</span>';
     const flash = FLASH_RISK===x.id ? ' class="tr-flash"' : '';
     return `<tr${flash}>
-      <td style="white-space:nowrap;font-family:var(--mono);font-size:10px;color:var(--accent)">${x.id}</td>
-      <td>${x.t}</td>
-      <td>${x.impact}</td>
-      <td><span class="tk-st ${x.prob==='активный'?'live':(x.prob==='высокая'?'over':(x.prob==='средняя'?'week':'ok'))}">${x.prob}</span></td>
-      <td>${x.measure}</td>
-      <td style="white-space:nowrap">${srcHtml}</td>
+      <td style="white-space:nowrap;font-family:var(--mono);font-size:10px;color:var(--accent)">${escAudit(x.id)}</td>
+      <td>${escAudit(x.t)}${riskChainHTML(x.id)}</td>
+      <td>${escAudit(x.impact)}</td>
+      <td><span class="tk-st ${x.prob==='активный'?'live':(x.prob==='высокая'?'over':(x.prob==='средняя'?'week':'ok'))}">${escAudit(x.prob)}</span></td>
+      <td>${escAudit(x.measure)}</td>
+      <td style="white-space:nowrap">${srcHtml}${confidence}</td>
       <td style="white-space:nowrap">${typeCell}</td>
     </tr>`;
   }).join('');
   FLASH_RISK = null;
+  const sourceMeta=SERVER_READY?`данные BL-40 · обновлено ${SERVER_DATA_AT.toLocaleTimeString('ru-RU')}`:'демонстрационный режим · серверное состояние загружается';
   document.getElementById('docView').innerHTML = `
     <div class="dv-head"><div><div class="dv-name">Риски · ${PRJMETA[t.proj].name}</div>
       <div class="dv-meta">реестр рисков · записей: ${list.length} · активных (наступивших): ${list.filter(x=>x.prob==='активный').length} · ${roleSwitchHTML()}</div>
-      <a class="tk-src" href="#" onclick="toast('В боевом контуре откроется вкладка «Риски» исходного файла Google Sheets','↗');return false">↗ источник: Google Sheets · вкладка «Риски»</a></div>
+      <div class="tk-src">${sourceMeta}</div></div>
     </div>
     <div class="dv-body">
-      <div class="dv-note">Риск появляется в реестре только после решения РП — статуса «не подтверждён» нет: до решения это предложение со статусом «новое». Наступивший риск не уходит в отдельный журнал проблем: он остаётся в реестре, а его вероятность меняется на «активный» — из такого риска порождается поручение на реакцию. Утверждённые записи правятся только в исходной таблице Google Sheets.</div>
+      <div class="dv-note">Автоматический риск создаётся из сигнала с источником и confidence; отдельное подтверждение фиксации риска не требуется. Связи ведут к решениям и поручениям, а ссылка Signal — к исходному сообщению либо честному состоянию недоступности.</div>
       ${(list.length||pendRisks) ? `<div class="tk-scroll${pendRisks?' has-pend':''}"><table class="tk-table tk-risks"><thead><tr><th>ID</th><th>Описание</th><th>Влияние</th><th>Вероятность</th><th>Мера</th><th>Источник</th><th>Статус</th></tr></thead><tbody>${pendRisks}${rows}</tbody></table></div>
-      <div style="font-family:var(--mono);font-size:9.5px;color:var(--ink-faint);margin-top:10px">утверждённые записи редактируются только в исходной таблице (вкладка «Риски») · в интерфейсе правятся лишь предложения со статусом «новое» · ручной ввод — через чат: «добавь риск …»</div>`
-      : '<div class="tk-empty">Рисков нет — реестр пуст. Предложения ИИ из каналов и ручные риски появятся здесь.</div>'}
+      <div style="font-family:var(--mono);font-size:9.5px;color:var(--ink-faint);margin-top:10px">${SERVER_READY?'реальные записи BL-40 · автоматическое происхождение сохраняется':'после входа демонстрационные строки заменяются серверными данными'}</div>`
+      : '<div class="tk-empty">Рисков нет — реестр пуст. Подтверждённые сигналы и ручные риски появятся здесь.</div>'}
     </div>`;
 }
 function addRisk(proj){
@@ -2728,17 +2764,17 @@ function tasksFromGviz(input){
 }
 /* --- загрузка: fetch → JSONP-фолбэк (обход CORS) → локальная копия --- */
 function loadTasksLive(manual){
-  if(tasksLoading) return;
+  if(tasksLoading||SERVER_READY) return;
   tasksLoading = true;
   if(manual) toast('Обновляю реестр из Google Sheets…','⟳');
   const finish = mode => {
     tasksLoading = false;
-    tasksSync = {mode, at:new Date(), tried:true};
+    tasksSync = {mode:SERVER_READY?'server':mode, at:SERVER_READY?SERVER_DATA_AT:new Date(), tried:true};
     const tab = TABS.find(x=>x.kind==='tasks' && x.proj===curProj);
     if(tab && activeTab===tab.id) renderTasksView(tab);
-    if(manual) toast(mode==='live' ? 'Реестр обновлён из Google Sheets' : 'Google Sheets недоступен — показана локальная копия', mode==='live'?'⟳':'⚠');
+    if(manual&&!SERVER_READY) toast(mode==='live' ? 'Реестр обновлён из Google Sheets' : 'Google Sheets недоступен — показана локальная копия', mode==='live'?'⟳':'⚠');
   };
-  const apply = input => { const live = tasksFromGviz(input); for(const k in live){ const linked=(TASKS[k]||[]).filter(x=>x.decisionId||x.demoLocal); TASKS[k]=linked.concat(live[k].filter(x=>!linked.some(l=>l.id===x.id))); } persistDemoState(); finish('live'); };
+  const apply = input => { if(SERVER_READY){finish('server');return;} const live = tasksFromGviz(input); for(const k in live){ const linked=(TASKS[k]||[]).filter(x=>x.decisionId||x.demoLocal); TASKS[k]=linked.concat(live[k].filter(x=>!linked.some(l=>l.id===x.id))); } persistDemoState(); finish('live'); };
   const jsonp = () => {
     const g = window.google = window.google || {};
     g.visualization = g.visualization || {};
@@ -2763,37 +2799,42 @@ function loadTasksLive(manual){
     .catch(jsonp);
 }
 function renderTasksView(t){
-  if(!tasksSync.tried && !tasksLoading) loadTasksLive(false);
+  if(!SERVER_READY&&!tasksSync.tried&&!tasksLoading)loadTasksLive(false);
   const list = TASKS[t.proj] || [];
   const over = list.filter(x=>x.st==='over').length;
   const rows = list.map(x=>{
     const result=x.result?`<div style="margin-top:7px;padding-top:7px;border-top:1px solid var(--hair);color:var(--ink-soft)"><b>Результат:</b> ${escAudit(x.result)}<div style="margin-top:3px;font-size:10px;color:var(--ink-faint)">${escAudit(x.completedByName||'участник')} · ${x.completedAt?new Date(x.completedAt).toLocaleString('ru-RU'):'время не указано'}</div></div>`:'';
-    return `<tr${FLASH_TASK===x.id?' class="tr-flash"':''}><td style="white-space:nowrap;font-family:var(--mono);font-size:10px;color:var(--accent)">${escAudit(x.id||'—')}</td><td>${escAudit(x.t)}${result}</td><td style="white-space:nowrap">${escAudit(x.who)}</td><td style="white-space:nowrap">${escAudit(x.due)}</td><td style="color:var(--ink-faint)">${x.decisionId?`<button class="ai-act ed" onclick="decisionsCard()">решение ${escAudit(x.decisionId)} ↗</button>`:escAudit(x.src||'Google Sheets')}</td><td><span class="tk-st ${x.st}">${TASK_ST[x.st]||escAudit(x.st)}</span></td></tr>`;
+    const decision=x.decisionId?chainNavButton('decision',x.decisionId):'';
+    const signal=x.sourceLink?`<div style="margin-top:4px">${sourceLinkHTML(x.sourceLink,x.signalId)}</div>`:'';
+    const source=decision||signal?`${decision}${signal}`:escAudit(x.src||(SERVER_READY?'источник не указан':'Google Sheets'));
+    return `<tr${FLASH_TASK===x.id?' class="tr-flash"':''}><td style="white-space:nowrap;font-family:var(--mono);font-size:10px;color:var(--accent)">${escAudit(x.id||'—')}</td><td>${escAudit(x.t)}${result}</td><td style="white-space:nowrap">${escAudit(x.who)}</td><td style="white-space:nowrap">${escAudit(x.due)}</td><td style="color:var(--ink-faint)">${source}</td><td><span class="tk-st ${escAudit(x.st)}">${TASK_ST[x.st]||escAudit(x.st)}</span></td></tr>`;
   }).join('');
   FLASH_TASK = null;
   const pendTasks = pendRowsHTML('tasks',t.proj,6);
   const syncTime = tasksSync.at ? tasksSync.at.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}) : '';
-  const syncLine = tasksLoading ? 'обновляю реестр из Google Sheets…'
+  const syncLine = tasksSync.mode==='server' ? `данные BL-40 · обновлено ${syncTime}`
+    : tasksLoading ? 'обновляю реестр из Google Sheets…'
     : tasksSync.mode==='live' ? `синхронизировано с Google Sheets · ${syncTime}`
     : tasksSync.tried ? 'локальная копия · Google Sheets недоступен — нужен доступ «по ссылке» или сеть'
     : 'источник: Google Sheets · загружается…';
-  document.getElementById('docView').innerHTML = `
-    <div class="dv-head">
-      <div><div class="dv-name">Поручения · ${PRJMETA[t.proj].name}</div>
-        <div class="dv-meta">реестр поручений · просрочено: ${over} · всего: ${list.length} · ${roleSwitchHTML()}</div>
-        <a class="tk-src" href="${TASKS_SRC}" target="_blank" rel="noopener">↗ источник: Google Sheets</a><button class="tk-edit" onclick="editTasksSource()" title="Изменить ссылку на реестр (сохраняется в этом браузере)">✎</button>
+  const sourceControls=SERVER_READY?'<div class="tk-src">серверный реестр BL-40 · источник и цепочка в каждой строке</div>':`<a class="tk-src" href="${TASKS_SRC}" target="_blank" rel="noopener">↗ источник: Google Sheets</a><button class="tk-edit" onclick="editTasksSource()" title="Изменить ссылку на реестр (сохраняется в этом браузере)">✎</button>
         <div class="tk-srcedit" id="tkSrcEdit" style="display:none">
           <input id="tkSrcInp" type="text" spellcheck="false" placeholder="https://docs.google.com/spreadsheets/d/…">
           <button class="btn primary" onclick="saveTasksSource()">Сохранить</button>
           <button class="btn ghost" onclick="document.getElementById('tkSrcEdit').style.display='none'">Отмена</button>
-        </div>
+        </div>`;
+  document.getElementById('docView').innerHTML = `
+    <div class="dv-head">
+      <div><div class="dv-name">Поручения · ${PRJMETA[t.proj].name}</div>
+        <div class="dv-meta">реестр поручений · просрочено: ${over} · всего: ${list.length} · ${roleSwitchHTML()}</div>
+        ${sourceControls}
       </div>
     </div>
     <div class="dv-body">
-      <div class="dv-note">Поручение — обязательство с владельцем и сроком. Реестр — система записи: ИИ собирает поручения из каналов (TG, почта, MAX) и предлагает новые строки, РП подтверждает их здесь или кнопками прямо в канале.</div>
+      <div class="dv-note">Поручение связывается с решением, риском и первичным сигналом. Переходы открывают связанные реестры; Signal ведёт к исходному сообщению либо показывает сохранённый идентификатор недоступного источника.</div>
       ${(list.length||pendTasks) ? `<div class="tk-scroll${pendTasks?' has-pend':''}"><table class="tk-table"><thead><tr><th>ID</th><th>Описание</th><th>Ответственный</th><th>Срок</th><th>Источник</th><th>Статус</th></tr></thead><tbody>${pendTasks}${rows}</tbody></table></div>
-      <div style="font-family:var(--mono);font-size:9.5px;color:var(--ink-faint);margin-top:10px">${syncLine} · вкладка «Поручения» исходного файла · правка утверждённых записей — только в Google Sheets</div>`
-      : `<div class="tk-empty">В проекте пока нет реестра поручений.<div style="font-family:var(--mono);font-size:9.5px;color:var(--ink-faint);margin-top:8px">${syncLine}</div><br><button class="btn primary" onclick="activateTab(ensureChatTab(curProj)); scenarioRegistry()">＋ Создать реестр с нуля</button></div>`}
+      <div style="font-family:var(--mono);font-size:9.5px;color:var(--ink-faint);margin-top:10px">${syncLine}${SERVER_READY?' · результат и атрибуция сохраняются на сервере':' · демонстрационный источник до загрузки сервера'}</div>`
+      : `<div class="tk-empty">Поручений пока нет.<div style="font-family:var(--mono);font-size:9.5px;color:var(--ink-faint);margin-top:8px">${syncLine}</div>${SERVER_READY?'':'<br><button class="btn primary" onclick="activateTab(ensureChatTab(curProj)); scenarioRegistry()">＋ Создать реестр с нуля</button>'}</div>`}
     </div>`;
 }
 /* Журнал решений ИИ-агента */
@@ -2805,6 +2846,12 @@ function decEditToggle(proj,id){
   const d=(DECISIONS[proj]||[]).find(x=>x.id===id); if(!d) return;
   d.editing=!d.editing;
   const tab=TABS.find(y=>y.kind==='decisions'&&y.proj===proj); if(tab) renderDecisionsView(tab);
+}
+function proposalVersionsHTML(proposalId){
+  const versions=SERVER_PROPOSAL_VERSIONS.filter(v=>v.proposalId===proposalId).sort((a,b)=>b.version-a.version);
+  if(!versions.length)return '';
+  const rows=versions.map(v=>`<div style="padding:8px 0;border-top:1px solid var(--hair)"><b>Версия ${escAudit(v.version)}</b> · ${escAudit(v.attribution)} · ${new Date(v.createdAt).toLocaleString('ru-RU')}<div style="margin-top:3px;color:var(--ink-faint)">${escAudit(v.title)}</div>${v.diff?`<pre style="white-space:pre-wrap;overflow-wrap:anywhere;background:var(--cream);padding:8px;border-radius:8px;margin-top:6px;font:11px/1.5 var(--mono)">${escAudit(v.diff)}</pre>`:'<div style="margin-top:3px;color:var(--ink-faint)">Исходная версия · diff отсутствует</div>'}</div>`).join('');
+  return `<details class="dv-note" style="margin-top:10px"><summary style="cursor:pointer">Версии и diff · ${versions.length}</summary>${rows}</details>`;
 }
 function renderDecisionsView(t){
   const list = DECISIONS[t.proj] || [];
@@ -2818,26 +2865,32 @@ function renderDecisionsView(t){
     const open = !!DEC_OPEN[x.id];
     const ed = !!x.editing;
     const caret = `<span class="pend-caret">${open?'▾':'▸'}</span> `;
-    const tcell = ed ? `<td>${peInp('pe-'+x.id+'-t',x.t,'текст решения')}</td>` : `<td>${caret}${x.t}</td>`;
+    const tcell = ed ? `<td>${peInp('pe-'+x.id+'-t',x.t,'текст решения')}</td>` : `<td>${caret}${escAudit(x.t)}</td>`;
     const srcCell = (x.risk && x.risk!=='—')
-      ? `<td style="white-space:nowrap"><a class="src-link" title="Перейти к риску в реестре рисков" onclick="event.stopPropagation();FLASH_RISK='${x.risk}';activateTab(ensureRisksTab(curProj))">риск ${x.risk} →</a></td>`
+      ? `<td style="white-space:nowrap">${chainNavButton('risk',x.risk)}</td>`
       : '<td style="color:var(--ink-faint)">—</td>';
-    const acts = isWait ? (canManage() ? `<td class="pend-acts"><div class="pend-acts-in"><button class="ai-act ok" title="${ed?'Принять с правками':'Принять решение'}" onclick="event.stopPropagation();decAct('${t.proj}','${x.id}','ok')">✓</button><button class="ai-act no" title="Отклонить" onclick="event.stopPropagation();decAct('${t.proj}','${x.id}','no')">✕</button><button class="ai-act ${ed?'no':'ed'}" title="${ed?'Отменить правки':'Редактировать текст, затем ✓'}" onclick="event.stopPropagation();decEditToggle('${t.proj}','${x.id}')">✎</button></div></td>` : `<td><button class="ai-act ed" title="Комментарий для РП" onclick="event.stopPropagation();toast('Комментарий к ${x.id} отправлен РП в канал','💬')">💬</button></td>`) : '';
+    const saveCorrection=ed?`<button class="ai-act ed" title="Сохранить новую версию без принятия" onclick="event.stopPropagation();decCorrect('${t.proj}','${x.id}')">💾</button>`:'';
+    const acts = isWait ? (canManage() ? `<td class="pend-acts"><div class="pend-acts-in">${saveCorrection}<button class="ai-act ok" title="${ed?'Принять с правками':'Принять решение'}" onclick="event.stopPropagation();decAct('${t.proj}','${x.id}','ok')">✓</button><button class="ai-act no" title="Отклонить" onclick="event.stopPropagation();decAct('${t.proj}','${x.id}','no')">✕</button><button class="ai-act ${ed?'no':'ed'}" title="${ed?'Отменить правки':'Редактировать текст'}" onclick="event.stopPropagation();decEditToggle('${t.proj}','${x.id}')">✎</button></div></td>` : `<td><span style="font-size:10px;color:var(--ink-faint);white-space:nowrap">только чтение</span></td>`) : '';
     const linked=(TASKS[t.proj]||[]).find(task=>task.decisionId===x.id);
-    const detail = (open && !ed) ? `<tr class="tr-pdetail"><td colspan="6"><div class="prop-why"><b>Почему предлагает:</b> ${x.why}</div><div class="prop-eff">Эффект: ${x.effect}</div><div class="pend-meta">${x.st==='wait'?'Пиэмка · автоматически · предложение':(x.attribution||'Пиэмка от имени Плахотина К.')} · ${linked?`связанное поручение ${linked.id}`:'поручение не связано'}</div></td></tr>` : '';
-    return `<tr class="${isWait?'tr-pend':''}${FLASH_DEC===x.id?' tr-flash':''}"${isWait?'':' style="cursor:pointer"'} ${ed?'':`onclick="decExpand('${x.id}')"`}><td style="white-space:nowrap;font-family:var(--mono);font-size:10px;color:var(--accent)">${x.id}</td>${tcell}${srcCell}<td style="white-space:nowrap;font-family:var(--mono);font-size:10.5px;color:var(--ink-faint)">${x.date}</td><td><span class="tk-st ${stCls(x.st)}">${DEC_ST[x.st]}</span></td>${acts}</tr>${detail}`;
+    const chain=linked?chainNavButton('task',linked.id):'<span style="color:var(--ink-faint)">поручение не связано</span>';
+    const primary=x.sourceLink?`<div style="margin-top:7px">${sourceLinkHTML(x.sourceLink,x.signalId)}</div>`:'';
+    const currentVersion=SERVER_PROPOSAL_VERSIONS.find(v=>v.proposalId===x.id&&v.version===(x.proposalVersion||1));
+    const attribution=x.st==='wait'?(currentVersion?.attribution||'Пиэмка · автоматически · предложение'):(x.attribution||'атрибуция не указана');
+    const detail = (open && !ed) ? `<tr class="tr-pdetail"><td colspan="6"><div class="prop-why"><b>Почему предлагает:</b> ${escAudit(x.why)}</div><div class="prop-eff">Эффект: ${escAudit(x.effect)}</div><div class="pend-meta">${escAudit(attribution)} · версия ${escAudit(x.proposalVersion||1)}</div><div style="margin-top:7px">${chain}</div>${primary}${proposalVersionsHTML(x.id)}</td></tr>` : '';
+    return `<tr class="${isWait?'tr-pend':''}${FLASH_DEC===x.id?' tr-flash':''}"${isWait?'':' style="cursor:pointer"'} ${ed?'':`onclick="decExpand('${x.id}')"`}><td style="white-space:nowrap;font-family:var(--mono);font-size:10px;color:var(--accent)">${escAudit(x.id)}</td>${tcell}${srcCell}<td style="white-space:nowrap;font-family:var(--mono);font-size:10.5px;color:var(--ink-faint)">${escAudit(x.date)}</td><td><span class="tk-st ${stCls(x.st)}">${DEC_ST[x.st]}</span></td>${acts}</tr>${detail}`;
   }).join('');
   FLASH_DEC = null;
   const tbl = shown.length
     ? `<div class="tk-scroll${hasWait?' has-pend':''}"><table class="tk-table"><thead><tr><th>ID</th><th>Описание</th><th>Источник</th><th>Дата</th><th>Статус</th></tr></thead><tbody>${rows}</tbody></table></div>
-       <div style="font-family:var(--mono);font-size:9.5px;color:var(--ink-faint);margin-top:10px">«новое» — предложение ИИ, ожидает решения РП (✓ / ✕ справа от строки) · обоснование и эффект — по клику на строку · правка утверждённых решений — только в исходной таблице</div>`
+       <div style="font-family:var(--mono);font-size:9.5px;color:var(--ink-faint);margin-top:10px">«новое» — предложение ожидает решения РП · обоснование, эффект, версия и связи — по клику на строку</div>`
     : '<div class="tk-empty">По выбранному фильтру решений нет.</div>';
+  const sourceMeta=SERVER_READY?`данные BL-40 · обновлено ${SERVER_DATA_AT.toLocaleTimeString('ru-RU')}`:'демонстрационный режим · серверное состояние загружается';
   document.getElementById('docView').innerHTML = `
     <div class="dv-head"><div><div class="dv-name">Решения · ${PRJMETA[t.proj].name}</div>
       <div class="dv-meta">журнал решений ИИ-агента · новые: ${wait} · всего: ${list.length} · ${roleSwitchHTML()}</div>
-      <a class="tk-src" href="#" onclick="toast('В боевом контуре откроется вкладка «Решения» исходного файла Google Sheets','↗');return false">↗ источник: Google Sheets · вкладка «Решения»</a></div></div>
+      <div class="tk-src">${sourceMeta}</div></div></div>
     <div class="dv-body">
-      <div class="dv-note">Журнал решений — память проекта: что предложил ИИ, кто и когда утвердил, какой эффект ожидался. Новые решения ждут ✓ / ✕ справа от строки, обоснование, атрибуция и связанное поручение — по клику. Утверждает только РП. Решения, поручения и события сохраняются в общей серверной базе.</div>
+      <div class="dv-note">Журнал решений — память проекта: что предложила система, кто и когда утвердил, какой эффект ожидался. Утверждает только РП. Риск, поручение, первичный сигнал и события доступны без изменения эталонной композиции экрана.</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${FILTERS.map(f=>`<button class="btn ${DEC_FILTER===f[0]?'primary':'ghost'}" style="font-size:11px;padding:5px 12px" onclick="decFilter('${f[0]}')">${f[1]}</button>`).join('')}</div>
       ${tbl}
       ${auditTrailHTML()}
@@ -2845,11 +2898,30 @@ function renderDecisionsView(t){
 }
 function escAudit(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function auditTrailHTML(){
-  const names={'signal.received':'сигнал получен','risk.recorded':'риск зафиксирован','proposal.created':'предложение создано','decision.accepted':'решение принято','decision.rejected':'решение отклонено','task.created':'поручение создано','result.recorded':'результат сохранён'};
-  const rows=SERVER_EVENTS.slice(0,12).map(e=>`<div style="padding:8px 0;border-top:1px solid var(--hair)"><b>${escAudit(names[e.eventType]||e.eventType)}</b> · ${escAudit(e.entityId)}${e.relatedId?' → '+escAudit(e.relatedId):''}<div style="margin-top:3px">${escAudit(e.detail)}</div><div style="margin-top:3px;color:var(--ink-faint)">${escAudit(e.attribution)} · ${new Date(e.createdAt).toLocaleString('ru-RU')}</div></div>`).join('');
+  const names={'signal.received':'сигнал получен','risk.recorded':'риск зафиксирован','proposal.created':'предложение создано','proposal.edited':'предложение исправлено','decision.accepted':'решение принято','decision.rejected':'решение отклонено','decision.reminded':'напоминание о решении','decision.escalated':'решение эскалировано','task.created':'поручение создано','task.reminded':'напоминание о поручении','task.escalated':'поручение эскалировано','task.completion_not_done':'поручение не выполнено','result.recorded':'результат сохранён','delivery.failed':'ошибка доставки','record.corrected':'запись исправлена'};
+  const rows=SERVER_EVENTS.slice(0,12).map(e=>{
+    const kind=e.entityType==='task'?'task':e.entityType==='risk'?'risk':['decision','proposal'].includes(e.entityType)?'decision':null;
+    const nav=kind?chainNavButton(kind,e.entityId):'';
+    const sources=(e.sourceLinks||[]).map(link=>sourceLinkHTML(link,null)).join(' · ');
+    return `<div style="padding:8px 0;border-top:1px solid var(--hair)"><b>${escAudit(names[e.eventType]||e.eventType)}</b> · ${escAudit(e.entityId)}${e.relatedId?' → '+escAudit(e.relatedId):''}<div style="margin-top:3px">${escAudit(e.detail)}</div><div style="margin-top:3px;color:var(--ink-faint)">${escAudit(e.attribution)} · ${new Date(e.createdAt).toLocaleString('ru-RU')}</div>${nav||sources?`<div style="margin-top:5px">${nav}${sources}</div>`:''}</div>`;
+  }).join('');
   return `<details class="dv-note" style="margin-top:14px"><summary style="cursor:pointer;min-height:32px">Серверный журнал событий · ${SERVER_EVENTS.length}</summary>${rows||'Событий пока нет'}</details>`;
 }
 function decFilter(f){ DEC_FILTER=f; const tab=TABS.find(x=>x.kind==='decisions'&&x.proj===curProj); if(tab) renderDecisionsView(tab); }
+async function decCorrect(proj,id){
+  if(!requireRP())return;
+  if(!SERVER_READY){toast('Дождитесь загрузки серверного состояния','сервер');return;}
+  const d=(DECISIONS[proj]||[]).find(x=>x.id===id);if(!d||d.st!=='wait')return;
+  const input=document.getElementById('pe-'+id+'-t');const title=input?.value.trim();
+  if(!title){toast('Текст предложения не может быть пустым','правка');return;}
+  try{
+    const state=await pmoApi('correct',{projectId:proj,decisionId:id,title},'POST');
+    applyServerState(state);DEC_OPEN[id]=true;
+    const tab=TABS.find(x=>x.kind==='decisions'&&x.proj===proj);if(tab)renderDecisionsView(tab);
+    const version=(DECISIONS[proj]||[]).find(x=>x.id===id)?.proposalVersion;
+    toast('Предложение '+id+' исправлено · версия '+version+' · решение не принято','✓');
+  }catch(e){toast(e.status===403?'Сервер: исправляет только РП':(e.message||'Не удалось сохранить версию'),'сервер');}
+}
 async function decAct(proj,id,act){
   if(!requireRP()) return;
   if(!SERVER_READY){toast('Дождитесь загрузки серверного состояния','сервер');return;}
@@ -2919,9 +2991,10 @@ function nextPropId(list, props, prefix){
   const nums=(list||[]).concat(props||[]).map(r=>parseInt(String(r.id).replace(/\D/g,''),10)||0);
   return prefix+'-'+String(Math.max(0,...nums)+1).padStart(2,'0');
 }
+function roleLabel(role){return ({rp:'РП',member:'участник',pmo:'PMO',auditor:'аудитор',c_level:'C-level'})[role]||'участник';}
 function roleSwitchHTML(){
   const who=SERVER_USER?.name?` · ${SERVER_USER.name}`:'';
-  return `<span class="role-sw">роль: <b>${USER_ROLE==='rp'?'РП':'участник'}</b>${who} · сервер</span>`;
+  return `<span class="role-sw">роль: <b>${roleLabel(USER_ROLE)}</b>${who} · ${USER_ROLE==='rp'?'сервер':'только чтение · сервер'}</span>`;
 }
 function rerenderActive(){
   const t=TABS.find(x=>x.id===activeTab); if(!t) return;
@@ -2937,6 +3010,7 @@ function propExpandToggle(id){ PROP_OPEN[id]=!PROP_OPEN[id]; rerenderActive(); }
    Источник — отдельная колонка (кликабельно); действия ✓ ✕ ✎ — справа от строки, за пределами таблицы;
    ✎ включает редактирование всех полей строки, ✓ — подтверждение (с правками). Детали доверия — в раскрытии. */
 function pendRowsHTML(reg, proj, cols){
+  if(SERVER_READY)return '';
   const list=(PROPS[reg][proj]||[]).filter(x=>x.st==='wait');
   if(!list.length) return '';
   return list.map(x=>propRowHTML(reg,proj,x,cols)).join('');
@@ -2990,7 +3064,7 @@ function propRowHTML(reg,proj,x,cols){
   let detail='';
   if(open && !ed){
     const dupBar = x.dup ? `<div class="dup-bar">≈ похоже на ${x.dup.of} (совпадение ${x.dup.pct}%) — <a href="#" onclick="propMerge('${reg}','${proj}','${x.id}');return false">объединить?</a></div>` : '';
-    const memberNote = USER_ROLE!=='rp' ? `<div style="margin-top:10px"><button class="ai-act ed" title="Комментарий для РП" onclick="toast('Комментарий к ${x.id} отправлен РП в канал','💬')">💬 комментарий</button></div>` : '';
+    const memberNote = USER_ROLE!=='rp' ? `<div style="margin-top:10px;color:var(--ink-faint);font-size:11px">Режим только чтения · исправление и утверждение доступны РП</div>` : '';
     detail=`<tr class="tr-pdetail"><td colspan="${cols+1}">
       <div class="prop-why"><b>Почему предлагает:</b> ${x.why}</div>
       <div class="prop-eff">Эффект: ${x.effect}</div>
@@ -3168,11 +3242,11 @@ new MutationObserver(labelRegistryTables).observe(document.getElementById('docVi
 buildTicker();labelRegistryTables();
 renderTabs();restoreServerState();
 /* первое сообщение ассистента приходит с задержкой — как живое входящее */
-const WELCOME_TXT = `<b>Проверка, исправление и аудит проекта.</b><br>Ежедневные решения живут в канале проекта. Здесь Пиэмка помогает проверить источник, исправить запись и проследить цепочку <b>сигнал → риск → предложение → решение → поручение → результат</b>.<br><span class="card-actions" style="border:0;background:transparent;padding:10px 0 4px;display:flex;justify-content:flex-start"><button class="btn primary" onclick="decisionsCard()">Проверить решения</button><button class="btn ghost" onclick="risksCard()">Реестр рисков</button><button class="btn ghost" onclick="tasksCard()">Поручения</button></span><br><span style="color:var(--ink-faint)">L0 надзор → L1 риски → L2 дайджест → L3 решения → L4 поручения. Данные учебные; решения, связанные поручения и аудит сохраняются на сервере и доступны между сессиями.</span>`
+const WELCOME_TXT = `<b>Проверка, исправление и аудит проекта.</b><br>Ежедневные решения живут в канале проекта. Здесь Пиэмка помогает проверить источник, исправить запись и проследить цепочку <b>сигнал → риск → предложение → решение → поручение → результат</b>.<div id="auditOverviewHome">Серверный audit-обзор загружается…</div><span class="card-actions" style="border:0;background:transparent;padding:10px 0 4px;display:flex;justify-content:flex-start"><button class="btn primary" onclick="decisionsCard()">Проверить решения</button><button class="btn ghost" onclick="risksCard()">Реестр рисков</button><button class="btn ghost" onclick="tasksCard()">Поручения</button></span><br><span style="color:var(--ink-faint)">Основной канальный сценарий не требует открытия веба. Решения, связанные поручения и аудит сохраняются на сервере и доступны между сессиями.</span>`
 setTimeout(()=>{
   if(curProj!=='PRJ-01' || curChat!=='c1' || thread.querySelector('.msg')) return;
   const m = addBotStart();
-  botSay(m, WELCOME_TXT, 1700).then(()=>{ CHATS['PRJ-01'].html['c1'] = thread.innerHTML; renderAllChats(); });
+  botSay(m, WELCOME_TXT, 1700).then(()=>{ renderAuditOverviewHome();CHATS['PRJ-01'].html['c1'] = thread.innerHTML; renderAllChats(); });
 }, 900);
 </script>
 </body>

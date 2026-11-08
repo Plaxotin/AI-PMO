@@ -1,0 +1,105 @@
+{
+  "mode": "isolated MySQL with synthetic fixtures and mock fetch; no real Telegram connection",
+  "scenario": "schema",
+  "checks": {
+    "additive_schema_preserves_existing_and_sla_tables": true
+  },
+  "allChecksPassed": true,
+  "calls": [],
+  "database": {
+    "notifications": [
+      {
+        "id": 20,
+        "objectType": "decision",
+        "objectId": "D-SLA-FAIL",
+        "objectVersion": "v1",
+        "step": "reminder",
+        "recipientRole": "rp",
+        "recipientConfigured": true,
+        "status": "failed",
+        "messageId": null,
+        "error": "synthetic rejected delivery"
+      },
+      {
+        "id": 21,
+        "objectType": "decision",
+        "objectId": "D-SLA-UNKNOWN",
+        "objectVersion": "v1",
+        "step": "reminder",
+        "recipientRole": "rp",
+        "recipientConfigured": true,
+        "status": "unknown",
+        "messageId": null,
+        "error": "synthetic network outcome unknown"
+      }
+    ],
+    "events": [
+      {
+        "entityType": "proposal",
+        "entityId": "D-SLA-FAIL",
+        "eventType": "proposal.created",
+        "relatedId": "R-SLA-FAIL",
+        "version": 1,
+        "sourceLinks": null,
+        "metadata": null
+      },
+      {
+        "entityType": "proposal",
+        "entityId": "D-SLA-UNKNOWN",
+        "eventType": "proposal.created",
+        "relatedId": "R-SLA-UNKNOWN",
+        "version": 1,
+        "sourceLinks": null,
+        "metadata": null
+      },
+      {
+        "entityType": "decision",
+        "entityId": "D-SLA-FAIL",
+        "eventType": "delivery.failed",
+        "relatedId": "R-SLA-FAIL",
+        "version": 1,
+        "sourceLinks": [
+          {
+            "url": "https://t.me/c/800/1184",
+            "type": "telegram_message",
+            "status": "available",
+            "sourceId": "Telegram · чат -100800 · сообщение 1184"
+          }
+        ],
+        "metadata": {
+          "error": "synthetic rejected delivery",
+          "slaStep": "reminder",
+          "delivery": "sla",
+          "objectVersion": "v1",
+          "recipientRole": "rp",
+          "deliveryStatus": "failed",
+          "notificationId": 20
+        }
+      },
+      {
+        "entityType": "decision",
+        "entityId": "D-SLA-UNKNOWN",
+        "eventType": "delivery.failed",
+        "relatedId": "R-SLA-UNKNOWN",
+        "version": 1,
+        "sourceLinks": [
+          {
+            "url": "https://t.me/c/800/1460",
+            "type": "telegram_message",
+            "status": "available",
+            "sourceId": "Telegram · чат -100800 · сообщение 1460"
+          }
+        ],
+        "metadata": {
+          "error": "synthetic network outcome unknown",
+          "slaStep": "reminder",
+          "delivery": "sla",
+          "objectVersion": "v1",
+          "recipientRole": "rp",
+          "deliveryStatus": "unknown",
+          "notificationId": 21
+        }
+      }
+    ]
+  }
+}

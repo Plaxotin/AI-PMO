@@ -1,0 +1,37 @@
+{
+  "scope": "staged release verification only; no activation, no production migration, no Telegram sends",
+  "release": "/opt/aipmo-platform/releases/bl42-sla-20261107",
+  "currentRelease": "/opt/aipmo-platform/releases/bl42-completion-feedback-20261107",
+  "archiveSha256": "0f16af5636102cc2b388ac825c801bf9d90fb18d1199f73906973b4998ffc1e1",
+  "hashes": {
+    "dist/boot.js": "55808dd2ea181e3813504600dfa3d459d2beadad768fe8aaac71532ae226a0a0",
+    ".env": "1b93c5c881f1451f6081c48d5ceefad4e62531f90d585082f9a1fac390176715",
+    "db/migrations/0003_bl42_sla_notifications.sql": "7031567b547255d71be0e01e1700282da29464b4f83cf06c2dd55d20591d08c4"
+  },
+  "productionJournalRows": 3,
+  "productionSlaTableCount": 0,
+  "activationBlockers": {
+    "pendingDecisionsTotal24h48h": [
+      2,
+      2,
+      0
+    ],
+    "openTasksTotalOverdue": [
+      6,
+      1
+    ]
+  },
+  "checks": {
+    "releaseHashesExact": true,
+    "currentReleaseUnchanged": true,
+    "productionEnvUnchanged": true,
+    "staticAndPngUnchanged": true,
+    "packageLockUnchanged": true,
+    "bootSyntaxValid": true,
+    "productionMigration0003NotApplied": true,
+    "existingServiceStillRunning": true,
+    "activationBlockedByExistingRecords": true
+  },
+  "allChecksPassed": true,
+  "realChatOrUserIdsIncluded": false
+}

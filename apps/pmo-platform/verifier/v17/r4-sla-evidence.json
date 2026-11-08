@@ -1,0 +1,56 @@
+{
+  "scope": "R-04 controlled-time 24/48 SLA with real RP and sponsor delivery",
+  "controlledHours": [
+    24,
+    48
+  ],
+  "summaries": {
+    "24": {
+      "claimed": 0,
+      "sent": 0,
+      "duplicates": 4,
+      "failed": 0,
+      "unknown": 0
+    },
+    "48": {
+      "claimed": 0,
+      "sent": 0,
+      "duplicates": 5,
+      "failed": 0,
+      "unknown": 0
+    }
+  },
+  "notifications": [
+    {
+      "step": "reminder",
+      "recipientRole": "rp",
+      "status": "sent"
+    },
+    {
+      "step": "escalation",
+      "recipientRole": "sponsor",
+      "status": "failed"
+    },
+    {
+      "step": "escalation",
+      "recipientRole": "sponsor",
+      "status": "sent"
+    }
+  ],
+  "auditCounts": {
+    "decision.escalated": 1,
+    "decision.reminded": 1
+  },
+  "decisionStatus": "wait",
+  "taskCount": 0,
+  "checks": {
+    "reminder24RpSent": true,
+    "escalation48SponsorReadOnlySent": true,
+    "exactTwoSuccessfulNotifications": true,
+    "exactOneDocumentedMissingRecipientFailure": true,
+    "auditExactlyOnce": true,
+    "r04StillPendingWithoutTask": true
+  },
+  "allChecksPassed": true,
+  "realChatOrUserIdsIncluded": false
+}

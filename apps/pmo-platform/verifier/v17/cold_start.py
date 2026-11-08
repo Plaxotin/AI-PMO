@@ -47,7 +47,7 @@ try:
     with urllib.request.urlopen(req, timeout=30) as response:
         body = json.loads(response.read())
         state = body['result']['data']['json']
-        task = next(x for x in state['tasks'] if x['id'] == 'P-D-TG-978100001')
+        task = next(x for x in state['tasks'] if x['id'] == 'P-01')
         result['database_read_without_node_modules'] = task['st'] == 'done' and bool(task['result'])
         result['audit_read_without_node_modules'] = any(x['eventType'] == 'result.recorded' for x in state['events'])
     log.close()

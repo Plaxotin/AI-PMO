@@ -9,8 +9,8 @@ from playwright.sync_api import sync_playwright
 ROOT = Path('/mnt/agents/output/app')
 OUT = ROOT / 'verifier/v17'
 BASE = 'http://localhost:3000'
-TASK_ID = 'P-D-TG-978100001'
-DECISION_ID = 'D-TG-978100001'
+TASK_ID = 'P-01'
+DECISION_ID = 'R-01'
 auth = json.loads(Path('/tmp/p0-test-auth.json').read_text())
 env = os.environ.copy(); env['NODE_ENV'] = 'production'
 log = open(OUT / 'browser-production-server.log', 'w')

@@ -1,0 +1,9 @@
+{
+  "scope": "R-05 signal-to-decision timing and channel; read-only",
+  "signalReceivedAt": "2026-11-07 23:40:45",
+  "decisionAcceptedAt": "2026-11-07 23:43:38",
+  "durationSeconds": 173,
+  "decisionChannel": "telegram",
+  "allChecksPassed": true,
+  "realChatOrUserIdsIncluded": false
+}

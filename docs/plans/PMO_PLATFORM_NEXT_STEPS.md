@@ -1,6 +1,6 @@
 # AI PMO — передача работы и следующие этапы
 
-Дата актуализации: 6 ноября 2026.
+Дата актуализации: 8 ноября 2026.
 
 ## 1. Источники истины
 
@@ -29,7 +29,7 @@ AI PMO — платформа проактивного управления **о
 
 Основной путь РП — ровно два клика: **открыть риск из дайджеста → принять предложение**. Только РП утверждает управленческие предложения, проверка роли обязательна на сервере. Риск, дайджест, решение после утверждения и поручение создаются системой.
 
-Telegram — первый канал, затем Email и MAX. Канал — место ежедневного действия; веб-реестр — проверка, исправление, сложный diff и аудит. Дайджесты, карточки рисков и персональные действия отправляются ботом **в личку РП**, а не в общий мониторимый чат. C-level получает read-only контекст по одному проекту.
+Telegram — первый канал, затем Email и MAX. Канал — место ежедневного действия; веб-реестр — проверка, исправление, сложный diff и аудит. Бот — невидимый наблюдатель рабочих чатов: он никогда не отправляет и не редактирует там сообщения. Дайджесты, карточки рисков, решения, `/status`, ошибки и персональные действия отправляются ботом **только в личку РП**. C-level получает read-only контекст по одному проекту.
 
 Отдельной оценки результата или эффекта РП не требуется. Система фиксирует их по фактам исполнения и параметрам проекта. BL-48 развивает Outcome Loop после P0 и не блокирует приёмку волны 0.
 
@@ -61,10 +61,10 @@ GitHub sync повторно выполнять не нужно. При след
 | Статус | Задачи |
 | --- | --- |
 | Реализовано | BL-1 · Аудит плана; BL-6 · Администратор поручений; BL-24 · RACI; BL-28 · Генератор ТЗ |
-| В работе | BL-35 · Project Audit Workspace; BL-36 · TG-надзор; BL-40 · Decision Log + Audit Trail; BL-41 · One-Click Decisions |
-| Бэклог | BL-42 · Escalation Engine; BL-54 · First value за 24 часа |
+| Production-принятые срезы | BL-35 · Project Audit Workspace; BL-36 · TG-надзор; BL-40 · Decision Log + Audit Trail; BL-41 · One-Click Decisions; BL-42 · Escalation Engine; BL-54 · First value за 24 часа; BL-56 · Лендинг |
+| Первый срез принят | BL-48 · Project Impact / Outcome Loop — полный Learning Loop и автоматический сбор KPI не закрыты |
 
-**Волна 0 не завершена.** Завершение GitHub sync не означает реализацию или приёмку всех её функций.
+**Волна 0 и SPEC-P0 приняты владельцем 08.11.2026 в 23:41 мск.** Локальная приёмка не выдаётся за синхронизацию Notion; перенос статусов и спецификаций выполняется после восстановления OAuth.
 
 ## 5. Что уже сделано после production baseline
 
@@ -110,10 +110,17 @@ GitHub sync повторно выполнять не нужно. При след
 
 ### Этап 2 — BL-54 · First value за 24 часа
 
-- Первый дайджест через 1 час ± 5 минут после подключения, затем ежедневно в 09:00 по времени проекта.
-- Доставка в личку РП; источник, свежесть и покрытие у содержательных пунктов.
-- Честное пустое состояние, dedupe первого и ежедневного дайджеста после restart.
-- Метрики подключения, доставки, перехода к риску и решения.
+- Актуальная спецификация: `docs/specs/SPEC-BL-54-first-value.md` **v1.1**. Первый дайджест через 1 час ± 5 минут после подключения, затем ежедневно в 09:00 по времени проекта.
+- Простой формат демо: `☀️ Дайджест проекта · ДД.ММ.ГГГГ`, затем **Факт — что сделано → План — что дальше → Риск — что мешает**. Каждый список начинается с 1; период, покрытие, буллеты и технические статусы отсутствуют.
+- Коды имеют формат `<буква>-<порядковый номер>` (`P-1`, `R-4`). Алиасы последовательны по `createdAt` внутри типа сущности; primary IDs, связи и callback не перезаписываются. Подтверждённые пункты вне реестров допускаются без кода. Кнопка — `Открыть риск P-N`.
+- Дайджест накопительный: `audit_events.metadata.includedItems` сохраняет версии показанных фактов и планов; неизменённые пункты не повторяются, изменённые версии разрешены. Открытые или изменённые риски могут повторяться.
+- Доставка только в личку РП; restart/replay одного periodKey не создаёт сообщения, `failed/unknown` наблюдаемы и не повторяются вслепую.
+
+**Фактическая приёмка 8 ноября:** исходный первый дайджест доставлен в 04:05 мск и найден владельцем. После двух уточнений формата реализована v1.1: изолированно **14/14 BL-54**, полный P0/BL-48 regression зелёный, unit **35/35**, typecheck/build успешны. Production preview **9/9**: 3 факта, 1 план, 6 открытых рисков, 1 508 символов.
+
+Production `/opt/aipmo-platform/releases/p0-bl54-cumulative-digest-v11-20261108`: сервис active, `NRestarts=0`, landing/workspace HTTP 200 и побайтно сохранены, журнал миграций 10. Контрольный реальный дайджест 23:37 мск — **12/12**: одна доставка и один audit с includedItems; после restart повтор не отправлен, факты и планы не повторяются, открытые риски остаются.
+
+Владелец в **23:41 мск** ответил **«принято»**. `ownerVisualAccepted=true`, `specP0Accepted=true`; матрица содержит все 9 шагов passed и `fullP0Accepted=true`. Evidence: `apps/pmo-platform/verifier/v17/bl54-v11-preview-evidence.json`, `bl54-v11-acceptance-evidence.json`, `p0-acceptance-matrix.json`. **BL-54 и SPEC-P0 закрыты локально по фактической приёмке**; Notion синхронизируется после восстановления OAuth.
 
 ### Этап 3 — BL-41 · One-Click Decisions
 
@@ -121,24 +128,71 @@ GitHub sync повторно выполнять не нужно. При след
 - Edit → новый preview → Accept; отмена без изменения исходного Proposal.
 - Версия, diff, edit distance и атрибуция; связанные события BL-40.
 
+**Серверный срез принят изолированно 7 ноября:** миграция `0006_bl41_telegram_edits.sql`, durable pending-edit в RP DM, одна текстовая инструкция и AI preview без изменения исходного Proposal. Accept до preview блокируется; Accept после preview атомарно создаёт версию/diff/edit distance, `proposal.edited`, решение и один Task. Expected-version guard останавливает stale preview. Cancel сохраняет исходную версию без новой версии/Task, Reject не создаёт Task, AI failure допускает явный retry. Карточки содержат не более трёх действий.
+
+Проверки через реальные route handlers с mock AI/Telegram: **13/13 BL-41**, **14/14 BL-54**, 18/18 contract, 6/6 restart/replay, 8/8 chain, 7/7 correction, 24/24 SLA, 11/11 roles, 19/19 mobile и 28/28 unit; миграции 0003–0006 чисто применены к baseline 0000–0002. Typecheck и build успешны. Evidence: `apps/pmo-platform/verifier/v17/bl41-telegram-edit-evidence.json`.
+
+Мобильная регрессия выявила, что `decideProposalRecord` через `ensureSeed` добавлял демонстрационные R-101/R-102 при решении. Side effect удалён: создаётся только отсутствующий Project, но не demo Risk/Decision/Task. Финальный mobile screenshot подтверждает чистый серверный реестр.
+
+Остаётся реальная приёмка на мобильном Telegram: два клика, Edit → preview → Accept/cancel и Reject. Реальный R3 подтверждает прежний RP DM Open → Accept и repeat, но не новый Edit-контур. Production migration 0006 не применялась; `.env`, webhook, Telegram и Notion statuses не изменялись. Следующий обязательный контур — production/controlled-time BL-42 SLA, затем финальная BL-35/SPEC-P0 приёмка после публикации владельцем.
+
 ### Этап 4 — BL-42 · Escalation Engine
 
-- Pending decision: напоминание через 24 часа, эскалация через 48 часов.
-- Просроченное поручение: напоминание сразу при обнаружении, эскалация через 24 часа просрочки.
-- Спонсор read-only; никакого автоматического утверждения или закрытия.
-- Остановка после закрытия, устойчивые ключи событий, restart без дублей, журнал BL-40 и ошибки доставки.
+Production-принятый срез контроля срока: в дату исполнения с 09:00 по времени проекта РП получает в личку вопрос «Поручение выполнено?» с контекстом и ответственным поручения. «Не выполнено» сохраняет открытое состояние и показывает подтверждение ответа; «Выполнено» атомарно закрывает поручение, создаёт один `result.recorded` и отправляет честное L3-уведомление. Реальный R2 прошёл обе ветки RP DM и production restart/replay: три повторных callback дедуплицированы, snapshot БД не изменился.
+
+7 ноября изолированно реализован оставшийся SLA-контур:
+
+- Pending decision: напоминание РП через 24 часа текущей версии, read-only эскалация спонсору через 48 часов.
+- Просроченное поручение: напоминание ответственному в личку с 00:00 следующего календарного дня, через 24 часа просрочки — read-only эскалация спонсору с копией РП.
+- Спонсор не получает approval rights или кнопок; рабочие групповые чаты остаются только для наблюдения.
+- Принятие/отклонение решения и выполнение поручения останавливают новые события. Смена версии создаёт новый SLA-контекст и использует timestamp новой версии.
+- Миграция `0003_bl42_sla_notifications.sql`, устойчивый ключ `object + version + step + recipient`, BL-40 audit, наблюдаемые `failed/unknown` и запрет слепых повторов.
+- Чистая изолированная приёмка: 25/25 unit, прежние 18/18 contract и 6/6 restart/replay, новые 24/24 SLA checks, чистое применение `0003` к baseline 0000–0002. Evidence: `apps/pmo-platform/verifier/v17/sla-contract-summary.json` и `sla-*-evidence.json`.
+
+Staged release `/opt/aipmo-platform/releases/bl42-sla-20261107` проверен по хэшам и составу. **Production не переключён**: существуют два pending-решения старше 24 часов и одно просроченное открытое поручение, поэтому запуск нового scheduler может сразу создать реальные уведомления. Миграция `0003` в production не применялась; `current`, production `.env`, webhook, gateway, БД и работающий сервис не изменялись. Evidence: `/opt/aipmo-platform/bl42-sla-staged-evidence.json`, mode `600`.
+
+Для закрытия production AC BL-42 нужен отдельно согласованный сценарий существующих записей, защищённые owner/sponsor mappings, backup, применение `0003`, контролируемая активация и реальная приёмка без незапланированных уведомлений. BL-35, полный SPEC-P0 и Outcome Loop BL-48 этим срезом не закрываются.
+
+Непубличный пакет `_work/aipmo-p0-bl54-bl41-20261107.tar.gz` проверен локально: 85 файлов, текущий runtime, миграции 0003–0006 и controlled-time sources, без `.env`/credentials/`.git`/логов/backups. SHA-256 `a3e9579f75afcc1e72a6eb583e6f6de64dc78abb2f44bd438c1d1c99eac11901`; evidence `apps/pmo-platform/verifier/v17/p0-release-package-evidence.json`. На VPS не перенесён и не активирован.
+
+Порядок controlled activation: read-only инвентаризация старых pending/overdue записей → явное решение владельца по каждому получателю/событию → backup → защищённые RP/owner/sponsor/founder mappings без смены `.env` → миграции 0003–0006 → проверка staged hashes → публикация владельцем и один restart → проверка отсутствия незапланированных исходящих → controlled-time BL-42 на согласованных R4/R5. До выполнения этих предусловий scheduler в production не активировать.
+
+Read-only inventory 07.11 подтвердил: `current=bl42-completion-feedback-20261107`, журнал 0000–0002, все пять новых таблиц отсутствуют; D-01 и D-02 pending по 31 часу, одно старое поручение просрочено; sponsor/founder/owner mappings отсутствуют. Сервис active, HTTP 200, `.env` и webhook не изменялись. Evidence: `apps/pmo-platform/verifier/v17/p0-production-preflight-evidence.json`.
+
+Controlled baseline завершён на `/opt/aipmo-platform/releases/p0-bl54-bl41-spec-merged-20261108`: **4 успешных SLA-сообщения + 1 внешняя owner failure**, без групповых сообщений и без дублей сущностей. Дополнительно зафиксированы **3 отдельные конфигурационные ошибки** `Не настроен личный получатель с ролью rp` после restart без recipients; они не маскируются и не считаются внешними доставками. Completion-вопроса для просроченного R1 нет: `shouldAskForCompletion` срабатывает только в саму дату срока, поэтому сценарий 5 + 1 был ошибочной гипотезой и не выполнялся.
+
+Merged release содержит проверенный backend P0 и финальный BL-56 landing/workspace/`piemka-avatar.webp`. Protected `.credentials` и recipients восстановлены копированием без публикации секретов; `.env` не изменён. Сервис active, `NRestarts=0`, landing/workspace HTTP 200, webhook без ошибки. Миграции 0003–0006 и все пять таблиц присутствуют. Evidence: `apps/pmo-platform/verifier/v17/p0-recovered-baseline-evidence.json`, `allChecksPassed=true`.
+
+Следующий согласованный шаг: РП отклоняет D-01/D-02 для остановки будущих 48h escalations. Затем R4 — новый реальный pending 24/48 → Reject/stop; R5 — Edit → preview → Accept, completion обе ветки + L3, BL-35/restart. R1 остаётся только техническим SLA/delivery fixture и не выдаётся за выполненный.
+
+### Короткие ID поручений
+
+Новые Task получают последовательные ID `P-01`, `P-02` и далее через атомарный `project_counters` и миграцию `0007_short_task_ids.sql`. Старые длинные ID и связи не переписываются. Production counter равен 5, поэтому следующая новая задача получит `P-06`; повторный Accept не расходует counter. Полный contract: 18/18, BL-41 с дополнительной short-ID проверкой 14/14, unit 35/35. Production `/opt/aipmo-platform/releases/p0-short-task-ids-20261108`, журнал 8, landing/workspace HTTP 200, финальный BL-56 landing сохранён. Evidence: `apps/pmo-platform/verifier/v17/p0-short-task-ids-evidence.json`.
+
+### Короткие ID решений
+
+Новые Decision получают последовательные ID `R-01`, `R-02` через тот же атомарный `project_counters` и миграцию `0008_short_decision_ids.sql`. Старые `D-*` сохранены, а web validation принимает оба формата. Открытие риска связывается по `riskId`, а не преобразованием букв ID. Production decision counter равен 3 — следующая decision `R-04`; task counter 5 — следующая задача `P-06`. Полный contract 18/18, BL-41 14/14, unit 35/35. D-01/D-02 отклонены владельцем, связанных Tasks нет. Production `/opt/aipmo-platform/releases/p0-short-decision-ids-20261108`, журнал 9, landing/workspace HTTP 200, финальный BL-56 landing сохранён. Evidence: `apps/pmo-platform/verifier/v17/p0-short-decision-ids-evidence.json`.
 
 ### Этап 5 — BL-35 и сквозная приёмка P0
 
-- Реальные данные BL-40 вместо демонстрационных объектов.
-- Сквозная навигация, источник, confidence, версии/diff/audit и разрешённые исправления РП.
-- PMO/аудитор и C-level без неразрешённых действий; мобильная проверка.
-- Сохранить эталонную композицию экрана решений; полный редизайн и обязательный чат не добавлять.
-- Выполнить раздел 10 SPEC-P0 целиком и только затем обновить статусы P0 в Notion.
+- **Первый read-only срез принят изолированно 7 ноября:** `pmo.state` не создаёт demo seed при чтении; API и workspace связывают Task ↔ Decision ↔ Risk ↔ Signal, показывают confidence, результат, версию, первичный источник и BL-40/BL-42 audit. Эталонная композиция сохранена, Google Sheets demo sync не перезаписывает серверные данные.
+- **Второй срез принят изолированно 7 ноября:** экран решений показывает версии/diff и attribution; РП может исправить только текст pending-предложения. `pmo.correct` требует admin/РП, создаёт новую proposal version и `record.corrected` без принятия решения или создания Task. Одинаковый retry идемпотентен; accepted/rejected записи и связанные поручения не изменяются, поскольку синхронизация accepted-решения с Task отдельно не специфицирована.
+- Проверки второго среза: 28/28 unit, 18/18 contract, 6/6 restart/replay, 8/8 BL-35 chain, 7/7 correction и 24/24 SLA; typecheck, workspace JS syntax и build успешны. Evidence: `apps/pmo-platform/verifier/v17/bl35-chain-evidence.json` и `bl35-correction-evidence.json`. Production не изменялся.
+- **Третий срез принят изолированно 7 ноября:** миграция `0004_bl35_project_roles.sql` добавляет проектные membership роли. Явная роль PMO/аудитор/C-level/member сохраняет read-only даже при platform admin; только проектный РП может вызывать `pmo.correct` и `pmo.decide`. Стартовый экран показывает свежесть, источники, последние цепочки, конфликты связей и объекты проверки; C-level получает read-only отчёт.
+- Проверки третьего среза: 28/28 unit, 18/18 contract, 6/6 restart/replay, 8/8 BL-35 chain, 7/7 correction, 24/24 SLA и 11/11 project roles/overview/Telegram-status; миграции `0003` и `0004` чисто применены к baseline 0000–0002. Typecheck, workspace JS syntax/token check и build успешны. Evidence: `apps/pmo-platform/verifier/v17/bl35-roles-evidence.json`. Production не изменялся. Telegram `status` и `configure` переведены на проектный `rpQuery`; реальные configure/webhook-вызовы не выполнялись.
+- **Четвёртый срез принят изолированно 7 ноября:** Headless Chrome 390 × 844 на локальной production-сборке и отдельной MySQL — **19/19** mobile checks, ноль JavaScript exceptions и ноль локальных HTTP errors. Проверены обзор, цепочки, результат, confidence/Signal, решения, RP-действия и read-only C-level; восемь screenshots просмотрены визуально. Длинные сквозные кнопки стали читаемыми, demo P-06/P-07 и R-101/R-102 больше не появляются при `SERVER_READY`, автоматический favicon 404 устранён. Evidence: `apps/pmo-platform/verifier/v17/bl35-mobile/bl35-mobile-evidence.json` и восемь PNG в том же каталоге. Навигация выполнялась без мутаций, production и Telegram не использовались.
+- Остаётся: реальные два клика в мобильном Telegram и полная сквозная приёмка раздела 10 SPEC-P0.
+- Выполнить раздел 10 SPEC-P0 целиком и только затем обновить статусы P0 в Notion. Четыре изолированных среза сами по себе не закрывают BL-35 или P0.
+
+### Итоговый отчёт по автономному плану
+
+Consolidated отчёт по срезам и доказательствам: `Администрирование/2026-11-07_AI_PMO_P0_отчёт_по_6ч_плану.md`. Он фиксирует завершённые изолированные реализации и не объявляет полный P0 завершённым до sponsor `/start`, публикации владельцем, controlled baseline, R4/R5 и всех девяти шагов SPEC-P0 §10.
 
 ### После P0
 
-1. **BL-48 · Project Impact / Outcome Loop** — подготовить SPEC-BL-48 перед разработкой.
+Актуальное сопоставление «первоначальный план → сделано → осталось» и отчёты для передачи: `docs/plans/PMO_REMAINING_WORK_2026-11-08.md` и `docs/reports/`.
+
+1. **BL-48 · Project Impact / Outcome Loop** — `docs/specs/SPEC-BL-48-outcome-loop.md` подготовлена отдельно. Первый серверный срез реализован и принят: `outcome_measurements`, RP-only `pmo.recordOutcome`, версии/audit, idempotency, BL-35 exposure и measured L3. Изолированно **11/11**, unit **35/35**. Production `/opt/aipmo-platform/releases/p0-outcome-20261108`, миграция `0009`, журнал 10; на P-06 записано явно synthetic измерение, версия 2 подтверждает эффект −3 дня, прежнее L3 не перезаписывается и не дублируется. Evidence: `apps/pmo-platform/verifier/v17/bl48-outcome-evidence.json`, `bl48-p06-evidence.json`, `bl48-release-evidence.json`.
 2. **BL-50** поставляет результаты поручений; **BL-55** использует результаты, подтверждённые эффекты и причины правок/отклонений для улучшения рекомендаций.
 3. **BL-52 · Email**, затем **BL-43 · MAX** — только по актуальным спецификациям и реальным доступам, без имитации подключения.
 4. Persisted outgoing queue, safe retry, dead-letter и мониторинг — **нет отдельной актуальной спеки; уведомить владельца перед стартом**.

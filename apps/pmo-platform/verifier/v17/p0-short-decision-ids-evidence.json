@@ -1,0 +1,46 @@
+{
+  "scope": "Short sequential Decision IDs with atomic durable counter and riskId-based navigation",
+  "currentRelease": "/opt/aipmo-platform/releases/p0-short-decision-ids-20261108",
+  "archiveSha256": "21d2d2548c54a88c66e2deec64a313926e29412a7dfe65ec2d451f4529f9737e",
+  "bootSha256": "65dda6dfa840629fd8ce531c7e76899350ecca6df46ba0c532fc2367a69fb629",
+  "migration0008Sha256": "258a76645497fd88fd229c9b91d54c52568c0233a115feae133696e6a577e7a8",
+  "backup": {
+    "path": "/opt/aipmo-platform/backups/aipmo-bl42-pre-20261107_231003.sql.gz",
+    "tables": 20,
+    "bytes": 13083,
+    "sha256": "490b86efe5f10d2fd5b5ddddab9849a43d12d081f4aa66663b022e3a08f4c562",
+    "gzipIntegrity": true
+  },
+  "isolatedChecks": {
+    "telegramContract": "18/18",
+    "restartReplay": "6/6",
+    "bl54": "14/14",
+    "bl41": "14/14",
+    "sla": "24/24",
+    "roles": "11/11",
+    "unit": "35/35",
+    "newDecisionId": "R-01",
+    "newTaskId": "P-01",
+    "legacyDecisionIdsAccepted": true,
+    "typecheckAndBuild": true
+  },
+  "production": {
+    "migrationJournalRows": 9,
+    "decisionCounterLastIssued": 3,
+    "nextDecisionId": "R-04",
+    "taskCounterLastIssued": 5,
+    "nextTaskId": "P-06",
+    "oldIdsPreserved": true,
+    "d01Status": "no",
+    "d02Status": "no",
+    "linkedTasksForD01D02": 0,
+    "landingMatchesFinalBl56": true,
+    "workspaceHttp": 200,
+    "landingHttp": 200,
+    "serviceActive": true,
+    "nRestarts": 0
+  },
+  "allChecksPassed": true,
+  "newRealDecisionsTasksOrSignalsCreated": false,
+  "realChatOrUserIdsIncluded": false
+}

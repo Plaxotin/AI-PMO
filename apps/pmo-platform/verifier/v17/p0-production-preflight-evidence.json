@@ -1,0 +1,60 @@
+{
+  "scope": "read-only production inventory only; no release transfer, activation, migration, Telegram sends or new entities",
+  "currentRelease": "/opt/aipmo-platform/releases/bl42-completion-feedback-20261107",
+  "service": {
+    "active": true,
+    "nRestartsZero": true,
+    "workspaceHttp": 200
+  },
+  "productionEnvSha256": "1b93c5c881f1451f6081c48d5ceefad4e62531f90d585082f9a1fac390176715",
+  "productionEnvUnchanged": true,
+  "webhook": {
+    "urlSha256": "7c7ced88b00b9f34edcc1714bd81e57ae0567c5b7cb8377e73f61a629fa9f80b",
+    "pendingUpdateCount": 0,
+    "lastErrorPresent": false
+  },
+  "migrationJournalRows": 3,
+  "newTablePresence": {
+    "telegram_sla_notifications": false,
+    "project_memberships": false,
+    "telegram_onboardings": false,
+    "telegram_digest_deliveries": false,
+    "telegram_pending_edits": false
+  },
+  "activationBlockers": {
+    "pendingDecisionsTotal24h48h": [
+      2,
+      2,
+      0
+    ],
+    "pendingDecisions": [
+      {
+        "decisionId": "D-01",
+        "ageHours": 31
+      },
+      {
+        "decisionId": "D-02",
+        "ageHours": 31
+      }
+    ],
+    "overdueOpenTasks": [
+      {
+        "taskId": "P-D-TG-770070494",
+        "due": "24.09.2026"
+      }
+    ],
+    "completionChecksByStatus": {
+      "done": 1
+    },
+    "existingSlaOrDeliveryEvents": {}
+  },
+  "recipientMappings": {
+    "rpCount": 1,
+    "memberCount": 1,
+    "sponsorCount": 0,
+    "founderCount": 0,
+    "ownerMappingCount": 0
+  },
+  "realChatOrUserIdsIncluded": false,
+  "productionChanged": false
+}

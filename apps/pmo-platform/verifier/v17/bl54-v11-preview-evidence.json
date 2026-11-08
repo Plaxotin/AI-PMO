@@ -1,0 +1,34 @@
+{
+  "scope": "Read-only production DB preview of SPEC-BL-54 v1.1; no Telegram send and no DB writes",
+  "generatedAt": "2026-11-08T20:36:07.107062Z",
+  "checks": {
+    "demo_header_and_section_order": true,
+    "each_list_starts_at_one": true,
+    "no_period_coverage_bullets_or_technical_status": true,
+    "simple_sequential_codes_only": true,
+    "actual_completed_count_matches_db": true,
+    "included_items_match_visible_facts_and_plans": true,
+    "risk_buttons_and_callbacks": true,
+    "source_links_valid_and_sanitized": true,
+    "telegram_length_bounded": true
+  },
+  "allChecksPassed": true,
+  "preview": {
+    "text": "☀️ Дайджест проекта · 08.11.2026\n\n☑️ Факт — что сделано\n1. P-9 · Получить доступ до 10.11.2026 и провести контрольную проверку 11.11.2026\n  Бессонов К. · Завершено: 08.11.26\n  Выполнение подтверждено РП Controlled RP.\n\n2. P-7 · Перенести тестирование на 20.11.2026 или позже либо получить лицензии досрочно (временные/тестовые)\n  Рената Плахотина · Завершено: 07.11.26\n  Выполнение подтверждено РП Konstantin.\n\n3. P-8 · Согласовать сдвиг тестирования на 22.11.2026 и получить от поставщика подтверждение поставки\n  Рената Плахотина · Завершено: 07.11.26\n  Контрольная точка тестирования перенесена на 22.11.2026, поставщик письменно подтвердил поставку 21.11.2026, план проекта обновлён.\n\n📌 План — что дальше\n1. P-6 · Согласовать перенос тестирования на период после 30.09 или обеспечить временные лицензии до 25.09\n  Рената Плахотина · Срок: 24.09.2026 · просрочено\n\n⚠️ Риск — что мешает\n1. P-8 · Сдвиг поставки лицензий 1С грозит срывом тестирования интеграции и приёмки\n  Прогноз: Поставщик перенёс поставку лицензий 1С с 10.11.2026 на 20.11.2026. Тестирование интеграции запланировано на 15.11.2026, до поставки лицензи…\n  Уверенность: 95%\n  Источник: <telegram-source>\n  Решение R-7\n\n2. P-1 · Отпуск ключевого разработчика в спринте 2\n  Прогноз: остановка задач интеграции\n  Уверенность: не оценена\n  Источник: не связан\n\n3. P-2 · Задержка поставки лицензий 1С от вендора\n  Прогноз: невозможность тестирования интеграции\n  Уверенность: не оценена\n  Источник: не связан\n  Решение R-2\n… ещё: 3.",
+    "textLength": 1508,
+    "completedCount": 3,
+    "plannedCount": 1,
+    "riskCount": 6,
+    "includedItemCount": 4,
+    "sourceLinkCount": 1,
+    "sourceLinksValid": true,
+    "buttonLabels": [
+      "Открыть риск P-8",
+      "Открыть риск P-1",
+      "Открыть риск P-2"
+    ],
+    "callbacksPreserved": true
+  },
+  "actualCompletedAtCurrentDate": 3,
+  "realChatOrUserIdsIncluded": false
+}

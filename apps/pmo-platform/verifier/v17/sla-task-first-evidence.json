@@ -1,0 +1,197 @@
+{
+  "mode": "isolated MySQL with synthetic fixtures and mock fetch; no real Telegram connection",
+  "scenario": "task-first",
+  "checks": {
+    "task_due_day_no_event": true,
+    "task_next_day_owner_reminder": true,
+    "task_repeat_no_duplicate": true,
+    "task_24h_sponsor_and_rp_copy": true,
+    "task_no_group_writes_or_buttons": true,
+    "task_audit_and_source_chain": true,
+    "task_done_stops_events": true
+  },
+  "allChecksPassed": true,
+  "calls": [
+    {
+      "chatId": "202",
+      "text": "Напоминание ответственному: поручение просрочено.\n\nПоручение P-SLA-1: Synthetic overdue task\nРиск: Synthetic risk 1\nОтветственный: Владелец теста\nСрок: 07.11.2026\nПросрочка: 0 ч.\nИсточник: https://t.me/c/800/949\nИстория событий: пока нет событий\nПоручение остаётся открытым.",
+      "payload": {
+        "chat_id": "202",
+        "text": "Напоминание ответственному: поручение просрочено.\n\nПоручение P-SLA-1: Synthetic overdue task\nРиск: Synthetic risk 1\nОтветственный: Владелец теста\nСрок: 07.11.2026\nПросрочка: 0 ч.\nИсточник: https://t.me/c/800/949\nИстория событий: пока нет событий\nПоручение остаётся открытым."
+      }
+    },
+    {
+      "chatId": "301",
+      "text": "Эскалация спонсору: поручение просрочено более чем на 24 часа.\n\nПоручение P-SLA-1: Synthetic overdue task\nРиск: Synthetic risk 1\nОтветственный: Владелец теста\nСрок: 07.11.2026\nПросрочка: 24 ч.\nИсточник: https://t.me/c/800/949\nИстория событий: task.reminded\nАвтоматического закрытия нет; действия утверждения спонсору недоступны.",
+      "payload": {
+        "chat_id": "301",
+        "text": "Эскалация спонсору: поручение просрочено более чем на 24 часа.\n\nПоручение P-SLA-1: Synthetic overdue task\nРиск: Synthetic risk 1\nОтветственный: Владелец теста\nСрок: 07.11.2026\nПросрочка: 24 ч.\nИсточник: https://t.me/c/800/949\nИстория событий: task.reminded\nАвтоматического закрытия нет; действия утверждения спонсору недоступны."
+      }
+    },
+    {
+      "chatId": "101",
+      "text": "Копия РП: поручение эскалировано после 24 часов просрочки.\n\nПоручение P-SLA-1: Synthetic overdue task\nРиск: Synthetic risk 1\nОтветственный: Владелец теста\nСрок: 07.11.2026\nПросрочка: 24 ч.\nИсточник: https://t.me/c/800/949\nИстория событий: task.reminded\nАвтоматического закрытия нет; действия утверждения спонсору недоступны.",
+      "payload": {
+        "chat_id": "101",
+        "text": "Копия РП: поручение эскалировано после 24 часов просрочки.\n\nПоручение P-SLA-1: Synthetic overdue task\nРиск: Synthetic risk 1\nОтветственный: Владелец теста\nСрок: 07.11.2026\nПросрочка: 24 ч.\nИсточник: https://t.me/c/800/949\nИстория событий: task.reminded\nАвтоматического закрытия нет; действия утверждения спонсору недоступны."
+      }
+    }
+  ],
+  "database": {
+    "notifications": [
+      {
+        "id": 12,
+        "objectType": "task",
+        "objectId": "P-SLA-1",
+        "objectVersion": "v7d16d649a670162c6e37d19c",
+        "step": "reminder",
+        "recipientRole": "owner",
+        "recipientConfigured": true,
+        "status": "sent",
+        "messageId": 8001,
+        "error": null
+      },
+      {
+        "id": 15,
+        "objectType": "task",
+        "objectId": "P-SLA-1",
+        "objectVersion": "v7d16d649a670162c6e37d19c",
+        "step": "escalation",
+        "recipientRole": "sponsor",
+        "recipientConfigured": true,
+        "status": "sent",
+        "messageId": 8002,
+        "error": null
+      },
+      {
+        "id": 16,
+        "objectType": "task",
+        "objectId": "P-SLA-1",
+        "objectVersion": "v7d16d649a670162c6e37d19c",
+        "step": "escalation",
+        "recipientRole": "rp",
+        "recipientConfigured": true,
+        "status": "sent",
+        "messageId": 8003,
+        "error": null
+      }
+    ],
+    "events": [
+      {
+        "entityType": "proposal",
+        "entityId": "D-SLA-1",
+        "eventType": "proposal.created",
+        "relatedId": "R-SLA-1",
+        "version": 1,
+        "sourceLinks": null,
+        "metadata": null
+      },
+      {
+        "entityType": "task",
+        "entityId": "P-SLA-1",
+        "eventType": "task.reminded",
+        "relatedId": "D-SLA-1",
+        "version": 1,
+        "sourceLinks": [
+          {
+            "url": "https://t.me/c/800/949",
+            "type": "telegram_message",
+            "status": "available",
+            "sourceId": "Telegram · чат -100800 · сообщение 949"
+          }
+        ],
+        "metadata": {
+          "slaStep": "reminder",
+          "delivery": "sla",
+          "messageId": 8001,
+          "objectVersion": "v7d16d649a670162c6e37d19c",
+          "recipientRole": "owner",
+          "notificationId": 12
+        }
+      },
+      {
+        "entityType": "task",
+        "entityId": "P-SLA-1",
+        "eventType": "task.escalated",
+        "relatedId": "D-SLA-1",
+        "version": 1,
+        "sourceLinks": [
+          {
+            "url": "https://t.me/c/800/949",
+            "type": "telegram_message",
+            "status": "available",
+            "sourceId": "Telegram · чат -100800 · сообщение 949"
+          }
+        ],
+        "metadata": {
+          "slaStep": "escalation",
+          "delivery": "sla",
+          "messageId": 8002,
+          "objectVersion": "v7d16d649a670162c6e37d19c",
+          "recipientRole": "sponsor",
+          "notificationId": 15
+        }
+      },
+      {
+        "entityType": "task",
+        "entityId": "P-SLA-1",
+        "eventType": "task.escalated",
+        "relatedId": "D-SLA-1",
+        "version": 1,
+        "sourceLinks": [
+          {
+            "url": "https://t.me/c/800/949",
+            "type": "telegram_message",
+            "status": "available",
+            "sourceId": "Telegram · чат -100800 · сообщение 949"
+          }
+        ],
+        "metadata": {
+          "slaStep": "escalation",
+          "delivery": "sla",
+          "messageId": 8003,
+          "objectVersion": "v7d16d649a670162c6e37d19c",
+          "recipientRole": "rp",
+          "notificationId": 16
+        }
+      }
+    ]
+  },
+  "summaries": {
+    "dueDay": {
+      "claimed": 0,
+      "sent": 0,
+      "duplicates": 0,
+      "failed": 0,
+      "unknown": 0
+    },
+    "nextDay": {
+      "claimed": 1,
+      "sent": 1,
+      "duplicates": 0,
+      "failed": 0,
+      "unknown": 0
+    },
+    "repeat": {
+      "claimed": 0,
+      "sent": 0,
+      "duplicates": 1,
+      "failed": 0,
+      "unknown": 0
+    },
+    "at24": {
+      "claimed": 2,
+      "sent": 2,
+      "duplicates": 1,
+      "failed": 0,
+      "unknown": 0
+    },
+    "done": {
+      "claimed": 0,
+      "sent": 0,
+      "duplicates": 0,
+      "failed": 0,
+      "unknown": 0
+    }
+  }
+}

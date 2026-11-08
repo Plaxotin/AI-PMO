@@ -1,0 +1,118 @@
+{
+  "mode": "isolated MySQL with synthetic fixtures and mock fetch; no real Telegram connection",
+  "scenario": "decision-late",
+  "checks": {
+    "decision_downtime_records_reminder_and_escalation": true
+  },
+  "allChecksPassed": true,
+  "calls": [
+    {
+      "chatId": "101",
+      "text": "Напоминание: предложение ожидает решения РП более 24 часов.\n\nРиск: Synthetic risk 1\nПредложение D-SLA-1: Synthetic proposal 1\nОтветственный: Владелец теста\nСрок: 09.11.2026\nОжидание решения: 48 ч.\nИсточник: https://t.me/c/800/949\nИстория событий: proposal.created\nРешение остаётся за РП; автоматического принятия нет.",
+      "payload": {
+        "chat_id": "101",
+        "text": "Напоминание: предложение ожидает решения РП более 24 часов.\n\nРиск: Synthetic risk 1\nПредложение D-SLA-1: Synthetic proposal 1\nОтветственный: Владелец теста\nСрок: 09.11.2026\nОжидание решения: 48 ч.\nИсточник: https://t.me/c/800/949\nИстория событий: proposal.created\nРешение остаётся за РП; автоматического принятия нет."
+      }
+    },
+    {
+      "chatId": "301",
+      "text": "Эскалация спонсору: предложение ожидает решения более 48 часов.\n\nРиск: Synthetic risk 1\nПредложение D-SLA-1: Synthetic proposal 1\nОтветственный: Владелец теста\nСрок: 09.11.2026\nОжидание решения: 48 ч.\nИсточник: https://t.me/c/800/949\nИстория событий: proposal.created\nРежим спонсора: только чтение, без действий утверждения.",
+      "payload": {
+        "chat_id": "301",
+        "text": "Эскалация спонсору: предложение ожидает решения более 48 часов.\n\nРиск: Synthetic risk 1\nПредложение D-SLA-1: Synthetic proposal 1\nОтветственный: Владелец теста\nСрок: 09.11.2026\nОжидание решения: 48 ч.\nИсточник: https://t.me/c/800/949\nИстория событий: proposal.created\nРежим спонсора: только чтение, без действий утверждения."
+      }
+    }
+  ],
+  "database": {
+    "notifications": [
+      {
+        "id": 10,
+        "objectType": "decision",
+        "objectId": "D-SLA-1",
+        "objectVersion": "v1",
+        "step": "reminder",
+        "recipientRole": "rp",
+        "recipientConfigured": true,
+        "status": "sent",
+        "messageId": 8001,
+        "error": null
+      },
+      {
+        "id": 11,
+        "objectType": "decision",
+        "objectId": "D-SLA-1",
+        "objectVersion": "v1",
+        "step": "escalation",
+        "recipientRole": "sponsor",
+        "recipientConfigured": true,
+        "status": "sent",
+        "messageId": 8002,
+        "error": null
+      }
+    ],
+    "events": [
+      {
+        "entityType": "proposal",
+        "entityId": "D-SLA-1",
+        "eventType": "proposal.created",
+        "relatedId": "R-SLA-1",
+        "version": 1,
+        "sourceLinks": null,
+        "metadata": null
+      },
+      {
+        "entityType": "decision",
+        "entityId": "D-SLA-1",
+        "eventType": "decision.reminded",
+        "relatedId": "R-SLA-1",
+        "version": 1,
+        "sourceLinks": [
+          {
+            "url": "https://t.me/c/800/949",
+            "type": "telegram_message",
+            "status": "available",
+            "sourceId": "Telegram · чат -100800 · сообщение 949"
+          }
+        ],
+        "metadata": {
+          "slaStep": "reminder",
+          "delivery": "sla",
+          "messageId": 8001,
+          "objectVersion": "v1",
+          "recipientRole": "rp",
+          "notificationId": 10
+        }
+      },
+      {
+        "entityType": "decision",
+        "entityId": "D-SLA-1",
+        "eventType": "decision.escalated",
+        "relatedId": "R-SLA-1",
+        "version": 1,
+        "sourceLinks": [
+          {
+            "url": "https://t.me/c/800/949",
+            "type": "telegram_message",
+            "status": "available",
+            "sourceId": "Telegram · чат -100800 · сообщение 949"
+          }
+        ],
+        "metadata": {
+          "slaStep": "escalation",
+          "delivery": "sla",
+          "messageId": 8002,
+          "objectVersion": "v1",
+          "recipientRole": "sponsor",
+          "notificationId": 11
+        }
+      }
+    ]
+  },
+  "summary": {
+    "claimed": 2,
+    "sent": 2,
+    "duplicates": 0,
+    "failed": 0,
+    "unknown": 0
+  }
+}

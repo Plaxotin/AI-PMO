@@ -1,0 +1,29 @@
+{
+  "scope": "Local release package verification only; not staged on VPS, not published, no production migration or Telegram sends",
+  "archive": "C:\\Users\\plaxo\\OneDrive\\Desktop\\стартап AI PMO\\_work\\aipmo-p0-bl54-bl41-20261107.tar.gz",
+  "archiveSha256": "b8af36ce0e32e828114dedbee713f3c698a990ab51c5b06acd62323926c048f9",
+  "fileCount": 97,
+  "hashes": {
+    "dist/boot.js": "0597db83b80060ee454a29e73ebcc777d7fe858b0e036a83baac178507786b0a",
+    "db/migrations/0003_bl42_sla_notifications.sql": "7031567b547255d71be0e01e1700282da29464b4f83cf06c2dd55d20591d08c4",
+    "db/migrations/0004_bl35_project_roles.sql": "06d5dd97d18e3d00c6ada2d21f17a310a949e50a461f768d61aa9351cd418f6c",
+    "db/migrations/0005_bl54_first_value.sql": "9b93e2f5694a446da37e90969a6875f715d06bf07babd7365c4b24f29106a8d2",
+    "db/migrations/0006_bl41_telegram_edits.sql": "2e4cd07a2e52ac4127d1e4de7d86331724bef8948bde7288c47353f04b1bb75f",
+    "db/migrations/0007_short_task_ids.sql": "63a02c3c91e9e9bf7a30fe2e1df7efcc4d4c1755ed60569cad3bb5be15a57311",
+    "db/migrations/0008_short_decision_ids.sql": "258a76645497fd88fd229c9b91d54c52568c0233a115feae133696e6a577e7a8",
+    "db/migrations/0009_bl48_outcome_measurements.sql": "494b77412fda2161877020da75b8e2d54ef9b27fabc543dd5a290a12a6d1b532"
+  },
+  "checks": {
+    "archiveReadable": true,
+    "bootHashMatchesBuild": true,
+    "runtimeAndStaticPresent": true,
+    "migrations0003To0009Present": true,
+    "controlledHarnessSourcesPresent": true,
+    "packageManifestPresent": true,
+    "noSecretsCredentialsGitLogsOrBackups": true,
+    "productionEnvNotIncluded": true
+  },
+  "allChecksPassed": true,
+  "publicationPerformed": false,
+  "productionChanged": false
+}

@@ -1,0 +1,58 @@
+{
+  "scope": "Real first BL-54 digest after one actual hour and restart/repeat",
+  "firstSummary": {
+    "claimed": 0,
+    "sent": 0,
+    "duplicates": 2,
+    "failed": 0,
+    "unknown": 0
+  },
+  "repeatAfterRestart": {
+    "claimed": 0,
+    "sent": 0,
+    "duplicates": 2,
+    "failed": 0,
+    "unknown": 0
+  },
+  "deliveries": [
+    {
+      "kind": "welcome",
+      "status": "sent",
+      "count": 1
+    },
+    {
+      "kind": "first",
+      "status": "sent",
+      "count": 1
+    },
+    {
+      "kind": "daily",
+      "status": "sent",
+      "count": 1
+    },
+    {
+      "kind": "founder",
+      "status": "sent",
+      "count": 1
+    }
+  ],
+  "auditCounts": {
+    "channel.connected": 1,
+    "connection.welcomed": 1,
+    "digest.sent": 2,
+    "founder.notified": 1
+  },
+  "onboarding": {
+    "connectedAt": "2026-11-08 07:19:44",
+    "firstDigestDueAt": "2026-11-08 08:19:44"
+  },
+  "checks": {
+    "firstDigestSent": true,
+    "welcomeAndFounderSent": true,
+    "firstDigestAuditExactlyOnce": false,
+    "restartRepeatNoResend": true,
+    "onboardingTimingRecorded": true
+  },
+  "allChecksPassed": false,
+  "realChatOrUserIdsIncluded": false
+}

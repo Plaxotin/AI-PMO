@@ -21,6 +21,17 @@ function ids(value: string | undefined) {
   return new Set((value || "").split(",").map((x) => x.trim()).filter(Boolean));
 }
 
+function ownerUserIds(value: string | undefined) {
+  if (!value?.trim()) return {} as Record<string, string>;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {} as Record<string, string>;
+    return Object.fromEntries(Object.entries(parsed).filter(([name, id]) => name.trim() && typeof id === "string" && id.trim())) as Record<string, string>;
+  } catch {
+    return {} as Record<string, string>;
+  }
+}
+
 export function getTelegramConfig() {
   const token = process.env.TELEGRAM_BOT_TOKEN || "";
   const projectChatIds = ids(process.env.TELEGRAM_PROJECT_CHAT_IDS || process.env.TELEGRAM_PROJECT_CHAT_ID);
@@ -32,6 +43,9 @@ export function getTelegramConfig() {
     projectChatIds,
     rpUserIds: ids(process.env.TELEGRAM_RP_USER_IDS),
     memberUserIds: ids(process.env.TELEGRAM_MEMBER_USER_IDS),
+    sponsorUserIds: ids(process.env.TELEGRAM_SPONSOR_USER_IDS),
+    founderUserIds: ids(process.env.TELEGRAM_FOUNDER_USER_IDS),
+    ownerUserIds: ownerUserIds(process.env.TELEGRAM_OWNER_USER_IDS_JSON),
     apiBaseUrl: (process.env.TELEGRAM_API_BASE_URL || "https://api.telegram.org").replace(/\/+$/, ""),
   };
 }

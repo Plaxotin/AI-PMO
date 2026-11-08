@@ -1,0 +1,13 @@
+{
+  "scope": "protected recipient preparation only; no restart, activation or Telegram sends",
+  "ownerTaskId": "P-D-TG-770070494",
+  "ownerMappingPrepared": true,
+  "ownerMappingTarget": "existing_test_member",
+  "memberPrivateMessageCount": 0,
+  "newPrivateStartCandidatesAfterKnownRoles": 0,
+  "sponsorConfigured": false,
+  "founderConfigured": false,
+  "overrideMode": "600",
+  "productionEnvChanged": false,
+  "realChatOrUserIdsIncluded": false
+}

@@ -1,0 +1,65 @@
+{
+  "mode": "BL-41 Telegram Edit through real route handlers on isolated MySQL with synthetic fixtures and mock AI/Telegram; no production or real Telegram calls",
+  "checks": {
+    "non_rp_cannot_start_edit": true,
+    "edit_starts_pending_without_mutating_proposal": true,
+    "accept_is_blocked_until_preview_or_cancel": true,
+    "one_instruction_creates_preview_without_mutating_original": true,
+    "accept_applies_version_diff_attribution_decision_and_task_atomically": true,
+    "repeated_accept_has_no_duplicates": true,
+    "short_task_id_atomic_and_repeat_stable": true,
+    "decision_does_not_create_demo_seed_records": true,
+    "cancel_after_preview_preserves_original_and_creates_no_version_or_task": true,
+    "reject_creates_decision_without_task": true,
+    "stale_preview_cannot_overwrite_newer_version": true,
+    "ai_failure_preserves_original_and_allows_explicit_retry": true,
+    "opened_card_has_no_more_than_three_actions": true,
+    "all_new_outbound_messages_stay_in_rp_dm": true
+  },
+  "allChecksPassed": true,
+  "result": {
+    "accepted": {
+      "status": "ok",
+      "version": 2,
+      "tasks": 1
+    },
+    "versions": [
+      {
+        "version": 1,
+        "actorRole": "system",
+        "editDistance": null
+      },
+      {
+        "version": 2,
+        "actorRole": "rp",
+        "editDistance": 27
+      }
+    ],
+    "eventTypes": [
+      "risk.opened",
+      "proposal.edited",
+      "decision.accepted",
+      "task.created"
+    ],
+    "cancel": {
+      "status": "wait",
+      "version": 1,
+      "versions": 1
+    },
+    "reject": {
+      "status": "no",
+      "tasks": 0
+    },
+    "stale": {
+      "callback": "error",
+      "status": "wait",
+      "version": 2
+    },
+    "aiRetry": {
+      "first": "error",
+      "retry": "processed"
+    },
+    "aiChatCalls": 7,
+    "telegramCalls": 26
+  }
+}

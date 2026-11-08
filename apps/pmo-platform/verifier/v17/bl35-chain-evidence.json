@@ -1,0 +1,39 @@
+{
+  "mode": "BL-35 read-only audit chain on isolated MySQL after the real-format contract fixture; no production connection and no Telegram sends",
+  "checks": {
+    "read_has_no_demo_seed_side_effect": true,
+    "repeated_read_is_stable": true,
+    "signal_exposed_with_author_and_primary_source": true,
+    "risk_has_confidence_and_signal": true,
+    "decision_has_version_risk_and_signal": true,
+    "task_has_result_decision_and_signal": true,
+    "complete_chain_uses_one_primary_source": true,
+    "proposal_versions_and_audit_are_returned": true
+  },
+  "allChecksPassed": true,
+  "countsBeforeAndAfterReads": {
+    "before": {
+      "signals": 4,
+      "risks": 1,
+      "decisions": 1,
+      "tasks": 1
+    },
+    "after": {
+      "signals": 4,
+      "risks": 1,
+      "decisions": 1,
+      "tasks": 1
+    }
+  },
+  "chain": {
+    "signal": "S-TG-978100001",
+    "risk": "R-TG-978100001",
+    "decision": "R-01",
+    "task": "P-01",
+    "sourceAvailable": true,
+    "sourceUrl": "https://t.me/c/900/900",
+    "confidence": 94,
+    "proposalVersion": 1,
+    "resultPresent": true
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "mode": "BL-48 outcome measurements and L3 on isolated MySQL with synthetic users/fixtures and mock Telegram; no production connection or real sends",
+  "checks": {
+    "no_measurement_is_not_confirmed": true,
+    "pmo_and_c_level_cannot_record": true,
+    "invalid_baseline_rejected": true,
+    "valid_measurement_confirms_numeric_effect": true,
+    "identical_retry_is_idempotent": true,
+    "correction_creates_version_two_and_preserves_original": true,
+    "audit_has_rp_attribution_and_source": true,
+    "effect_audit_uses_measured_assessment": true,
+    "bl35_exposes_measurement_and_assessment": true,
+    "c_level_is_read_only": true,
+    "l3_uses_measured_effect_once": true
+  },
+  "allChecksPassed": true,
+  "result": {
+    "noMeasurement": null,
+    "firstAssessment": {
+      "expectedEffect": "Сократить срок на 2 дня",
+      "status": "confirmed",
+      "text": "Изменение срока: −2 дн. (baseline 10 → actual 8 days)",
+      "basis": "schedule_days · baseline 10 → actual 8 days · цель 8 · Synthetic project schedule measurement · sourceId BL48-SYNTHETIC-001 · версия 1"
+    },
+    "correctedAssessment": {
+      "expectedEffect": "Сократить срок на 2 дня",
+      "status": "confirmed",
+      "text": "Изменение срока: −3 дн. (baseline 10 → actual 7 days)",
+      "basis": "schedule_days · baseline 10 → actual 7 days · цель 8 · Synthetic project schedule measurement · sourceId BL48-SYNTHETIC-001 · версия 2"
+    },
+    "versions": [
+      {
+        "version": 1,
+        "status": "superseded",
+        "previousVersionId": null
+      },
+      {
+        "version": 2,
+        "status": "confirmed",
+        "previousVersionId": 1
+      }
+    ],
+    "outcomeEventTypes": [
+      "outcome.recorded",
+      "outcome.corrected"
+    ],
+    "firstEffect": true,
+    "repeatedEffect": false,
+    "telegramCalls": 1
+  }
+}

@@ -1,0 +1,126 @@
+{
+  "scope": "Recovered controlled baseline: 4 successful SLA messages + 1 external owner failure + 3 documented credential failures; no completion prompt for past-due R1",
+  "currentRelease": "/opt/aipmo-platform/releases/p0-bl54-bl41-spec-merged-20261108",
+  "migrationJournalRows": 7,
+  "successfulSlaMessages": 4,
+  "ownerExternalFailures": 1,
+  "documentedCredentialFailures": 3,
+  "completionPromptsForPastDueR1": 0,
+  "notificationKeys": [
+    {
+      "objectType": "decision",
+      "objectId": "D-01",
+      "step": "reminder",
+      "recipientRole": "rp",
+      "status": "failed"
+    },
+    {
+      "objectType": "decision",
+      "objectId": "D-01",
+      "step": "reminder",
+      "recipientRole": "rp",
+      "status": "sent"
+    },
+    {
+      "objectType": "decision",
+      "objectId": "D-02",
+      "step": "reminder",
+      "recipientRole": "rp",
+      "status": "failed"
+    },
+    {
+      "objectType": "decision",
+      "objectId": "D-02",
+      "step": "reminder",
+      "recipientRole": "rp",
+      "status": "sent"
+    },
+    {
+      "objectType": "task",
+      "objectId": "P-D-TG-770070494",
+      "step": "escalation",
+      "recipientRole": "rp",
+      "status": "failed"
+    },
+    {
+      "objectType": "task",
+      "objectId": "P-D-TG-770070494",
+      "step": "escalation",
+      "recipientRole": "rp",
+      "status": "sent"
+    },
+    {
+      "objectType": "task",
+      "objectId": "P-D-TG-770070494",
+      "step": "escalation",
+      "recipientRole": "sponsor",
+      "status": "sent"
+    },
+    {
+      "objectType": "task",
+      "objectId": "P-D-TG-770070494",
+      "step": "reminder",
+      "recipientRole": "owner",
+      "status": "failed"
+    }
+  ],
+  "auditCounts": [
+    {
+      "entityId": "D-01",
+      "eventType": "decision.reminded",
+      "count": 1
+    },
+    {
+      "entityId": "D-01",
+      "eventType": "delivery.failed",
+      "count": 1
+    },
+    {
+      "entityId": "D-02",
+      "eventType": "decision.reminded",
+      "count": 1
+    },
+    {
+      "entityId": "D-02",
+      "eventType": "delivery.failed",
+      "count": 1
+    },
+    {
+      "entityId": "P-D-TG-770070494",
+      "eventType": "delivery.failed",
+      "count": 2
+    },
+    {
+      "entityId": "P-D-TG-770070494",
+      "eventType": "task.escalated",
+      "count": 2
+    }
+  ],
+  "decisionStates": {
+    "D-01": "wait",
+    "D-02": "wait"
+  },
+  "technicalR1Status": "new",
+  "webhook": {
+    "urlSha256": "7c7ced88b00b9f34edcc1714bd81e57ae0567c5b7cb8377e73f61a629fa9f80b",
+    "pendingUpdateCount": 0,
+    "lastErrorPresent": false
+  },
+  "checks": {
+    "expectedCurrentRelease": true,
+    "serviceAndPagesHealthy": true,
+    "productionEnvUnchanged": true,
+    "webhookHealthy": true,
+    "migrations0003To0006Applied": true,
+    "exactFourSuccessfulSlaMessages": true,
+    "exactOwnerExternalFailure": true,
+    "exactThreeDocumentedCredentialFailures": true,
+    "exactRecoveredAuditCounts": true,
+    "noCompletionPromptForPastDueR1": true,
+    "legacyDecisionsPendingWithoutTasks": true,
+    "technicalR1NotMarkedDone": true,
+    "noRealIdsExported": true
+  },
+  "allChecksPassed": true,
+  "realChatOrUserIdsIncluded": false
+}

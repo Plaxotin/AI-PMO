@@ -1,0 +1,27 @@
+{
+  "scope": "R-04 read-only baseline before controlled SLA; no new messages by verifier",
+  "decisionId": "R-04",
+  "riskId": "R-TG-770070520",
+  "status": "wait",
+  "proposalVersion": 1,
+  "proposalDue": "2026-11-20",
+  "confidence": 95,
+  "signalCount": 1,
+  "taskCount": 0,
+  "auditCounts": {
+    "proposal.created": 1,
+    "risk.recorded": 1,
+    "signal.received": 1
+  },
+  "checks": {
+    "exactlyOneR4Signal": true,
+    "r04PendingVersionOne": true,
+    "confidencePresent": true,
+    "sourceAvailable": true,
+    "noTaskBeforeReject": true,
+    "baseAuditExactlyOnce": true,
+    "noPriorSlaEvents": true
+  },
+  "allChecksPassed": true,
+  "realChatOrUserIdsIncluded": false
+}

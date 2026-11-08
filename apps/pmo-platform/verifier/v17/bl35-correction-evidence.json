@@ -1,0 +1,34 @@
+{
+  "mode": "BL-35 correction through tRPC on isolated MySQL; no production connection and no Telegram sends",
+  "checks": {
+    "direct_member_request_forbidden": true,
+    "rp_correction_creates_version_two": true,
+    "identical_retry_has_no_duplicate": true,
+    "original_origin_and_diff_preserved": true,
+    "audit_records_correction_without_acceptance": true,
+    "no_task_created_by_correction": true,
+    "decided_proposal_conflict": true
+  },
+  "allChecksPassed": true,
+  "result": {
+    "status": "wait",
+    "currentVersion": 2,
+    "storedVersions": 2,
+    "correctionEvents": 1,
+    "tasks": 0,
+    "memberDenied": true,
+    "decidedDenied": true,
+    "auditEvent": {
+      "actorRole": "rp",
+      "channel": "web",
+      "version": 2,
+      "eventType": "record.corrected"
+    },
+    "auditCriteria": {
+      "actorRole": true,
+      "channel": true,
+      "version": true,
+      "status": true
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "scope": "P-06 completion via direct backend functions and restart/replay; no physical click or fabricated Telegram callback ID",
+  "firstBackendCall": {
+    "outcome": {
+      "kind": "already_done"
+    },
+    "effectSent": false
+  },
+  "repeatBackendCall": {
+    "outcome": {
+      "kind": "already_done"
+    },
+    "effectSent": false
+  },
+  "restartUpdateReplay": {
+    "ok": true,
+    "duplicate": true
+  },
+  "taskStatus": "done",
+  "completedByNamePresent": true,
+  "completionStatus": "done",
+  "effectStatus": "sent",
+  "auditCounts": {
+    "effect.reported": 1,
+    "result.recorded": 1
+  },
+  "checks": {
+    "taskDoneWithAttribution": true,
+    "completionDoneAndEffectSent": true,
+    "exactResultAndEffectAudit": true,
+    "honestUnconfirmedEffect": true,
+    "repeatBackendAlreadyDone": true,
+    "repeatEffectNotResent": true,
+    "restartUpdateReplayDeduplicated": true
+  },
+  "allChecksPassed": true,
+  "realChatOrUserIdsIncluded": false
+}

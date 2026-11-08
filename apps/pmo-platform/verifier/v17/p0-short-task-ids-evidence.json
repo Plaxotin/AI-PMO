@@ -1,0 +1,43 @@
+{
+  "scope": "Short sequential Task IDs with atomic durable counter; production migration and merged release verification",
+  "currentRelease": "/opt/aipmo-platform/releases/p0-short-task-ids-20261108",
+  "archiveSha256": "4d94d776ccfcc3a0dfeff9263eb3b8c57172948998a737f60b7ece060bfe9f08",
+  "bootSha256": "b160dd4d394ac56bee0a40f8b65de8909e6f97eeeb60fe2bd2e3e28f997005cb",
+  "migration0007Sha256": "63a02c3c91e9e9bf7a30fe2e1df7efcc4d4c1755ed60569cad3bb5be15a57311",
+  "backup": {
+    "path": "/opt/aipmo-platform/backups/aipmo-bl42-pre-20261107_225019.sql.gz",
+    "tables": 19,
+    "bytes": 12934,
+    "sha256": "a11a26fa52502562c6295ed526aab5ad993f4c7c6d43db633e1b3951e1f999e8",
+    "gzipIntegrity": true
+  },
+  "isolatedChecks": {
+    "telegramContract": "18/18",
+    "restartReplay": "6/6",
+    "bl54": "14/14",
+    "bl41IncludingShortId": "14/14",
+    "sla": "24/24",
+    "roles": "11/11",
+    "unit": "35/35",
+    "typecheckAndBuild": true
+  },
+  "production": {
+    "migrationJournalRows": 8,
+    "projectCountersPresent": true,
+    "taskCounterLastIssued": 5,
+    "nextTaskId": "P-06",
+    "oldTaskIdsPreserved": true,
+    "landingMatchesFinalBl56": true,
+    "workspaceHttp": 200,
+    "landingHttp": 200,
+    "serviceActive": true,
+    "nRestarts": 11
+  },
+  "incidentsResolved": {
+    "diskFullDuringDependencyCopy": "Removed only obsolete agent-created staged directories; current release and database preserved. New release uses a symlink to compatible node_modules.",
+    "workingDirectoryPermissionDenied": "Changed new release ownership to aipmo-platform and restarted successfully; NRestarts increased during failed attempts and is reported honestly."
+  },
+  "allChecksPassed": true,
+  "newRealTasksOrSignalsCreated": false,
+  "realChatOrUserIdsIncluded": false
+}

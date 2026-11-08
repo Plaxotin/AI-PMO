@@ -37,4 +37,15 @@ describe("Telegram roles", () => {
     expect(telegramRole(20, config as ReturnType<typeof getTelegramConfig>)).toBe("member");
     expect(telegramRole(30, config as ReturnType<typeof getTelegramConfig>)).toBeNull();
   });
+
+  it("loads sponsor and owner delivery targets without granting approval rights", () => {
+    vi.stubEnv("TELEGRAM_SPONSOR_USER_IDS", "30, 31");
+    vi.stubEnv("TELEGRAM_OWNER_USER_IDS_JSON", '{"Владелец теста":"20"}');
+    const config = getTelegramConfig();
+
+    expect([...config.sponsorUserIds]).toEqual(["30", "31"]);
+    expect(config.ownerUserIds).toEqual({ "Владелец теста": "20" });
+    expect(telegramRole(30, config)).toBeNull();
+    expect(telegramRole(31, config)).toBeNull();
+  });
 });

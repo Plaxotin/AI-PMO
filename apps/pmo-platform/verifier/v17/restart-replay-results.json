@@ -1,0 +1,12 @@
+{
+  "mode": "restart/replay on the same isolated MySQL database with mock Telegram Bot API and mock AI; not a real Telegram connection",
+  "checks": {
+    "restart_preserves_registry_and_audit": true,
+    "restart_scheduler_does_not_repeat_question_or_effect": true,
+    "replay_message_callback_result_migration_no_duplicates": true,
+    "replay_does_not_repeat_ai_or_telegram": true,
+    "task_decision_risk_signal_source_chain": true,
+    "migration_alias_and_history_survive_restart": true
+  },
+  "all_checks_passed": true
+}

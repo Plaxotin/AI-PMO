@@ -36,6 +36,26 @@ export const projects = mysqlTable("projects", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+export const projectCounters = mysqlTable("project_counters", {
+  projectId: varchar("projectId", { length: 64 }).notNull(),
+  counterName: varchar("counterName", { length: 32 }).notNull(),
+  nextValue: bigint("nextValue", { mode: "number", unsigned: true }).notNull(),
+}, (table) => ({
+  projectCounterUnique: uniqueIndex("project_counters_project_name_unique").on(table.projectId, table.counterName),
+}));
+
+export const projectMemberships = mysqlTable("project_memberships", {
+  id: serial("id").primaryKey(),
+  projectId: varchar("projectId", { length: 64 }).notNull(),
+  userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+  role: mysqlEnum("role", ["member", "rp", "pmo", "auditor", "c_level"]).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => ({
+  projectUserUnique: uniqueIndex("project_memberships_project_user_unique").on(table.projectId, table.userId),
+  projectRoleIdx: index("project_memberships_project_role_idx").on(table.projectId, table.role),
+}));
+
 export const channels = mysqlTable("channels", {
   id: varchar("id", { length: 64 }).primaryKey(),
   projectId: varchar("projectId", { length: 64 }).notNull(),
@@ -185,6 +205,136 @@ export const telegramPendingResults = mysqlTable("telegram_pending_results", {
   taskIdx: index("telegram_pending_task_idx").on(table.taskId),
 }));
 
+export const telegramPendingEdits = mysqlTable("telegram_pending_edits", {
+  id: serial("id").primaryKey(),
+  decisionId: varchar("decisionId", { length: 64 }).notNull(),
+  chatId: varchar("chatId", { length: 64 }).notNull(),
+  userId: varchar("userId", { length: 64 }).notNull(),
+  sourceVersion: int("sourceVersion", { unsigned: true }).notNull(),
+  instruction: text("instruction"),
+  previewTitle: text("previewTitle"),
+  previewOwner: varchar("previewOwner", { length: 255 }),
+  previewDue: varchar("previewDue", { length: 16 }),
+  status: mysqlEnum("status", ["pending", "processing", "preview", "cancelled", "accepted"]).default("pending").notNull(),
+  error: text("error"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => ({
+  decisionUserUnique: uniqueIndex("telegram_pending_edits_decision_user_unique").on(table.decisionId, table.userId),
+  chatStatusIdx: index("telegram_pending_edits_chat_status_idx").on(table.chatId, table.userId, table.status),
+}));
+
+export const telegramCompletionChecks = mysqlTable("telegram_completion_checks", {
+  id: serial("id").primaryKey(),
+  taskId: varchar("taskId", { length: 64 }).notNull(),
+  dueVersion: varchar("dueVersion", { length: 16 }).notNull(),
+  chatId: varchar("chatId", { length: 64 }).notNull(),
+  userId: varchar("userId", { length: 64 }).notNull(),
+  promptMessageId: bigint("promptMessageId", { mode: "number" }),
+  status: mysqlEnum("status", ["sending", "pending", "done", "not_done", "failed", "unknown"]).default("sending").notNull(),
+  effectStatus: mysqlEnum("effectStatus", ["none", "pending", "sending", "sent", "failed", "unknown"]).default("none").notNull(),
+  effectMessageId: bigint("effectMessageId", { mode: "number" }),
+  error: text("error"),
+  respondedAt: timestamp("respondedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => ({
+  taskDueUserIdx: uniqueIndex("telegram_completion_task_due_user_unique").on(table.taskId, table.dueVersion, table.userId),
+  statusIdx: index("telegram_completion_status_idx").on(table.status, table.effectStatus),
+}));
+
+export const telegramSlaNotifications = mysqlTable("telegram_sla_notifications", {
+  id: serial("id").primaryKey(),
+  objectType: mysqlEnum("objectType", ["decision", "task"]).notNull(),
+  objectId: varchar("objectId", { length: 64 }).notNull(),
+  objectVersion: varchar("objectVersion", { length: 64 }).notNull(),
+  step: mysqlEnum("step", ["reminder", "escalation"]).notNull(),
+  recipientRole: mysqlEnum("recipientRole", ["rp", "owner", "sponsor"]).notNull(),
+  chatId: varchar("chatId", { length: 64 }).notNull().default(""),
+  userId: varchar("userId", { length: 64 }).notNull().default(""),
+  status: mysqlEnum("status", ["sending", "sent", "failed", "unknown"]).default("sending").notNull(),
+  messageId: bigint("messageId", { mode: "number" }),
+  error: text("error"),
+  sentAt: timestamp("sentAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => ({
+  objectStepRecipientIdx: uniqueIndex("telegram_sla_object_step_recipient_unique").on(
+    table.objectType,
+    table.objectId,
+    table.objectVersion,
+    table.step,
+    table.recipientRole,
+    table.userId,
+  ),
+  statusIdx: index("telegram_sla_status_idx").on(table.status, table.createdAt),
+}));
+
+export const telegramOnboardings = mysqlTable("telegram_onboardings", {
+  id: serial("id").primaryKey(),
+  projectId: varchar("projectId", { length: 64 }).notNull(),
+  channelId: varchar("channelId", { length: 64 }).notNull(),
+  connectedAt: timestamp("connectedAt").notNull(),
+  firstDigestDueAt: timestamp("firstDigestDueAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  projectUnique: uniqueIndex("telegram_onboardings_project_unique").on(table.projectId),
+  firstDigestIdx: index("telegram_onboardings_first_digest_idx").on(table.firstDigestDueAt),
+}));
+
+export const telegramDigestDeliveries = mysqlTable("telegram_digest_deliveries", {
+  id: serial("id").primaryKey(),
+  projectId: varchar("projectId", { length: 64 }).notNull(),
+  kind: mysqlEnum("kind", ["welcome", "first", "daily", "founder"]).notNull(),
+  periodKey: varchar("periodKey", { length: 32 }).notNull(),
+  recipientRole: mysqlEnum("recipientRole", ["rp", "founder"]).notNull(),
+  chatId: varchar("chatId", { length: 64 }).notNull().default(""),
+  userId: varchar("userId", { length: 64 }).notNull().default(""),
+  status: mysqlEnum("status", ["sending", "sent", "failed", "unknown"]).default("sending").notNull(),
+  coverageStart: timestamp("coverageStart"),
+  coverageEnd: timestamp("coverageEnd"),
+  messageId: bigint("messageId", { mode: "number" }),
+  error: text("error"),
+  sentAt: timestamp("sentAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => ({
+  digestRecipientUnique: uniqueIndex("telegram_digest_recipient_unique").on(
+    table.projectId,
+    table.kind,
+    table.periodKey,
+    table.recipientRole,
+    table.userId,
+  ),
+  statusIdx: index("telegram_digest_status_idx").on(table.status, table.createdAt),
+}));
+
+export const outcomeMeasurements = mysqlTable("outcome_measurements", {
+  id: serial("id").primaryKey(),
+  projectId: varchar("projectId", { length: 64 }).notNull(),
+  taskId: varchar("taskId", { length: 64 }).notNull(),
+  decisionId: varchar("decisionId", { length: 64 }).notNull(),
+  metric: varchar("metric", { length: 64 }).notNull(),
+  unit: varchar("unit", { length: 24 }).notNull(),
+  baselineValue: varchar("baselineValue", { length: 32 }),
+  targetValue: varchar("targetValue", { length: 32 }),
+  actualValue: varchar("actualValue", { length: 32 }),
+  source: text("source").notNull(),
+  sourceId: varchar("sourceId", { length: 255 }).notNull(),
+  sourceUrl: text("sourceUrl"),
+  status: mysqlEnum("status", ["draft", "confirmed", "superseded"]).default("confirmed").notNull(),
+  version: int("version", { unsigned: true }).default(1).notNull(),
+  previousVersionId: bigint("previousVersionId", { mode: "number", unsigned: true }),
+  recordedByUserId: bigint("recordedByUserId", { mode: "number", unsigned: true }).notNull(),
+  recordedByName: varchar("recordedByName", { length: 255 }).notNull(),
+  recordedByRole: varchar("recordedByRole", { length: 24 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  taskMetricVersionUnique: uniqueIndex("outcome_measurements_task_metric_version_unique").on(table.taskId, table.metric, table.version),
+  decisionIdx: index("outcome_measurements_decision_idx").on(table.decisionId),
+  projectIdx: index("outcome_measurements_project_idx").on(table.projectId),
+}));
+
 export const auditEvents = mysqlTable("audit_events", {
   id: serial("id").primaryKey(),
   projectId: varchar("projectId", { length: 64 }).notNull(),
@@ -222,4 +372,5 @@ export type Risk = typeof risks.$inferSelect;
 export type Decision = typeof decisions.$inferSelect;
 export type ProposalVersion = typeof proposalVersions.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
+export type Signal = typeof signals.$inferSelect;
 export type AuditEvent = typeof auditEvents.$inferSelect;

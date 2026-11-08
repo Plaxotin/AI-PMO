@@ -1,0 +1,73 @@
+{
+  "scope": "BL-54 v1.0 controlled real Telegram acceptance digest to configured RP DM; separate periodKey; restart and repeat",
+  "requestedLocalTime": "2026-11-08T22:20:00+03:00",
+  "sentAfterExplicitOwnerConfirmation": true,
+  "first": {
+    "periodKey": "acceptance-20261108-2220",
+    "coverageStart": "2026-11-01T19:41:39.386Z",
+    "coverageEnd": "2026-11-08T19:41:39.386Z",
+    "completedCount": 3,
+    "plannedCount": 1,
+    "riskCount": 9,
+    "sourceLinkCount": 3,
+    "sourceLinksValid": true,
+    "textLength": 2128,
+    "completedIndex": 82,
+    "planIndex": 812,
+    "risksIndex": 1033,
+    "periodFormatValid": true,
+    "coverageWordAbsent": true,
+    "legacyCodesAbsent": true,
+    "p06Visible": true,
+    "duplicate": false,
+    "sent": true,
+    "failed": false,
+    "unknown": false,
+    "messageReturned": true
+  },
+  "repeatAfterRestart": {
+    "periodKey": "acceptance-20261108-2220",
+    "coverageStart": "2026-11-01T19:41:42.557Z",
+    "coverageEnd": "2026-11-08T19:41:42.557Z",
+    "completedCount": 3,
+    "plannedCount": 1,
+    "riskCount": 9,
+    "sourceLinkCount": 3,
+    "sourceLinksValid": true,
+    "textLength": 2128,
+    "completedIndex": 82,
+    "planIndex": 812,
+    "risksIndex": 1033,
+    "periodFormatValid": true,
+    "coverageWordAbsent": true,
+    "legacyCodesAbsent": true,
+    "p06Visible": true,
+    "duplicate": true,
+    "sent": false,
+    "failed": false,
+    "unknown": false,
+    "messageReturned": false
+  },
+  "deliveries": [
+    {
+      "status": "sent",
+      "count": 1,
+      "messageReturnedCount": 1
+    }
+  ],
+  "acceptanceAuditCount": 1,
+  "checks": {
+    "first_acceptance_message_sent": true,
+    "completed_plan_risks_order": true,
+    "period_format_and_wording": true,
+    "short_codes_and_p06": true,
+    "source_links_valid": true,
+    "telegram_length_bounded": true,
+    "restart_repeat_no_duplicate": true,
+    "exactly_one_delivery_row": true,
+    "exactly_one_audit_event": true
+  },
+  "allChecksPassed": true,
+  "ownerVisualAccepted": false,
+  "realChatOrUserIdsIncluded": false
+}

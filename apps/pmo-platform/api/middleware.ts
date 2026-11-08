@@ -3,6 +3,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
 import { log } from "./lib/logger";
+import { resolveProjectRole, type ProjectRole } from "./queries/project-access";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -58,5 +59,20 @@ function requireRole(role: string) {
   });
 }
 
+function requireProjectRole(role: ProjectRole) {
+  return t.middleware(async (opts) => {
+    const { ctx, next } = opts;
+    if (!ctx.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: ErrorMessages.unauthenticated });
+    }
+    const projectRole = await resolveProjectRole(ctx.user);
+    if (projectRole !== role) {
+      throw new TRPCError({ code: "FORBIDDEN", message: ErrorMessages.insufficientRole });
+    }
+    return next({ ctx: { ...ctx, user: ctx.user, projectRole } });
+  });
+}
+
 export const authedQuery = t.procedure.use(requireAuth);
 export const adminQuery = authedQuery.use(requireRole("admin"));
+export const rpQuery = authedQuery.use(requireProjectRole("rp"));

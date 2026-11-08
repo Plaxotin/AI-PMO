@@ -1,0 +1,98 @@
+{
+  "mode": "BL-54 first value on isolated MySQL with synthetic projects and mock global Telegram fetch; no production connection or real Telegram sends",
+  "checks": {
+    "onboarding_persists_connection_and_first_due": true,
+    "immediate_welcome_and_sanitized_founder_signal": true,
+    "welcome_and_founder_are_durable_deduplicated": true,
+    "no_digest_before_one_hour": true,
+    "first_digest_has_simple_numbered_sections_short_codes_and_changed_risk": true,
+    "first_digest_restart_and_repeat_do_not_duplicate": true,
+    "daily_digest_starts_at_nine_and_dedupes_facts_plans": true,
+    "daily_digest_restart_and_repeat_do_not_duplicate": true,
+    "empty_digest_is_honest": true,
+    "metrics_link_connection_delivery_open_and_decision_to_project": true,
+    "explicit_delivery_failure_is_audited_and_not_blindly_retried": true,
+    "unknown_delivery_outcome_is_audited_and_not_blindly_retried": true,
+    "all_outbound_messages_stay_in_private_targets": true,
+    "delivery_rows_are_durable_and_bounded": true
+  },
+  "allChecksPassed": true,
+  "result": {
+    "firstDigestDueAt": "2026-11-07T08:30:00.000Z",
+    "firstSummary": {
+      "claimed": 1,
+      "sent": 1,
+      "duplicates": 0,
+      "failed": 0,
+      "unknown": 0
+    },
+    "dailySummary": {
+      "claimed": 1,
+      "sent": 1,
+      "duplicates": 1,
+      "failed": 0,
+      "unknown": 0
+    },
+    "deliveryCounts": {
+      "welcome": 1,
+      "founder": 1,
+      "first": 1,
+      "daily": 3
+    },
+    "failedStatus": "failed",
+    "unknownStatus": "unknown",
+    "metrics": {
+      "projectId": "PRJ-BL54",
+      "connections": 1,
+      "welcomes": 1,
+      "firstDigests": 1,
+      "dailyDigests": 1,
+      "deliveryAttempts": 4,
+      "deliveryFailures": 2,
+      "riskOpens": 1,
+      "acceptedDecisions": 1,
+      "rejectedDecisions": 0,
+      "founderNotifications": 1,
+      "pendingDeliveries": 0
+    },
+    "outboundCallCount": 6,
+    "emptyDigest": {
+      "riskCount": 0,
+      "buttons": 0
+    },
+    "debug": {
+      "firstDigestText": "☀️ Дайджест проекта · 07.11.2026\n\n☑️ Факт — что сделано\n1. P-1 · Synthetic BL-54 completed task\n  Synthetic owner · Завершено: 07.11.26\n  Synthetic actual completed result\n\n📌 План — что дальше\n1. P-2 · Synthetic BL-54 planned task\n  Synthetic planner · Срок: 10.11.2026\n\n⚠️ Риск — что мешает\n1. P-1 · Synthetic BL-54 supplier risk · изменён\n  Прогноз: Synthetic schedule impact\n  Уверенность: 91%\n  Источник: https://t.me/c/978200001/101\n  Решение R-1 · Поручение P-1",
+      "visibleCodes": [
+        "P-1",
+        "P-2",
+        "P-1",
+        "R-1",
+        "P-1"
+      ],
+      "firstIncludedItems": [
+        {
+          "section": "fact",
+          "entityId": "P-BL54-001",
+          "entityType": "task",
+          "versionKey": "69bf87cc51f308ff7277885f38ffd639be3f5abd89a021032a3909e7cd0b52bd"
+        },
+        {
+          "section": "plan",
+          "entityId": "P-BL54-002",
+          "entityType": "task",
+          "versionKey": "aba820808d98a44862eba40948617caa44eb2ee1174110a91ba3a01a95cc01a2"
+        }
+      ],
+      "replyMarkup": {
+        "inline_keyboard": [
+          [
+            {
+              "text": "Открыть риск P-1",
+              "callback_data": "open:R-TG-770070523"
+            }
+          ]
+        ]
+      }
+    }
+  }
+}

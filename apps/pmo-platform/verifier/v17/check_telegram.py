@@ -15,6 +15,7 @@ def same(a, b):
 
 route = text(ROOT / 'api/routes/telegram.ts')
 queries = text(ROOT / 'api/queries/telegram.ts')
+completion = text(ROOT / 'api/queries/completion.ts')
 pmo = text(ROOT / 'api/queries/pmo.ts')
 schema = text(ROOT / 'db/schema.ts')
 config = text(ROOT / 'api/telegram/config.ts')
@@ -40,8 +41,8 @@ checks['update_deduplication'] = 'telegram_updates' in schema and 'claimTelegram
 checks['signal_deduplication'] = 'signals_chat_message_unique' in schema
 checks['shared_web_telegram_decision_operation'] = 'decideProposalRecord' in route and 'getDb().transaction(async (tx)' in pmo
 checks['one_task_per_decision'] = 'uniqueIndex("tasks_decision_unique")' in schema
-checks['atomic_result_and_audit'] = 'completeTaskResult' in queries and 'result.recorded' in queries and 'for("update")' in queries
-checks['full_chain_audit'] = all(name in queries or name in pmo for name in ['signal.received', 'risk.recorded', 'proposal.created', 'decision.accepted', 'task.created', 'result.recorded'])
+checks['atomic_result_and_audit'] = 'answerCompletionCheck' in route and 'result.recorded' in completion and 'for("update")' in completion
+checks['full_chain_audit'] = all(name in queries or name in pmo or name in completion for name in ['signal.received', 'risk.recorded', 'proposal.created', 'decision.accepted', 'task.created', 'result.recorded'])
 checks['runtime_model_discovery'] = 'await listModels()' in ai and 'defaultModelId' in ai
 checks['structured_ai_output'] = 'generateObject({' in ai and 'riskAnalysisSchema' in ai
 checks['ai_error_classification'] = 'classifyAiError(error)' in ai

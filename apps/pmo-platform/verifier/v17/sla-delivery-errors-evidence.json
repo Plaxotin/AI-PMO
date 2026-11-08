@@ -1,0 +1,139 @@
+{
+  "mode": "isolated MySQL with synthetic fixtures and mock fetch; no real Telegram connection",
+  "scenario": "delivery-errors",
+  "checks": {
+    "delivery_failed_and_unknown_distinct": true,
+    "delivery_failures_audited_without_retry": true
+  },
+  "allChecksPassed": true,
+  "calls": [
+    {
+      "chatId": "101",
+      "text": "Напоминание: предложение ожидает решения РП более 24 часов.\n\nРиск: Synthetic risk FAIL\nПредложение D-SLA-FAIL: Synthetic proposal FAIL\nОтветственный: Владелец теста\nСрок: 09.11.2026\nОжидание решения: 24 ч.\nИсточник: https://t.me/c/800/1184\nИстория событий: proposal.created\nРешение остаётся за РП; автоматического принятия нет.",
+      "payload": {
+        "chat_id": "101",
+        "text": "Напоминание: предложение ожидает решения РП более 24 часов.\n\nРиск: Synthetic risk FAIL\nПредложение D-SLA-FAIL: Synthetic proposal FAIL\nОтветственный: Владелец теста\nСрок: 09.11.2026\nОжидание решения: 24 ч.\nИсточник: https://t.me/c/800/1184\nИстория событий: proposal.created\nРешение остаётся за РП; автоматического принятия нет."
+      }
+    },
+    {
+      "chatId": "101",
+      "text": "Напоминание: предложение ожидает решения РП более 24 часов.\n\nРиск: Synthetic risk UNKNOWN\nПредложение D-SLA-UNKNOWN: Synthetic proposal UNKNOWN\nОтветственный: Владелец теста\nСрок: 09.11.2026\nОжидание решения: 24 ч.\nИсточник: https://t.me/c/800/1460\nИстория событий: proposal.created\nРешение остаётся за РП; автоматического принятия нет.",
+      "payload": {
+        "chat_id": "101",
+        "text": "Напоминание: предложение ожидает решения РП более 24 часов.\n\nРиск: Synthetic risk UNKNOWN\nПредложение D-SLA-UNKNOWN: Synthetic proposal UNKNOWN\nОтветственный: Владелец теста\nСрок: 09.11.2026\nОжидание решения: 24 ч.\nИсточник: https://t.me/c/800/1460\nИстория событий: proposal.created\nРешение остаётся за РП; автоматического принятия нет."
+      }
+    }
+  ],
+  "database": {
+    "notifications": [
+      {
+        "id": 20,
+        "objectType": "decision",
+        "objectId": "D-SLA-FAIL",
+        "objectVersion": "v1",
+        "step": "reminder",
+        "recipientRole": "rp",
+        "recipientConfigured": true,
+        "status": "failed",
+        "messageId": null,
+        "error": "synthetic rejected delivery"
+      },
+      {
+        "id": 21,
+        "objectType": "decision",
+        "objectId": "D-SLA-UNKNOWN",
+        "objectVersion": "v1",
+        "step": "reminder",
+        "recipientRole": "rp",
+        "recipientConfigured": true,
+        "status": "unknown",
+        "messageId": null,
+        "error": "synthetic network outcome unknown"
+      }
+    ],
+    "events": [
+      {
+        "entityType": "proposal",
+        "entityId": "D-SLA-FAIL",
+        "eventType": "proposal.created",
+        "relatedId": "R-SLA-FAIL",
+        "version": 1,
+        "sourceLinks": null,
+        "metadata": null
+      },
+      {
+        "entityType": "proposal",
+        "entityId": "D-SLA-UNKNOWN",
+        "eventType": "proposal.created",
+        "relatedId": "R-SLA-UNKNOWN",
+        "version": 1,
+        "sourceLinks": null,
+        "metadata": null
+      },
+      {
+        "entityType": "decision",
+        "entityId": "D-SLA-FAIL",
+        "eventType": "delivery.failed",
+        "relatedId": "R-SLA-FAIL",
+        "version": 1,
+        "sourceLinks": [
+          {
+            "url": "https://t.me/c/800/1184",
+            "type": "telegram_message",
+            "status": "available",
+            "sourceId": "Telegram · чат -100800 · сообщение 1184"
+          }
+        ],
+        "metadata": {
+          "error": "synthetic rejected delivery",
+          "slaStep": "reminder",
+          "delivery": "sla",
+          "objectVersion": "v1",
+          "recipientRole": "rp",
+          "deliveryStatus": "failed",
+          "notificationId": 20
+        }
+      },
+      {
+        "entityType": "decision",
+        "entityId": "D-SLA-UNKNOWN",
+        "eventType": "delivery.failed",
+        "relatedId": "R-SLA-UNKNOWN",
+        "version": 1,
+        "sourceLinks": [
+          {
+            "url": "https://t.me/c/800/1460",
+            "type": "telegram_message",
+            "status": "available",
+            "sourceId": "Telegram · чат -100800 · сообщение 1460"
+          }
+        ],
+        "metadata": {
+          "error": "synthetic network outcome unknown",
+          "slaStep": "reminder",
+          "delivery": "sla",
+          "objectVersion": "v1",
+          "recipientRole": "rp",
+          "deliveryStatus": "unknown",
+          "notificationId": 21
+        }
+      }
+    ]
+  },
+  "summaries": {
+    "first": {
+      "claimed": 2,
+      "sent": 0,
+      "duplicates": 0,
+      "failed": 1,
+      "unknown": 1
+    },
+    "repeat": {
+      "claimed": 0,
+      "sent": 0,
+      "duplicates": 2,
+      "failed": 0,
+      "unknown": 0
+    }
+  }
+}

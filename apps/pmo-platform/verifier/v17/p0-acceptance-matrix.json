@@ -1,0 +1,55 @@
+{
+  "scope": "SPEC-P0 §10 acceptance matrix accepted by the owner on 08.11.2026 at 23:41 Europe/Moscow after BL-54 v1.1 real Telegram visual acceptance",
+  "steps": {
+    "1_connection_welcome_first_digest": {
+      "status": "passed",
+      "evidence": [
+        "bl54-onboarding-evidence.json",
+        "bl54-first-value-evidence.json",
+        "bl54-actual-delivery-evidence.json",
+        "bl54-v11-preview-evidence.json",
+        "bl54-v11-acceptance-evidence.json"
+      ],
+      "remaining": null
+    },
+    "2_real_signal_risk_source_confidence_dedupe": {
+      "status": "passed",
+      "evidence": ["r4-baseline-evidence.json"]
+    },
+    "3_two_clicks_reject_edit_preview_accept": {
+      "status": "passed",
+      "evidence": ["r4-reject-evidence.json", "bl48-p06-evidence.json"]
+    },
+    "4_rp_member_pmo_sponsor_server_roles": {
+      "status": "passed_isolated_and_real",
+      "evidence": ["bl35-roles-evidence.json", "r4-sla-evidence.json"]
+    },
+    "5_due_both_branches_l3_bl35_restart": {
+      "status": "passed",
+      "evidence": ["p06-done-replay-evidence.json", "bl35-p06-evidence.json"]
+    },
+    "6_sla_reminders_escalations_stop": {
+      "status": "passed",
+      "evidence": ["r4-sla-evidence.json", "r4-reject-evidence.json"]
+    },
+    "7_migrate_multichat_replay_restart_delivery_error": {
+      "status": "passed",
+      "evidence": ["real-b-migration-evidence.json", "real-b-r3-replay-evidence.json", "p0-recovered-baseline-evidence.json"]
+    },
+    "8_audit_versions_diff_dedupe_attribution": {
+      "status": "passed",
+      "evidence": ["bl48-p06-evidence.json", "p06-done-replay-evidence.json"]
+    },
+    "9_time_to_decision_and_channel": {
+      "status": "passed",
+      "durationSeconds": 173,
+      "decisionChannel": "telegram",
+      "evidence": ["r05-timing-evidence.json"]
+    }
+  },
+  "fullP0Accepted": true,
+  "acceptedAtLocal": "2026-11-08T23:41:00+03:00",
+  "ownerMessage": "принято",
+  "blockingExternalStep": null,
+  "notionOAuth": "disconnected/expired; local P0 acceptance is not a claim of Notion synchronization; SPEC-BL-48 and SPEC-BL-54 need separate Notion import after reauthorization"
+}

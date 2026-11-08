@@ -1,0 +1,28 @@
+{
+  "scope": "Read-only BL-35 production chain after restart; no mutations",
+  "checks": {
+    "roleAndServerState": true,
+    "decisionVersionTwo": true,
+    "taskDoneWithResult": true,
+    "completeChain": true,
+    "sourceAvailable": true,
+    "repeatedReadStable": true
+  },
+  "role": "rp",
+  "readOnly": false,
+  "decision": {
+    "id": "R-05",
+    "version": 2,
+    "status": "ok"
+  },
+  "task": {
+    "id": "P-06",
+    "status": "done",
+    "resultPresent": true,
+    "decisionId": "R-05",
+    "riskId": "R-TG-770070523"
+  },
+  "sourceStatus": "available",
+  "allChecksPassed": true,
+  "realChatOrUserIdsIncluded": false
+}

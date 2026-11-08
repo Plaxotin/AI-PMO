@@ -1,0 +1,171 @@
+{
+  "mode": "isolated MySQL with synthetic fixtures and mock fetch; no real Telegram connection",
+  "scenario": "decision-restart",
+  "checks": {
+    "decision_restart_replay_no_duplicate": true,
+    "decision_version_uses_new_timestamp": true,
+    "decision_version_new_sla_context": true,
+    "decision_accept_stops_events": true
+  },
+  "allChecksPassed": true,
+  "calls": [
+    {
+      "chatId": "101",
+      "text": "Напоминание: предложение ожидает решения РП более 24 часов.\n\nРиск: Synthetic risk 1\nПредложение D-SLA-1: Synthetic proposal version 2\nОтветственный: Владелец теста\nСрок: 10.11.2026\nОжидание решения: 24 ч.\nИсточник: https://t.me/c/800/949\nИстория событий: proposal.created → decision.reminded → decision.escalated\nРешение остаётся за РП; автоматического принятия нет.",
+      "payload": {
+        "chat_id": "101",
+        "text": "Напоминание: предложение ожидает решения РП более 24 часов.\n\nРиск: Synthetic risk 1\nПредложение D-SLA-1: Synthetic proposal version 2\nОтветственный: Владелец теста\nСрок: 10.11.2026\nОжидание решения: 24 ч.\nИсточник: https://t.me/c/800/949\nИстория событий: proposal.created → decision.reminded → decision.escalated\nРешение остаётся за РП; автоматического принятия нет."
+      }
+    }
+  ],
+  "database": {
+    "notifications": [
+      {
+        "id": 1,
+        "objectType": "decision",
+        "objectId": "D-SLA-1",
+        "objectVersion": "v1",
+        "step": "reminder",
+        "recipientRole": "rp",
+        "recipientConfigured": true,
+        "status": "sent",
+        "messageId": 8001,
+        "error": null
+      },
+      {
+        "id": 5,
+        "objectType": "decision",
+        "objectId": "D-SLA-1",
+        "objectVersion": "v1",
+        "step": "escalation",
+        "recipientRole": "sponsor",
+        "recipientConfigured": true,
+        "status": "sent",
+        "messageId": 8002,
+        "error": null
+      },
+      {
+        "id": 9,
+        "objectType": "decision",
+        "objectId": "D-SLA-1",
+        "objectVersion": "v2",
+        "step": "reminder",
+        "recipientRole": "rp",
+        "recipientConfigured": true,
+        "status": "sent",
+        "messageId": 8001,
+        "error": null
+      }
+    ],
+    "events": [
+      {
+        "entityType": "proposal",
+        "entityId": "D-SLA-1",
+        "eventType": "proposal.created",
+        "relatedId": "R-SLA-1",
+        "version": 1,
+        "sourceLinks": null,
+        "metadata": null
+      },
+      {
+        "entityType": "decision",
+        "entityId": "D-SLA-1",
+        "eventType": "decision.reminded",
+        "relatedId": "R-SLA-1",
+        "version": 1,
+        "sourceLinks": [
+          {
+            "url": "https://t.me/c/800/949",
+            "type": "telegram_message",
+            "status": "available",
+            "sourceId": "Telegram · чат -100800 · сообщение 949"
+          }
+        ],
+        "metadata": {
+          "slaStep": "reminder",
+          "delivery": "sla",
+          "messageId": 8001,
+          "objectVersion": "v1",
+          "recipientRole": "rp",
+          "notificationId": 1
+        }
+      },
+      {
+        "entityType": "decision",
+        "entityId": "D-SLA-1",
+        "eventType": "decision.escalated",
+        "relatedId": "R-SLA-1",
+        "version": 1,
+        "sourceLinks": [
+          {
+            "url": "https://t.me/c/800/949",
+            "type": "telegram_message",
+            "status": "available",
+            "sourceId": "Telegram · чат -100800 · сообщение 949"
+          }
+        ],
+        "metadata": {
+          "slaStep": "escalation",
+          "delivery": "sla",
+          "messageId": 8002,
+          "objectVersion": "v1",
+          "recipientRole": "sponsor",
+          "notificationId": 5
+        }
+      },
+      {
+        "entityType": "decision",
+        "entityId": "D-SLA-1",
+        "eventType": "decision.reminded",
+        "relatedId": "R-SLA-1",
+        "version": 2,
+        "sourceLinks": [
+          {
+            "url": "https://t.me/c/800/949",
+            "type": "telegram_message",
+            "status": "available",
+            "sourceId": "Telegram · чат -100800 · сообщение 949"
+          }
+        ],
+        "metadata": {
+          "slaStep": "reminder",
+          "delivery": "sla",
+          "messageId": 8001,
+          "objectVersion": "v2",
+          "recipientRole": "rp",
+          "notificationId": 9
+        }
+      }
+    ]
+  },
+  "summaries": {
+    "replay": {
+      "claimed": 0,
+      "sent": 0,
+      "duplicates": 2,
+      "failed": 0,
+      "unknown": 0
+    },
+    "earlyV2": {
+      "claimed": 0,
+      "sent": 0,
+      "duplicates": 0,
+      "failed": 0,
+      "unknown": 0
+    },
+    "at24V2": {
+      "claimed": 1,
+      "sent": 1,
+      "duplicates": 0,
+      "failed": 0,
+      "unknown": 0
+    },
+    "closed": {
+      "claimed": 0,
+      "sent": 0,
+      "duplicates": 0,
+      "failed": 0,
+      "unknown": 0
+    }
+  }
+}

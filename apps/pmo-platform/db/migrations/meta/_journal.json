@@ -15,6 +15,62 @@
       "when": 1793225347317,
       "tag": "0001_bl36_channel_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1794010343821,
+      "tag": "0002_bl42_completion_checks",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1794016188755,
+      "tag": "0003_bl42_sla_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1794054000000,
+      "tag": "0004_bl35_project_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1794057600000,
+      "tag": "0005_bl54_first_value",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1794061200000,
+      "tag": "0006_bl41_telegram_edits",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1794064800000,
+      "tag": "0007_short_task_ids",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1794068400000,
+      "tag": "0008_short_decision_ids",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1794072000000,
+      "tag": "0009_bl48_outcome_measurements",
+      "breakpoints": true
     }
   ]
 }

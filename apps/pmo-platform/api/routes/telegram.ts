@@ -5,9 +5,16 @@ import { log } from "../lib/logger";
 import { analyzeProjectSignal } from "../ai/risk";
 import { getTelegramConfig, telegramCredentialDiagnostics, telegramRole } from "../telegram/config";
 import { getTelegramChatMigration } from "../telegram/migration";
-import { answerTelegramCallback, editTelegramMessage, sendTelegramMessage } from "../telegram/client";
+import { answerTelegramCallback, editTelegramMessage, sendTelegramMessage, type TelegramButton } from "../telegram/client";
 import { decideProposalRecord } from "../queries/pmo";
-import { claimTelegramUpdate, completeTaskResult, createRiskProposal, createTelegramSignal, findPendingResult, finishTelegramUpdate, getRiskProposal, getTaskWithDecision, markTelegramSignal, migrateTelegramChat, requestTaskResult, resolveTelegramProjectChat, setResultPromptMessage } from "../queries/telegram";
+import { claimTelegramUpdate, createRiskProposal, createTelegramSignal, finishTelegramUpdate, getRiskProposal, getRiskProposalByRiskId, getTaskWithDecision, markTelegramSignal, migrateTelegramChat, resolveTelegramProjectChat } from "../queries/telegram";
+import { answerCompletionCheck } from "../queries/completion";
+import { deliverEffectNotification } from "../telegram/completion-scheduler";
+import { deliverOnboardingMessages } from "../telegram/first-value";
+import { recordRiskOpened } from "../queries/first-value";
+import { reviseProjectProposal } from "../ai/proposal-edit";
+import { buildProposalDiff, telegramSourceLink } from "../queries/proposal-audit";
+import { cancelTelegramProposalEdit, claimTelegramEditInstruction, completeTelegramProposalEdit, failTelegramProposalPreview, getActiveTelegramProposalEdit, saveTelegramProposalPreview, startTelegramProposalEdit } from "../queries/telegram-edit";
 
 const userSchema = z.object({ id: z.number(), first_name: z.string(), last_name: z.string().optional(), username: z.string().optional(), is_bot: z.boolean().optional() });
 const messageSchema = z.object({ message_id: z.number(), text: z.string().optional(), from: userSchema.optional(), chat: z.object({ id: z.number() }), reply_to_message: z.object({ message_id: z.number() }).optional(), migrate_to_chat_id: z.number().optional(), migrate_from_chat_id: z.number().optional() });
@@ -28,11 +35,70 @@ function safeSecretEqual(actual: string, expected: string) {
 
 function proposalText(bundle: NonNullable<Awaited<ReturnType<typeof getRiskProposal>>>) {
   const { decision, risk, signal } = bundle;
-  return `⚠️ ${risk?.id || "Риск"} · ${risk?.probability || "оценка"}\n${risk?.title || ""}\n\nВлияние: ${risk?.impact || "—"}\n\nПредложение ${decision.id}:\n${decision.title}\n\nОтветственный: ${decision.proposalOwner || "Руководитель проекта"}\nСрок: ${decision.proposalDue || "—"}\n\nИсточник: Telegram · чат ${signal?.chatId || "—"} · сообщение ${signal?.messageId || "—"} · ${signal?.authorName || "—"}`;
+  const source = signal ? telegramSourceLink(signal.chatId, signal.messageId) : null;
+  const sourceText = source?.url || `источник недоступен; сохранён sourceId ${source?.sourceId || "—"}`;
+  return `⚠️ ${risk?.id || "Риск"} · ${risk?.probability || "оценка"}\n${risk?.title || ""}\n\nВлияние: ${risk?.impact || "—"}\n\nПредложение ${decision.id}:\n${decision.title}\n\nОтветственный: ${decision.proposalOwner || "Руководитель проекта"}\nСрок: ${decision.proposalDue || "—"}\n\nИсточник: ${sourceText} · ${signal?.authorName || "—"}`;
 }
 
-function proposalButtons(decisionId: string, riskId: string) {
-  return [[{ text: "⚠️ Открыть риск", callback_data: `open:${riskId}` }, { text: "✅ Принять предложение", callback_data: `accept:${decisionId}` }], [{ text: "Отклонить", callback_data: `reject:${decisionId}` }]];
+function proposalButtons(decisionId: string, riskId: string, opened = false) {
+  if (opened) return [[{ text: "✅ Принять", callback_data: `accept:${decisionId}` }, { text: "Изменить", callback_data: `edit:${decisionId}` }], [{ text: "Отклонить", callback_data: `reject:${decisionId}` }]];
+  return [[{ text: "⚠️ Открыть риск", callback_data: `open:${riskId}` }, { text: "✅ Принять", callback_data: `accept:${decisionId}` }], [{ text: "Изменить", callback_data: `edit:${decisionId}` }]];
+}
+
+function previewText(decision: { id: string; title: string; rationale: string; effect: string; proposalOwner: string | null; proposalDue: string | null; proposalVersion: number }, edit: { previewTitle: string | null; previewOwner: string | null; previewDue: string | null }) {
+  const before = { title: decision.title, rationale: decision.rationale, effect: decision.effect, owner: decision.proposalOwner || "Руководитель проекта", due: decision.proposalDue || "—" };
+  const after = { ...before, title: edit.previewTitle || before.title, owner: edit.previewOwner || before.owner, due: edit.previewDue || before.due };
+  const change = buildProposalDiff(before, after);
+  return `Новый предпросмотр ${decision.id} · версия ${decision.proposalVersion} → ${decision.proposalVersion + 1}\n\nПредложение:\n${after.title}\n\nОтветственный: ${after.owner}\nСрок: ${after.due}\n\nОбоснование: ${after.rationale}\nЭффект: ${after.effect}\n\nDiff:\n${change.diff || "Изменений нет"}\n\nИсходная версия не изменена. Решение и поручение будут созданы только после «Принять».`;
+}
+
+function statusText(role: "rp" | "member") {
+  return `Пиэмка · AI PMO\nЧат привязан к проекту PRJ-01.\nВаша роль: ${role === "rp" ? "РП" : "участник"}.\n\nРабочие чаты используются только для наблюдения. Предложения, решения и персональные действия доступны РП в этом личном чате.`;
+}
+
+async function notifyRp(text: string, buttons?: TelegramButton[][]) {
+  const config = getTelegramConfig();
+  if (!config.rpUserIds.size) throw new Error("Личный чат РП не настроен");
+  for (const chatId of config.rpUserIds) {
+    await sendTelegramMessage({ chatId, text, buttons });
+  }
+}
+
+export async function handlePrivateMessage(message: TelegramMessage) {
+  const user = message.from;
+  const text = message.text?.trim();
+  if (!user || user.is_bot || !text || telegramRole(user.id) !== "rp" || String(message.chat.id) !== String(user.id)) return "ignored" as const;
+  const chatId = String(message.chat.id);
+  if (text.startsWith("/start") || text.startsWith("/status")) {
+    await sendTelegramMessage({ chatId, text: statusText("rp") });
+    return "processed" as const;
+  }
+  const claimed = await claimTelegramEditInstruction({ chatId, userId: String(user.id), instruction: text });
+  if (!claimed) return "ignored" as const;
+  try {
+    const revised = await reviseProjectProposal({
+      title: claimed.decision.title,
+      owner: claimed.decision.proposalOwner || person(user),
+      due: claimed.decision.proposalDue || "—",
+      instruction: text,
+    });
+    const preview = await saveTelegramProposalPreview({ editId: claimed.edit.id, ...revised });
+    if (!preview) {
+      await sendTelegramMessage({ chatId, text: "Ветка редактирования отменена; исходное предложение не изменено." });
+      return "ignored" as const;
+    }
+    await sendTelegramMessage({
+      chatId,
+      text: previewText(claimed.decision, preview),
+      buttons: [[{ text: "✅ Принять", callback_data: `accept:${claimed.decision.id}` }, { text: "Отменить правку", callback_data: `editcancel:${claimed.decision.id}` }]],
+    });
+    return "processed" as const;
+  } catch (error) {
+    const messageText = error instanceof Error ? error.message : String(error);
+    await failTelegramProposalPreview(claimed.edit.id, messageText);
+    await sendTelegramMessage({ chatId, text: `Не удалось подготовить новый предпросмотр. Исходное предложение не изменено. Отправьте правку ещё раз или отмените редактирование.\n${messageText.slice(0, 500)}` });
+    return "error" as const;
+  }
 }
 
 async function handleMessage(message: TelegramMessage, updateId: number, channelId: string) {
@@ -44,18 +110,12 @@ async function handleMessage(message: TelegramMessage, updateId: number, channel
   if (!role) return "ignored" as const;
   const chatId = String(message.chat.id);
 
-  if (message.reply_to_message) {
-    const pending = await findPendingResult({ chatId, userId: String(user.id), replyToMessageId: message.reply_to_message.message_id });
-    if (pending) {
-      const completion = await completeTaskResult({ pendingId: pending.id, taskId: pending.taskId, result: text, actorUserId: user.id, actorName: person(user), actorRole: role });
-      await sendTelegramMessage({ chatId, replyToMessageId: message.message_id, text: completion.alreadyCompleted ? `Результат по ${pending.taskId} уже был сохранён.` : `✅ Результат по ${pending.taskId} сохранён.\nПоручение отмечено выполненным, событие добавлено в журнал.` });
+  if (text.startsWith("/start") || text.startsWith("/status")) {
+    if (role === "rp") {
+      await notifyRp(statusText(role));
       return "processed" as const;
     }
-  }
-
-  if (text.startsWith("/start") || text.startsWith("/status")) {
-    await sendTelegramMessage({ chatId, text: `Пиэмка · AI PMO\nЧат привязан к проекту PRJ-01.\nВаша роль: ${role === "rp" ? "РП" : "участник"}.\n\nСообщение с риском будет проанализировано. РП утверждает предложения кнопками; результат отправляется ответом на запрос бота.` });
-    return "processed" as const;
+    return "ignored" as const;
   }
 
   const { signal, created } = await createTelegramSignal({ updateId, channelId, chatId, messageId: message.message_id, authorId: String(user.id), authorName: person(user), authorRole: role, text });
@@ -67,7 +127,7 @@ async function handleMessage(message: TelegramMessage, updateId: number, channel
     const messageText = error instanceof Error ? error.message : String(error);
     await markTelegramSignal(signal.id, "error", messageText);
     log.error("Telegram signal analysis failed", { signalId: signal.id, error: messageText });
-    await sendTelegramMessage({ chatId, replyToMessageId: message.message_id, text: `Сигнал ${signal.id} сохранён, но AI-анализ сейчас недоступен. Риск и предложение не созданы. Повторите отправку позже или проверьте сигнал в веб-реестре.` });
+    await notifyRp(`Сигнал ${signal.id} сохранён, но AI-анализ сейчас недоступен. Риск и предложение не созданы. Повторите отправку позже или проверьте сигнал в веб-реестре.`);
     return "error" as const;
   }
   if (!analysis.isRisk || analysis.confidence < 0.6) {
@@ -77,12 +137,12 @@ async function handleMessage(message: TelegramMessage, updateId: number, channel
   const ids = await createRiskProposal(signal.id, updateId, analysis);
   const bundle = await getRiskProposal(ids.decisionId);
   if (!bundle) throw new Error("Не удалось прочитать созданное предложение");
-  await sendTelegramMessage({ chatId, replyToMessageId: message.message_id, text: proposalText(bundle), buttons: proposalButtons(ids.decisionId, ids.riskId) });
+  await notifyRp(proposalText(bundle), proposalButtons(ids.decisionId, ids.riskId));
   return "processed" as const;
 }
 
 
-async function handleCallback(callback: NonNullable<z.infer<typeof updateSchema>["callback_query"]>) {
+export async function handleCallback(callback: NonNullable<z.infer<typeof updateSchema>["callback_query"]>) {
   const config = getTelegramConfig();
   const role = telegramRole(callback.from.id, config);
   if (!role) {
@@ -94,18 +154,60 @@ async function handleCallback(callback: NonNullable<z.infer<typeof updateSchema>
   if (!message || !entityId) return "ignored" as const;
   const chatId = String(message.chat.id);
 
+  // All interactive actions live in the RP DM. Never edit legacy group cards.
+  if (role !== "rp" || chatId !== String(callback.from.id)) {
+    await answerTelegramCallback(callback.id, "Действия доступны РП в личном чате с Пиэмкой");
+    return "ignored" as const;
+  }
+
   if (action === "open") {
-    const bundle = await getRiskProposal(entityId.replace(/^R-/, "D-"));
+    const bundle = await getRiskProposalByRiskId(entityId);
     if (!bundle) { await answerTelegramCallback(callback.id, "Риск не найден"); return "error" as const; }
+    await recordRiskOpened({ riskId: entityId, decisionId: bundle.decision.id, actorUserId: callback.from.id, actorName: person(callback.from) });
     await answerTelegramCallback(callback.id, `Открыт ${entityId}`);
-    await sendTelegramMessage({ chatId, text: `${proposalText(bundle)}\n\nОбоснование: ${bundle.decision.rationale}\nЭффект: ${bundle.decision.effect}\n\nИсходный сигнал:\n${bundle.signal?.content || "—"}`, buttons: bundle.decision.status === "wait" && bundle.risk ? proposalButtons(bundle.decision.id, bundle.risk.id) : undefined });
+    await sendTelegramMessage({ chatId, text: `${proposalText(bundle)}\n\nОбоснование: ${bundle.decision.rationale}\nЭффект: ${bundle.decision.effect}\n\nИсходный сигнал:\n${bundle.signal?.content || "—"}`, buttons: bundle.decision.status === "wait" && bundle.risk ? proposalButtons(bundle.decision.id, bundle.risk.id, true) : undefined });
+    return "processed" as const;
+  }
+
+  if (action === "edit") {
+    const started = await startTelegramProposalEdit({ decisionId: entityId, chatId, userId: String(callback.from.id) });
+    if (!started) { await answerTelegramCallback(callback.id, "Предложение уже решено"); return "ignored" as const; }
+    await answerTelegramCallback(callback.id, "Отправьте одну текстовую правку");
+    await sendTelegramMessage({
+      chatId,
+      text: `Редактирование ${entityId}, версия ${started.decision.proposalVersion}. Отправьте одну текстовую инструкцию: что изменить в предложении, ответственном или сроке. Исходная версия не изменится до принятия нового предпросмотра.`,
+      buttons: [[{ text: "Отменить правку", callback_data: `editcancel:${entityId}` }]],
+    });
+    return "processed" as const;
+  }
+
+  if (action === "editcancel") {
+    const cancelled = await cancelTelegramProposalEdit({ decisionId: entityId, chatId, userId: String(callback.from.id) });
+    if (!cancelled) { await answerTelegramCallback(callback.id, "Активная правка не найдена"); return "ignored" as const; }
+    const bundle = await getRiskProposal(entityId);
+    await answerTelegramCallback(callback.id, "Правка отменена");
+    if (bundle) await sendTelegramMessage({ chatId, text: `Правка отменена. Исходная версия ${bundle.decision.proposalVersion} не изменена.\n\n${proposalText(bundle)}`, buttons: bundle.decision.status === "wait" && bundle.risk ? proposalButtons(bundle.decision.id, bundle.risk.id, true) : undefined });
     return "processed" as const;
   }
 
   if (action === "accept" || action === "reject") {
-    if (role !== "rp") { await answerTelegramCallback(callback.id, "Утверждает только руководитель проекта"); return "ignored" as const; }
+    const pendingEdit = await getActiveTelegramProposalEdit({ decisionId: entityId, chatId, userId: String(callback.from.id) });
+    if (pendingEdit && pendingEdit.status !== "preview") {
+      await answerTelegramCallback(callback.id, "Сначала отправьте правку или отмените редактирование");
+      return "ignored" as const;
+    }
     try {
-      const result = await decideProposalRecord({ decisionId: entityId, action: action === "accept" ? "ok" : "no" }, { userId: callback.from.id, name: person(callback.from), channel: "telegram" });
+      const result = await decideProposalRecord({
+        decisionId: entityId,
+        action: action === "accept" ? "ok" : "no",
+        ...(pendingEdit?.status === "preview" ? {
+          title: pendingEdit.previewTitle || undefined,
+          owner: pendingEdit.previewOwner || undefined,
+          due: pendingEdit.previewDue || undefined,
+          expectedVersion: pendingEdit.sourceVersion,
+        } : {}),
+      }, { userId: callback.from.id, name: person(callback.from), channel: "telegram" });
+      if (pendingEdit?.status === "preview") await completeTelegramProposalEdit({ decisionId: entityId, chatId, userId: String(callback.from.id) });
       const bundle = await getRiskProposal(entityId);
       if (!bundle) throw new Error("Решение не найдено после обработки");
       if (result.status === "ok" && result.taskId) {
@@ -113,27 +215,60 @@ async function handleCallback(callback: NonNullable<z.infer<typeof updateSchema>
         const taskText = result.alreadyDecided
           ? `Поручение ${result.taskId} уже связано с решением.`
           : `Поручение ${result.taskId} создано и связано с решением.`;
-        await editTelegramMessage({ chatId, messageId: message.message_id, text: `✅ Решение ${entityId} ${result.alreadyDecided ? "уже было принято" : "принято"}\n${bundle.decision.title}\n\n${taskText}\nОтветственный: ${taskBundle?.task.owner || "—"}\nСрок: ${taskBundle?.task.due || "—"}\n\n${bundle.decision.attribution || `Пиэмка от имени ${person(callback.from)}`}`, buttons: [[{ text: "📌 Отметить результат", callback_data: `result:${result.taskId}` }]] });
+        await editTelegramMessage({ chatId, messageId: message.message_id, text: `✅ Решение ${entityId} ${result.alreadyDecided ? "уже было принято" : "принято"}\n${bundle.decision.title}\n\n${taskText}\nОтветственный: ${taskBundle?.task.owner || "—"}\nСрок: ${taskBundle?.task.due || "—"}\n\n${bundle.decision.attribution || `Пиэмка от имени ${person(callback.from)}`}`, buttons: [] });
       } else {
         await editTelegramMessage({ chatId, messageId: message.message_id, text: `Решение ${entityId} ${result.alreadyDecided ? "уже было отклонено" : "отклонено"}.\n${bundle.decision.attribution || `Пиэмка от имени ${person(callback.from)}`}` });
       }
       await answerTelegramCallback(callback.id, result.alreadyDecided ? "Решение уже обработано; показано сохранённое состояние" : result.status === "ok" ? `Создано поручение ${result.taskId}` : "Решение отклонено");
       return "processed" as const;
     } catch (error) {
-      await answerTelegramCallback(callback.id, error instanceof Error && error.message.includes("уже") ? "Решение уже обработано" : "Не удалось сохранить решение");
+      await answerTelegramCallback(callback.id, error instanceof Error ? error.message : "Не удалось сохранить решение");
       return "error" as const;
     }
   }
 
-  if (action === "result") {
-    const bundle = await getTaskWithDecision(entityId);
-    if (!bundle) { await answerTelegramCallback(callback.id, "Поручение не найдено"); return "error" as const; }
-    if (bundle.task.status === "done") { await answerTelegramCallback(callback.id, "Результат уже сохранён"); return "processed" as const; }
-    const pendingId = await requestTaskResult({ taskId: entityId, chatId, userId: String(callback.from.id) });
-    const prompt = await sendTelegramMessage({ chatId, text: `Результат по ${entityId}.\nОтветьте на это сообщение: что сделано, когда и какой итог?`, forceReply: true });
-    await setResultPromptMessage(pendingId, prompt.message_id);
-    await answerTelegramCallback(callback.id, "Ответьте на запрос бота");
-    return "processed" as const;
+  if (action === "cd" || action === "cn") {
+    const checkId = Number(entityId);
+    if (!Number.isSafeInteger(checkId) || checkId <= 0) return "ignored" as const;
+    try {
+      const outcome = await answerCompletionCheck({
+        checkId,
+        chatId,
+        userId: String(callback.from.id),
+        answer: action === "cd" ? "done" : "not_done",
+        actorUserId: callback.from.id,
+        actorName: person(callback.from),
+      });
+      if (outcome.kind === "not_done" || outcome.kind === "already_not_done") {
+        if (outcome.kind === "not_done") {
+          await editTelegramMessage({
+            chatId,
+            messageId: message.message_id,
+            text: `${message.text || `Поручение ${entityId}`}\n\nОтвет сохранён: поручение не выполнено и остаётся открытым.`,
+            buttons: [[
+              { text: "Выполнено", callback_data: `cd:${checkId}` },
+              { text: "Не выполнено", callback_data: `cn:${checkId}` },
+            ]],
+          });
+        }
+        await answerTelegramCallback(callback.id, outcome.kind === "not_done" ? "Ответ сохранён; поручение остаётся открытым" : "Ответ уже был сохранён");
+        return "processed" as const;
+      }
+      await answerTelegramCallback(callback.id, outcome.kind === "done" ? "Выполнение подтверждено" : "Поручение уже было закрыто");
+      await deliverEffectNotification(checkId);
+      if (outcome.kind === "done") {
+        await editTelegramMessage({
+          chatId,
+          messageId: message.message_id,
+          text: `${message.text || `Поручение ${entityId}`}\n\n✅ Выполнение подтверждено РП ${person(callback.from)}.`,
+          buttons: [],
+        });
+      }
+      return "processed" as const;
+    } catch (error) {
+      await answerTelegramCallback(callback.id, error instanceof Error ? error.message : "Не удалось сохранить ответ");
+      return "error" as const;
+    }
   }
   return "ignored" as const;
 }
@@ -149,17 +284,22 @@ telegramRoutes.post("/webhook", async (c) => {
   const update = parsed.data;
   const migration = getTelegramChatMigration(update.message);
   const chatId = update.message?.chat.id ?? update.callback_query?.message?.chat.id;
-  const binding = await resolveTelegramProjectChat(String(migration?.oldChatId ?? chatId), config.projectChatIds);
-  if (!binding) return c.json({ ok: true, ignored: "chat" });
+  const actor = update.message?.from ?? update.callback_query?.from;
+  const privateRp = Boolean(actor && !actor.is_bot && telegramRole(actor.id, config) === "rp" && String(chatId) === String(actor.id));
+  const binding = privateRp ? null : await resolveTelegramProjectChat(String(migration?.oldChatId ?? chatId), config.projectChatIds);
+  if (!privateRp && !binding) return c.json({ ok: true, ignored: "chat" });
   const claimed = await claimTelegramUpdate(update.update_id, update);
   if (!claimed) return c.json({ ok: true, duplicate: true });
   try {
+    if (binding?.onboarding) await deliverOnboardingMessages(binding.onboarding);
     const status = migration && update.message
       ? await migrateTelegramChat({ ...migration, messageChatId: String(update.message.chat.id), messageId: update.message.message_id }).then(() => "processed" as const)
       : update.callback_query
         ? await handleCallback(update.callback_query)
         : update.message
-          ? await handleMessage(update.message, update.update_id, binding.channelId)
+          ? privateRp
+            ? await handlePrivateMessage(update.message)
+            : await handleMessage(update.message, update.update_id, binding!.channelId)
           : "ignored";
     await finishTelegramUpdate(update.update_id, status, status === "error" ? "Обработка завершилась с ошибкой" : undefined);
     return c.json({ ok: true, status });

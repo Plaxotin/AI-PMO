@@ -1,0 +1,93 @@
+{
+  "mode": "Headless Chrome mobile emulation at 390x844 against local production build, isolated MySQL and synthetic session cookies; navigation only, no mutations, production or Telegram connections",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "checks": {
+    "rp_server_state_and_overview": true,
+    "rp_overview_mobile_layout": true,
+    "rp_overview_chain_navigates_to_task": true,
+    "rp_tasks_hide_demo_proposals": true,
+    "rp_tasks_mobile_layout": true,
+    "rp_decision_fields_and_actions": true,
+    "rp_decisions_mobile_layout": true,
+    "rp_risks_confidence_sources_and_chain": true,
+    "rp_risks_hide_demo_proposals": true,
+    "rp_risks_mobile_layout": true,
+    "c_level_read_only_overview": true,
+    "c_level_overview_mobile_layout": true,
+    "c_level_decision_has_no_rp_actions": true,
+    "c_level_decisions_mobile_layout": true,
+    "c_level_task_result_and_chain_remain_readable": true,
+    "c_level_tasks_mobile_layout": true,
+    "c_level_risks_mobile_layout": true,
+    "no_javascript_exceptions": true,
+    "no_local_http_errors": true
+  },
+  "allChecksPassed": true,
+  "observed": {
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "roles": {
+      "rp": {
+        "role": "rp",
+        "overviewLayout": {
+          "innerWidth": 390,
+          "pageWidth": 390,
+          "tables": []
+        },
+        "decisionsLayout": {
+          "innerWidth": 390,
+          "pageWidth": 390,
+          "tables": [
+            {
+              "left": 40,
+              "right": 310,
+              "clientWidth": 270,
+              "scrollWidth": 270,
+              "overflowX": "visible",
+              "display": "block"
+            }
+          ]
+        }
+      },
+      "c_level": {
+        "role": "c_level",
+        "overviewLayout": {
+          "innerWidth": 390,
+          "pageWidth": 390,
+          "tables": []
+        },
+        "decisionsLayout": {
+          "innerWidth": 390,
+          "pageWidth": 390,
+          "tables": [
+            {
+              "left": 40,
+              "right": 310,
+              "clientWidth": 270,
+              "scrollWidth": 270,
+              "overflowX": "visible",
+              "display": "block"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "javascriptExceptions": [],
+  "localHttpErrors": [],
+  "screenshots": [
+    "rp-01-overview-mobile-390.png",
+    "rp-02-task-chain-mobile-390.png",
+    "rp-03-decision-mobile-390.png",
+    "rp-04-risks-mobile-390.png",
+    "c-level-01-overview-mobile-390.png",
+    "c-level-02-decision-mobile-390.png",
+    "c-level-03-task-mobile-390.png",
+    "c-level-04-risks-mobile-390.png"
+  ]
+}
