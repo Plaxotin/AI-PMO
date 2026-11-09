@@ -25,6 +25,8 @@
 | [SPEC-BL-48-outcome-loop.md](specs/SPEC-BL-48-outcome-loop.md) | BL-48 — первый срез принят; v1.1-draft, isolated KPI/Learning 23/23 |
 | [SPEC-BL-50-commitment-tracking.md](specs/SPEC-BL-50-commitment-tracking.md) | BL-50 — Commitment Tracking, кандидаты и исходы поручений |
 | [SPEC-BL-55-learning-loop.md](specs/SPEC-BL-55-learning-loop.md) | BL-55 — Learning Loop, метрики и версии логики |
+| [SPEC-BL-52-email-supervision.md](specs/SPEC-BL-52-email-supervision.md) | BL-52 — Email-надзор, CC/пересылка, privacy и дедупликация |
+| [SPEC-BL-43-max-delivery-channel.md](specs/SPEC-BL-43-max-delivery-channel.md) | BL-43 — канал доставки MAX, Webhook, callbacks и delivery outcomes |
 
 ## Планы реализации (`docs/plans/`)
 
@@ -51,6 +53,7 @@
 | [2026-11-09-bl48-real-pilot-scenario.md](reports/2026-11-09-bl48-real-pilot-scenario.md) | Предлагаемый реальный пилот P-03 → R-06/P-07, требуется подтверждение |
 | [2026-11-10-contact-hotfix.md](reports/2026-11-10-contact-hotfix.md) | Contact-only production hotfix, контрольная отправка `sent` |
 | [2026-11-10-bl48-real-pilot.md](reports/2026-11-10-bl48-real-pilot.md) | Реальный пилот P-03: +1 день, `confirmed`, `met`, restart без дублей |
+| [2026-11-10-bl50-real-pilot-scenario.md](reports/2026-11-10-bl50-real-pilot-scenario.md) | BL-50 — отдельный сценарий реального пилота, требуется подтверждение |
 
 ## Процесс разработки
 
