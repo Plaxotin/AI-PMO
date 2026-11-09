@@ -98,7 +98,7 @@ npm run db:migrate
 - Изолированно **14/14 BL-54**, полный P0/BL-48 regression зелёный, unit **35/35**, typecheck/build успешны. Production preview **9/9**: 3 факта, 1 план, 6 открытых рисков, 1 508 символов.
 - Production `/opt/aipmo-platform/releases/p0-bl54-cumulative-digest-v11-20261108`: сервис active, `NRestarts=0`, landing/workspace HTTP 200 и побайтно сохранены, журнал миграций 10.
 - Контрольный реальный дайджест 08.11 в 23:37 мск: **12/12**, одна доставка и один audit с includedItems. После restart повтор не отправлен; факты и планы не повторяются, открытые риски остаются. Владелец визуально принял дайджест в **23:41 мск**; `ownerVisualAccepted=true`, `specP0Accepted=true`.
-- Evidence: `verifier/v17/bl54-first-value-evidence.json`, `bl54-v11-preview-evidence.json`, `bl54-v11-acceptance-evidence.json`. **BL-54 и SPEC-P0 приняты**; Notion синхронизируется отдельно после восстановления OAuth.
+- Evidence: `verifier/v17/bl54-first-value-evidence.json`, `bl54-v11-preview-evidence.json`, `bl54-v11-acceptance-evidence.json`. **BL-54 и SPEC-P0 приняты**; Notion синхронизирован через плагин 09.11.2026.
 
 ### BL-41 — Telegram Edit → preview → Accept/cancel
 
@@ -167,7 +167,7 @@ npm run db:migrate
 - Learning Context использует только real, confirmed, comparable и не superseded измерения; `learning.context.used` сохраняет версии и модель. AI получает явный запрет на причинность, перенос чисел без основания и повышение confidence по одному прецеденту.
 - `pmo.configureOutcomeSource`, `pmo.approveOutcomeBinding`, `pmo.collectOutcome` доступны только РП. `pmo.state` и workspace показывают источники, наблюдения, origin, dataClass, сопоставимость и learning usage для read-only ролей.
 - Изолированный contract **23/23**, дополнительные adapter/currency unit-проверки доводят общий unit-набор до **39/39**. Полный regression: Telegram **18/18**, restart/replay **6/6**, BL-54 **14/14**, SLA **24/24**, прежний BL-48 **11/11**, typecheck/build успешны. Evidence: `verifier/v17/bl48-kpi-learning-evidence.json`.
-- Реальный источник и mapping не подключались; production, production БД, Telegram и Notion не изменялись. Production deployment и реальная приёмка требуют отдельного подтверждённого сценария.
+- Реальный источник и mapping не подключались; production, production БД и Telegram не изменялись. Notion синхронизирован отдельно через плагин 09.11.2026. Production deployment и реальная приёмка требуют отдельного подтверждённого сценария.
 
 ## Правила безопасности
 

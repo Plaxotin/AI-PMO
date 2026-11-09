@@ -64,7 +64,7 @@ GitHub sync повторно выполнять не нужно. При след
 | Production-принятые срезы | BL-35 · Project Audit Workspace; BL-36 · TG-надзор; BL-40 · Decision Log + Audit Trail; BL-41 · One-Click Decisions; BL-42 · Escalation Engine; BL-54 · First value за 24 часа; BL-56 · Лендинг |
 | Первый срез принят | BL-48 · Project Impact / Outcome Loop — полный Learning Loop и автоматический сбор KPI не закрыты |
 
-**Волна 0 и SPEC-P0 приняты владельцем 08.11.2026 в 23:41 мск.** Локальная приёмка не выдаётся за синхронизацию Notion; перенос статусов и спецификаций выполняется после восстановления OAuth.
+**Волна 0 и SPEC-P0 приняты владельцем 08.11.2026 в 23:41 мск.** Notion синхронизирован через плагин 09.11.2026: SPEC-P0, статусы BL-35/36/40/41/42/54, SPEC-BL-54 v1.1, SPEC-BL-48 v1.1-draft, итоговый отчёт и журнал. BL-48 остаётся «В работе» только с первым принятым срезом.
 
 ## 5. Что уже сделано после production baseline
 
@@ -120,7 +120,7 @@ GitHub sync повторно выполнять не нужно. При след
 
 Production `/opt/aipmo-platform/releases/p0-bl54-cumulative-digest-v11-20261108`: сервис active, `NRestarts=0`, landing/workspace HTTP 200 и побайтно сохранены, журнал миграций 10. Контрольный реальный дайджест 23:37 мск — **12/12**: одна доставка и один audit с includedItems; после restart повтор не отправлен, факты и планы не повторяются, открытые риски остаются.
 
-Владелец в **23:41 мск** ответил **«принято»**. `ownerVisualAccepted=true`, `specP0Accepted=true`; матрица содержит все 9 шагов passed и `fullP0Accepted=true`. Evidence: `apps/pmo-platform/verifier/v17/bl54-v11-preview-evidence.json`, `bl54-v11-acceptance-evidence.json`, `p0-acceptance-matrix.json`. **BL-54 и SPEC-P0 закрыты локально по фактической приёмке**; Notion синхронизируется после восстановления OAuth.
+Владелец в **23:41 мск** ответил **«принято»**. `ownerVisualAccepted=true`, `specP0Accepted=true`; матрица содержит все 9 шагов passed и `fullP0Accepted=true`. Evidence: `apps/pmo-platform/verifier/v17/bl54-v11-preview-evidence.json`, `bl54-v11-acceptance-evidence.json`, `p0-acceptance-matrix.json`. **BL-54 и SPEC-P0 приняты**; Notion синхронизирован через плагин 09.11.2026.
 
 ### Этап 3 — BL-41 · One-Click Decisions
 
@@ -193,7 +193,7 @@ Consolidated отчёт по срезам и доказательствам: `А
 Актуальное сопоставление «первоначальный план → сделано → осталось» и отчёты для передачи: `docs/plans/PMO_REMAINING_WORK_2026-11-08.md` и `docs/reports/`.
 
 1. **BL-48 · Project Impact / Outcome Loop** — `docs/specs/SPEC-BL-48-outcome-loop.md` подготовлена отдельно. Первый серверный срез реализован и принят: `outcome_measurements`, RP-only `pmo.recordOutcome`, версии/audit, idempotency, BL-35 exposure и measured L3. Изолированно **11/11**, unit **35/35**. Production `/opt/aipmo-platform/releases/p0-outcome-20261108`, миграция `0009`, журнал 10; на P-06 записано явно synthetic измерение, версия 2 подтверждает эффект −3 дня, прежнее L3 не перезаписывается и не дублируется. Evidence: `apps/pmo-platform/verifier/v17/bl48-outcome-evidence.json`, `bl48-p06-evidence.json`, `bl48-release-evidence.json`.
-   - **v1.1-draft, изолированный срез 09.11.2026:** миграция `0010`, read-only Sources, RP-approved Bindings, durable Observations, HTTPS GET `registry_json`, direction-aware EffectAssessment и аудируемый Learning Context. Новый contract **23/23**, общий unit **39/39**, полный regression зелёный. Evidence: `apps/pmo-platform/verifier/v17/bl48-v11-isolated-evidence.json`. Реальный источник и mapping не подключены, production и Notion не изменены, полный BL-48 не закрыт.
+   - **v1.1-draft, изолированный срез 09.11.2026:** миграция `0010`, read-only Sources, RP-approved Bindings, durable Observations, HTTPS GET `registry_json`, direction-aware EffectAssessment и аудируемый Learning Context. Новый contract **23/23**, общий unit **39/39**, полный regression зелёный. Evidence: `apps/pmo-platform/verifier/v17/bl48-v11-isolated-evidence.json`. Реальный источник и mapping не подключены, production не изменён, Notion синхронизирован отдельно через плагин 09.11.2026, полный BL-48 не закрыт.
 2. **BL-50** поставляет результаты поручений; **BL-55** использует результаты, подтверждённые эффекты и причины правок/отклонений для улучшения рекомендаций.
 3. **BL-52 · Email**, затем **BL-43 · MAX** — только по актуальным спецификациям и реальным доступам, без имитации подключения.
 4. Persisted outgoing queue, safe retry, dead-letter и мониторинг — **нет отдельной актуальной спеки; уведомить владельца перед стартом**.
