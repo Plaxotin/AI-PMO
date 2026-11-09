@@ -177,8 +177,8 @@ npm run db:migrate
 - EffectAssessment разделяет достоверность `confirmed` и `targetStatus`: `met`, `not_met`, `not_set`. Поддержаны direction-aware формулы schedule/cost/quality/resources, primary-метрика и запрет произвольного выбора между разными KPI.
 - Learning Context использует только real, confirmed, comparable и не superseded измерения; `learning.context.used` сохраняет версии и модель. AI получает явный запрет на причинность, перенос чисел без основания и повышение confidence по одному прецеденту.
 - `pmo.configureOutcomeSource`, `pmo.approveOutcomeBinding`, `pmo.collectOutcome` доступны только РП. `pmo.state` и workspace показывают источники, наблюдения, origin, dataClass, сопоставимость и learning usage для read-only ролей.
-- Изолированный contract **23/23**, дополнительные adapter/currency/Google Sheets unit-проверки доводят общий unit-набор до **41/41**. Полный regression: Telegram **18/18**, restart/replay **6/6**, BL-54 **14/14**, SLA **24/24**, прежний BL-48 **11/11**, typecheck/build успешны. Evidence: `verifier/v17/bl48-kpi-learning-evidence.json`, `bl48-google-sheets-adapter-evidence.json`.
-- Реальный источник и mapping не подключались; production, production БД и Telegram не изменялись. Notion синхронизирован отдельно через плагин 09.11.2026. Production deployment и реальная приёмка требуют отдельного подтверждённого сценария.
+- Изолированный contract **23/23**, общий main unit **47/47**. Полный regression: Telegram **18/18**, restart/replay **6/6**, BL-54 **14/14**, SLA **24/24**, прежний BL-48 **11/11**, typecheck/build успешны. Evidence: `verifier/v17/bl48-kpi-learning-evidence.json`, `bl48-google-sheets-adapter-evidence.json`.
+- Реальный пилот P-03 выполнен 10.11.2026: R-06/P-07, baseline 12, target 12, actual 11, эффект +1 день, `confirmed`, `met`; повтор/restart без дублей, Learning Context содержит P-07 и исключает legacy synthetic P-06. Release `/opt/aipmo-platform/releases/bl48-kpi-learning-v11-20261110`, журнал 11. Evidence: `verifier/v17/bl48-real-pilot-evidence.json`. Полная приёмка BL-48 владельцем не заявляется.
 
 ## Правила безопасности
 

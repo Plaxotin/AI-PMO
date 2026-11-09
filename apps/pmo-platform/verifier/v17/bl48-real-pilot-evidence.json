@@ -1,0 +1,93 @@
+{
+  "scope": "BL-48 separate real pilot P-03 with read-only Google Sheets; no Telegram sends and no synthetic effect",
+  "decisionId": "R-06",
+  "taskId": "P-07",
+  "source": {
+    "id": "SRC-BL6-REGISTRY",
+    "type": "google_sheets",
+    "readOnly": true,
+    "idempotent": true
+  },
+  "binding": {
+    "key": "B-BL48-P03",
+    "version": 1,
+    "idempotent": true
+  },
+  "initialCollection": {
+    "status": "collected",
+    "created": true
+  },
+  "immediateRepeatCollection": {
+    "status": "throttled"
+  },
+  "postRestartCollection": {
+    "status": "throttled",
+    "created": null
+  },
+  "assessment": {
+    "expectedEffect": "Сохранить базовый срок: направить список тех.долга официальным письмом не позднее 19.08.2026",
+    "status": "confirmed",
+    "targetStatus": "met",
+    "actualEffectValue": "1",
+    "text": "Изменение срока: −1 дн. (baseline 12 → actual 11 days)",
+    "basis": "schedule_days · decrease_is_better · baseline 12 → actual 11 days · цель 12 · BL-6 · Реестр поручений · read-only · sourceId SRC-BL6-REGISTRY · версия 1",
+    "measurementId": 3,
+    "measurementVersion": 1,
+    "bindingId": 1
+  },
+  "observations": [
+    {
+      "role": "actual",
+      "value": "11",
+      "unit": "days",
+      "dataClass": "real",
+      "validationStatus": "validated"
+    },
+    {
+      "role": "target",
+      "value": "12",
+      "unit": "days",
+      "dataClass": "real",
+      "validationStatus": "validated"
+    },
+    {
+      "role": "baseline",
+      "value": "12",
+      "unit": "days",
+      "dataClass": "real",
+      "validationStatus": "validated"
+    }
+  ],
+  "measurements": [
+    {
+      "version": 1,
+      "status": "confirmed",
+      "origin": "automatic",
+      "dataClass": "real",
+      "comparabilityStatus": "comparable"
+    }
+  ],
+  "learning": {
+    "count": 1,
+    "measurementRefs": [
+      {
+        "measurementId": 3,
+        "measurementVersion": 1
+      }
+    ],
+    "includesTaskP07": true,
+    "includesSourceRegistry": true,
+    "includesLegacySyntheticP06": false,
+    "usageCreated": true,
+    "usageRepeatCreated": false,
+    "usageAuditCount": 1,
+    "previewModelId": "preview-no-ai-call"
+  },
+  "bl35": {
+    "sourceVisible": true,
+    "bindingVisible": true,
+    "measurementsVisible": true
+  },
+  "spreadsheetIdIncluded": false,
+  "realChatOrUserIdsIncluded": false
+}
