@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { importPKCS8, SignJWT } from "jose";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import {
@@ -116,11 +118,132 @@ export async function registryJsonRead({ source, binding }: {
   return body.observations;
 }
 
+type GoogleServiceAccount = { client_email: string; private_key: string };
+
+async function googleServiceAccountToken(connectionRef: string) {
+  const credentialsPath = process.env[`${connectionRef}_CREDS_PATH`];
+  if (!credentialsPath) throw new Error("OUTCOME_SOURCE_CONFIG_MISSING");
+  const credentials = JSON.parse(await readFile(credentialsPath, "utf8")) as GoogleServiceAccount;
+  const privateKey = await importPKCS8(credentials.private_key, "RS256");
+  const assertion = await new SignJWT({ scope: "https://www.googleapis.com/auth/spreadsheets.readonly" })
+    .setProtectedHeader({ alg: "RS256", typ: "JWT" })
+    .setIssuer(credentials.client_email)
+    .setSubject(credentials.client_email)
+    .setAudience("https://oauth2.googleapis.com/token")
+    .setIssuedAt()
+    .setExpirationTime("1h")
+    .sign(privateKey);
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) throw new Error(`OUTCOME_AUTH_HTTP_${response.status}`);
+  const body = await response.json() as { access_token?: string };
+  if (!body.access_token) throw new Error("OUTCOME_AUTH_SCHEMA_INVALID");
+  return body.access_token;
+}
+
+function projectDate(value: string) {
+  const match = value.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  const date = match ? new Date(`${match[3]}-${match[2]}-${match[1]}T00:00:00.000Z`) : new Date(value);
+  if (Number.isNaN(date.getTime())) throw new Error("OUTCOME_SOURCE_DATE_INVALID");
+  return date;
+}
+
+function daysBetween(start: Date, end: Date) {
+  return Math.round((end.getTime() - start.getTime()) / 86_400_000);
+}
+
+function normalizedTaskId(value: string) {
+  const match = value.trim().match(/^(?:P-?)?0*(\d+)$/i);
+  return match ? `P-${Number(match[1])}` : value.trim();
+}
+
+export async function googleSheetsRead({ source, binding }: {
+  source: typeof outcomeSources.$inferSelect;
+  binding: typeof outcomeMetricBindings.$inferSelect;
+}): Promise<OutcomeObservationInput[]> {
+  const spreadsheetId = String(source.config.spreadsheetId || process.env[`${source.connectionRef}_SPREADSHEET_ID`] || "");
+  if (!spreadsheetId) throw new Error("OUTCOME_SOURCE_CONFIG_MISSING");
+  const token = await googleServiceAccountToken(source.connectionRef);
+  const range = String(source.config.range || "Реестр поручений!A:Z");
+  const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}`, {
+    method: "GET",
+    redirect: "manual",
+    headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) throw new Error(`OUTCOME_SOURCE_HTTP_${response.status}`);
+  const body = await response.json() as { values?: string[][] };
+  if (!Array.isArray(body.values) || body.values.length < 2) throw new Error("OUTCOME_SOURCE_SCHEMA_INVALID");
+  const headers = body.values[0].map((value) => value.trim().toLowerCase());
+  const column = (...names: string[]) => {
+    for (const name of names) {
+      const index = headers.indexOf(name.toLowerCase());
+      if (index >= 0) return index;
+    }
+    return -1;
+  };
+  const idColumn = column("ID", "№");
+  const createdColumn = column("Дата создания", "Data sozdaniya");
+  const deadlineKorrColumn = column("Srok korr");
+  const deadlinePlanColumn = column("Srok plan", "Срок", "Srok");
+  const statusColumn = column("Статус", "Status");
+  const closedColumn = column("Дата закрытия", "Data zakrytiya");
+  const row = body.values.slice(1).find((values) => normalizedTaskId(String(values[idColumn] || "")) === normalizedTaskId(binding.externalKey));
+  if (!row) throw new Error("OUTCOME_SOURCE_ROW_NOT_FOUND");
+  const cell = (index: number) => index >= 0 ? String(row[index] || "").trim() : "";
+  const createdText = cell(createdColumn);
+  const deadlineText = cell(deadlineKorrColumn) || cell(deadlinePlanColumn);
+  const closedText = cell(closedColumn);
+  const status = cell(statusColumn);
+  if (!createdText || !deadlineText || !closedText) throw new Error("OUTCOME_SOURCE_ROW_FIELDS_MISSING");
+  if (status !== "Выполнено") throw new Error("OUTCOME_SOURCE_ROW_NOT_DONE");
+  const createdAt = projectDate(createdText);
+  const deadlineAt = projectDate(deadlineText);
+  const closedAt = projectDate(closedText);
+  const baseline = String(daysBetween(createdAt, deadlineAt));
+  const actual = String(daysBetween(createdAt, closedAt));
+  const taskId = normalizedTaskId(String(row[idColumn] || ""));
+  return [
+    {
+      externalObservationId: `${taskId}-BASELINE-${createdText}`,
+      role: "baseline",
+      value: baseline,
+      unit: "days",
+      observedAt: createdAt,
+      dataClass: "real",
+      sourceRecordUrl: null,
+    },
+    {
+      externalObservationId: `${taskId}-TARGET-${deadlineText}`,
+      role: "target",
+      value: baseline,
+      unit: "days",
+      observedAt: createdAt,
+      dataClass: "real",
+      sourceRecordUrl: null,
+    },
+    {
+      externalObservationId: `${taskId}-ACTUAL-${closedText}`,
+      role: "actual",
+      value: actual,
+      unit: "days",
+      observedAt: closedAt,
+      dataClass: "real",
+      sourceRecordUrl: null,
+    },
+  ];
+}
+
 async function readSource(source: typeof outcomeSources.$inferSelect, binding: typeof outcomeMetricBindings.$inferSelect) {
   if (!source.readOnly) throw new Error("OUTCOME_SOURCE_NOT_READ_ONLY");
   const adapter = adapters.get(source.type);
   if (adapter) return adapter.read({ source, binding });
   if (source.type === "registry_json") return registryJsonRead({ source, binding });
+  if (source.type === "google_sheets") return googleSheetsRead({ source, binding });
   throw new Error("OUTCOME_SOURCE_ADAPTER_UNAVAILABLE");
 }
 

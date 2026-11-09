@@ -1,0 +1,31 @@
+{
+  "scope": "BL-48 google_sheets read-only adapter isolated verification; no real API call and no production changes",
+  "adapter": {
+    "oauthScope": "https://www.googleapis.com/auth/spreadsheets.readonly",
+    "credentialSource": "server-side connectionRef_CREDS_PATH",
+    "spreadsheetReadMethod": "GET",
+    "taskIdNormalization": "P-03, P-3 and numeric 3 map to the same external row",
+    "baselineFormula": "Srok korr or Srok plan minus Data sozdaniya",
+    "targetFormula": "baseline",
+    "actualFormula": "Data zakrytiya minus Data sozdaniya",
+    "missingDatesRejected": true,
+    "nonDoneRowsRejected": true
+  },
+  "checks": {
+    "syntheticCredentialsOauthFlow": true,
+    "spreadsheetReadIsGet": true,
+    "realRowMapsTo12Baseline12Target11Actual": true,
+    "incompleteRowDoesNotInventKpi": true,
+    "bl48KpiLearningContract": "23/23",
+    "unit": "41/41",
+    "typecheck": true,
+    "productionBuild": true
+  },
+  "defectFoundAndFixed": "Bare numeric sheet ID 3 and external P-03 were normalized differently; both now resolve to P-3",
+  "realApiCalled": false,
+  "realSourceChanged": false,
+  "productionChanged": false,
+  "credentialsIncluded": false,
+  "realChatOrUserIdsIncluded": false,
+  "allChecksPassed": true
+}
