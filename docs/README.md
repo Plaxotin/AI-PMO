@@ -23,6 +23,8 @@
 | [SPEC-BL-36-tg-monitoring.md](specs/SPEC-BL-36-tg-monitoring.md) | BL-36 — Telegram-надзор и невидимый бот-наблюдатель |
 | [SPEC-BL-54-first-value.md](specs/SPEC-BL-54-first-value.md) | **BL-54 v1.1 — принятый накопительный дайджест** |
 | [SPEC-BL-48-outcome-loop.md](specs/SPEC-BL-48-outcome-loop.md) | BL-48 — первый срез принят; v1.1-draft, isolated KPI/Learning 23/23 |
+| [SPEC-BL-50-commitment-tracking.md](specs/SPEC-BL-50-commitment-tracking.md) | BL-50 — Commitment Tracking, кандидаты и исходы поручений |
+| [SPEC-BL-55-learning-loop.md](specs/SPEC-BL-55-learning-loop.md) | BL-55 — Learning Loop, метрики и версии логики |
 
 ## Планы реализации (`docs/plans/`)
 
