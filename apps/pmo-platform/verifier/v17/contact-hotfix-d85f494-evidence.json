@@ -1,0 +1,48 @@
+{
+  "scope": "Contact-only production hotfix for landing/contact; no BL-48 migration or pilot writes",
+  "sourceCommit": "d85f494574d3e6e26f4fc14ebc468d467e5df119",
+  "hotfixBranchCommit": "1a213fc",
+  "release": "/opt/aipmo-platform/releases/contact-hotfix-d85f494-20261110",
+  "backup": {
+    "path": "/opt/aipmo-platform/backups/aipmo-bl42-pre-20261109_210307.sql.gz",
+    "tables": 21,
+    "bytes": 21117,
+    "sha256": "7a4d7cb3f2859edc84f4f4b69a020da293b3f755c7e9bf888ff7a14521f8a89d",
+    "gzipIntegrity": true
+  },
+  "checks": {
+    "mainTypecheckBuild": true,
+    "mainUnit": "47/47",
+    "contactOnlyTypecheckBuild": true,
+    "contactOnlyUnit": "41/41",
+    "bootNodeCheck": true,
+    "service": "active/running",
+    "nRestarts": 0,
+    "landingHttp": 200,
+    "workspaceHttp": 200,
+    "externalLandingHttp": 200,
+    "externalWorkspaceHttp": 200
+  },
+  "preservation": {
+    "productionEnvSha256": "1b93c5c881f1451f6081c48d5ceefad4e62531f90d585082f9a1fac390176715",
+    "workspaceSha256": "6690d803ab444e22717c934a7981ff9b1f1d8ab5f6d01c6f615c3978b469c2e0",
+    "canonicalPngUnchanged": true,
+    "credentialsPreserved": true,
+    "controlledGatewayPreserved": true,
+    "bl48MigrationApplied": false
+  },
+  "contact": {
+    "recipientConfigured": true,
+    "recipientIdIncluded": false,
+    "controlledSubmissions": 1,
+    "httpStatus": 200,
+    "outcome": "sent",
+    "journalContactDelivered": true,
+    "retryPerformed": false
+  },
+  "bootSha256": "bf96047cbeeb4a114f8dd159258304fad640ed6e15085519fc5b959bc3bc4f0b",
+  "landingSha256": "af3bfc28d87d128a0ea956939d229d9b57cad59f8019c84403236d2746ed8947",
+  "completedAtLocal": "2026-11-10T00:07:46+03:00",
+  "realChatOrUserIdsIncluded": false,
+  "allChecksPassed": true
+}

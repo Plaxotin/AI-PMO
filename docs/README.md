@@ -47,6 +47,7 @@
 | [2026-11-07-ai-pmo-p0-6h-plan-report.md](reports/2026-11-07-ai-pmo-p0-6h-plan-report.md) | Предыдущий отчёт по автономному 6-часовому плану |
 | [2026-11-09-notion-sync.md](reports/2026-11-09-notion-sync.md) | Ссылки и проверенные статусы синхронизации Notion |
 | [2026-11-09-bl48-real-pilot-scenario.md](reports/2026-11-09-bl48-real-pilot-scenario.md) | Предлагаемый реальный пилот P-03 → R-06/P-07, требуется подтверждение |
+| [2026-11-10-contact-hotfix.md](reports/2026-11-10-contact-hotfix.md) | Contact-only production hotfix, контрольная отправка `sent` |
 
 ## Процесс разработки
 
