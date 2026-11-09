@@ -10,6 +10,7 @@
 | SPEC-BL-48 v1.1-draft | [Открыть](https://app.notion.com/p/4132fbb64c0e81f5913af4506a384bc0) | Полная спецификация и ссылка на GitHub |
 | Итоговый отчёт SPEC-P0/BL-48 | [Открыть](https://app.notion.com/p/4132fbb64c0e81ec864dc2a012195429) | Полный отчёт и ссылка на GitHub |
 | Журнал приёмки P0 | [Открыть](https://app.notion.com/p/4132fbb64c0e811e98bdc4ff7b10d330) | Итоговая матрица, evidence index и ссылка на полный 54-раздельный журнал в GitHub |
+| Сценарий реального пилота BL-48 | [Открыть](https://app.notion.com/p/4132fbb64c0e8160be9cda9d7bc05265) | P-03 → R-06/P-07; baseline 12, target 12, actual 11, ожидается +1 день; production writes ещё не подтверждены |
 
 ## Обновлённые страницы
 
