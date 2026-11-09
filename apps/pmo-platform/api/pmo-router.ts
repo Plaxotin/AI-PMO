@@ -4,6 +4,7 @@ import { decideProposal, getProjectState } from "./queries/pmo";
 import { correctPendingProposal } from "./queries/correction";
 import { recordOutcome } from "./queries/outcome";
 import { approveOutcomeMetricBinding, collectOutcomeMetricBinding, configureOutcomeSource } from "./queries/outcome-kpi";
+import { applyLogicChange, approveLogicChange, createGoldenRegressionCase, proposeLogicChange, rollbackLogicChange, runLogicRegression } from "./queries/learning-metrics";
 
 const metricSchema = z.enum(["schedule_days", "cost_amount", "quality_defects", "resource_days"]);
 const unitSchema = z.enum(["days", "hours", "currency", "count", "percent", "ratio"]);
@@ -77,4 +78,40 @@ export const pmoRouter = createRouter({
   collectOutcome: rpQuery
     .input(z.object({ key: z.string().trim().min(1).max(64) }))
     .mutation(({ input }) => collectOutcomeMetricBinding(input.key)),
+  proposeLogic: rpQuery
+    .input(z.object({
+      id: z.string().trim().min(1).max(64),
+      cluster: z.string().trim().min(1).max(64),
+      question: z.string().trim().min(1).max(5000),
+      currentVersion: z.string().trim().min(1).max(64),
+      proposedVersion: z.string().trim().min(1).max(64),
+      changeType: z.enum(["prompt", "threshold", "rule", "model"]),
+      rationale: z.string().trim().min(1).max(5000),
+      evidenceRefs: z.array(z.record(z.string(), z.unknown())),
+      expectedMetric: z.string().trim().min(1).max(64),
+    }))
+    .mutation(({ ctx, input }) => proposeLogicChange(input, { userId: ctx.user.id, name: ctx.user.name || "Руководитель проекта" })),
+  approveLogic: rpQuery
+    .input(z.object({ id: z.string().trim().min(1).max(64) }))
+    .mutation(({ ctx, input }) => approveLogicChange(input.id, { userId: ctx.user.id, name: ctx.user.name || "Руководитель проекта" })),
+  regressLogic: rpQuery
+    .input(z.object({ id: z.string().trim().min(1).max(64), evaluator: z.enum(["default", "degrade"]).optional() }))
+    .mutation(({ input }) => runLogicRegression(input.id, input.evaluator)),
+  applyLogic: rpQuery
+    .input(z.object({ id: z.string().trim().min(1).max(64) }))
+    .mutation(({ ctx, input }) => applyLogicChange(input.id, { userId: ctx.user.id, name: ctx.user.name || "Руководитель проекта" })),
+  rollbackLogic: rpQuery
+    .input(z.object({ id: z.string().trim().min(1).max(64) }))
+    .mutation(({ ctx, input }) => rollbackLogicChange(input.id, { userId: ctx.user.id, name: ctx.user.name || "Руководитель проекта" })),
+  goldenCase: rpQuery
+    .input(z.object({
+      id: z.string().trim().min(1).max(64),
+      question: z.string().trim().min(1).max(5000),
+      input: z.string().trim().min(1).max(20000),
+      expected: z.record(z.string(), z.unknown()),
+      sourceCorrectionId: z.string().trim().min(1).max(64),
+      modelId: z.string().trim().min(1).max(255),
+      version: z.string().trim().min(1).max(64),
+    }))
+    .mutation(({ ctx, input }) => createGoldenRegressionCase(input, { userId: ctx.user.id, name: ctx.user.name || "Руководитель проекта" })),
 });

@@ -485,6 +485,44 @@ export const commitmentOutcomes = mysqlTable("commitment_outcomes", {
   projectIdx: index("commitment_outcomes_project_idx").on(table.projectId),
 }));
 
+export const logicChangeProposals = mysqlTable("logic_change_proposals", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  projectId: varchar("projectId", { length: 64 }).notNull(),
+  cluster: varchar("cluster", { length: 64 }).notNull(),
+  question: text("question").notNull(),
+  currentVersion: varchar("currentVersion", { length: 64 }).notNull(),
+  proposedVersion: varchar("proposedVersion", { length: 64 }).notNull(),
+  changeType: mysqlEnum("changeType", ["prompt", "threshold", "rule", "model"]).notNull(),
+  rationale: text("rationale").notNull(),
+  evidenceRefs: json("evidenceRefs").$type<Record<string, unknown>[]>().notNull(),
+  expectedMetric: varchar("expectedMetric", { length: 64 }).notNull(),
+  baselineMetrics: json("baselineMetrics").$type<Record<string, unknown>>().notNull(),
+  status: mysqlEnum("status", ["proposed", "approved", "rejected", "testing", "applied", "rolled_back"]).default("proposed").notNull(),
+  approvedByUserId: bigint("approvedByUserId", { mode: "number", unsigned: true }),
+  regressionResult: json("regressionResult").$type<Record<string, unknown>>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+  approvedAt: timestamp("approvedAt"),
+  appliedAt: timestamp("appliedAt"),
+  rolledBackAt: timestamp("rolledBackAt"),
+}, (table) => ({
+  projectIdx: index("logic_change_proposals_project_idx").on(table.projectId),
+}));
+
+export const goldenRegressionCases = mysqlTable("golden_regression_cases", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  projectId: varchar("projectId", { length: 64 }).notNull(),
+  question: text("question").notNull(),
+  input: text("input").notNull(),
+  expected: json("expected").$type<Record<string, unknown>>().notNull(),
+  sourceCorrectionId: varchar("sourceCorrectionId", { length: 64 }).notNull(),
+  modelId: varchar("modelId", { length: 255 }).notNull(),
+  version: varchar("version", { length: 64 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  projectIdx: index("golden_regression_cases_project_idx").on(table.projectId),
+}));
+
 export const auditEvents = mysqlTable("audit_events", {
   id: serial("id").primaryKey(),
   projectId: varchar("projectId", { length: 64 }).notNull(),

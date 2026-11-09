@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { auditEvents, commitmentCandidates, commitmentOutcomes, decisions, learningContextUsages, outcomeMeasurements, outcomeMetricBindings, outcomeObservations, outcomeSources, projectCounters, projects, proposalVersions, risks, signals, tasks, type User } from "@db/schema";
+import { auditEvents, commitmentCandidates, commitmentOutcomes, decisions, goldenRegressionCases, learningContextUsages, logicChangeProposals, outcomeMeasurements, outcomeMetricBindings, outcomeObservations, outcomeSources, projectCounters, projects, proposalVersions, risks, signals, tasks, type User } from "@db/schema";
+import { buildLearningMetrics } from "./learning-metrics";
 import { assessTaskOutcome } from "./outcome";
 import { getDb } from "./connection";
 import { buildProposalDiff, telegramSourceLink, type ProposalSnapshot } from "./proposal-audit";
@@ -60,7 +61,7 @@ export async function ensureSeed() {
 
 export async function getProjectState(user: User) {
   const db = getDb();
-  const [role, riskRows, decisionRows, versionRows, taskRows, signalRows, eventRows, outcomeRows, sourceRows, bindingRows, observationRows, learningRows, commitmentRows, commitmentOutcomeRows] = await Promise.all([
+  const [role, riskRows, decisionRows, versionRows, taskRows, signalRows, eventRows, outcomeRows, sourceRows, bindingRows, observationRows, learningRows, commitmentRows, commitmentOutcomeRows, logicRows, goldenRows] = await Promise.all([
     resolveProjectRole(user),
     db.select().from(risks).where(eq(risks.projectId, DEMO_PROJECT_ID)).orderBy(asc(risks.id)),
     db.select().from(decisions).where(eq(decisions.projectId, DEMO_PROJECT_ID)).orderBy(asc(decisions.id)),
@@ -75,7 +76,10 @@ export async function getProjectState(user: User) {
     db.select().from(learningContextUsages).where(eq(learningContextUsages.projectId, DEMO_PROJECT_ID)).orderBy(desc(learningContextUsages.createdAt), desc(learningContextUsages.id)).limit(100),
     db.select().from(commitmentCandidates).where(eq(commitmentCandidates.projectId, DEMO_PROJECT_ID)).orderBy(desc(commitmentCandidates.createdAt), desc(commitmentCandidates.id)).limit(100),
     db.select().from(commitmentOutcomes).where(eq(commitmentOutcomes.projectId, DEMO_PROJECT_ID)).orderBy(desc(commitmentOutcomes.createdAt), desc(commitmentOutcomes.id)).limit(100),
+    db.select().from(logicChangeProposals).where(eq(logicChangeProposals.projectId, DEMO_PROJECT_ID)).orderBy(desc(logicChangeProposals.createdAt), desc(logicChangeProposals.id)).limit(100),
+    db.select().from(goldenRegressionCases).where(eq(goldenRegressionCases.projectId, DEMO_PROJECT_ID)).orderBy(desc(goldenRegressionCases.createdAt), desc(goldenRegressionCases.id)).limit(100),
   ]);
+  const learningMetrics = await buildLearningMetrics();
   const outcomeAssessments = new Map(await Promise.all(taskRows.map(async (task) => [task.id, await assessTaskOutcome(task.id)] as const)));
   const chain = buildProjectChain(signalRows, riskRows, decisionRows, taskRows);
   const overview = buildAuditOverview(
@@ -101,6 +105,9 @@ export async function getProjectState(user: User) {
     learningContextUsages: learningRows.map((x) => ({ id: x.id, proposalId: x.proposalId, proposalVersion: x.proposalVersion, contextHash: x.contextHash, modelId: x.modelId, measurementRefs: x.measurementRefs, createdAt: x.createdAt })),
     commitmentCandidates: commitmentRows.map((x) => ({ id: x.id, signalId: x.signalId, decisionId: x.decisionId, taskId: x.taskId, existingTaskId: x.existingTaskId, title: x.title, owner: x.owner, due: x.due, confidence: x.confidence, changeType: x.changeType, status: x.status, rejectionReason: x.rejectionReason, evidenceVersion: x.evidenceVersion, evidenceHash: x.evidenceHash, editDistance: x.editDistance, decidedAt: x.decidedAt, completedAt: x.completedAt, createdAt: x.createdAt })),
     commitmentOutcomes: commitmentOutcomeRows.map((x) => ({ id: x.id, taskId: x.taskId, decisionId: x.decisionId, outcome: x.outcome, resultText: x.resultText, completedAt: x.completedAt, source: x.source, sourceId: x.sourceId, expectedEffect: x.expectedEffect, effectAssessment: x.effectAssessment, recordedByName: x.recordedByName, recordedByRole: x.recordedByRole, createdAt: x.createdAt, updatedAt: x.updatedAt })),
+    learningMetrics,
+    logicChangeProposals: logicRows.map((x) => ({ id: x.id, cluster: x.cluster, question: x.question, currentVersion: x.currentVersion, proposedVersion: x.proposedVersion, changeType: x.changeType, rationale: x.rationale, evidenceRefs: x.evidenceRefs, expectedMetric: x.expectedMetric, baselineMetrics: x.baselineMetrics, status: x.status, regressionResult: x.regressionResult, approvedAt: x.approvedAt, appliedAt: x.appliedAt, rolledBackAt: x.rolledBackAt })),
+    goldenRegressionCases: goldenRows.map((x) => ({ id: x.id, question: x.question, input: x.input, expected: x.expected, sourceCorrectionId: x.sourceCorrectionId, modelId: x.modelId, version: x.version, createdAt: x.createdAt })),
     events: eventRows.map((x) => ({ id: x.id, entityType: x.entityType, entityId: x.entityId, eventType: x.eventType, relatedId: x.relatedId, actorName: x.actorName, actorRole: x.actorRole, attribution: x.attribution, channel: x.channel, version: x.version, sourceLinks: x.sourceLinks, diff: x.diff, metadata: x.metadata, detail: x.detail, createdAt: x.createdAt })),
   };
 }
