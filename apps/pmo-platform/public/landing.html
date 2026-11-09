@@ -61,8 +61,9 @@ h2{font-size:30px;font-weight:700;letter-spacing:-.015em;line-height:1.18;max-wi
 .cap{margin-top:14px;font-size:13.5px;line-height:1.6;color:var(--ink-faint);max-width:640px}
 .cap b{color:var(--ink-soft)}
 /* демо: мобильный Telegram */
-.duo{display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start;margin-top:30px}
-@media (max-width:820px){.duo{grid-template-columns:1fr}}
+.demo-stage{margin-top:30px}
+.demo-restart{display:flex;justify-content:center;margin-top:22px}
+.demo-restart[hidden]{display:none}
 .shot{position:relative;min-width:0;margin:0}
 .phone{width:min(360px,100%);aspect-ratio:9/16;margin:0 auto;background:#151b20;border:5px solid #1d252c;border-radius:30px;overflow:hidden;box-shadow:0 22px 48px rgba(18,18,18,.20);display:flex;flex-direction:column}
 .tg-status{height:24px;padding:5px 14px 0;background:rgba(250,250,250,.98);display:flex;align-items:center;justify-content:space-between;color:#111;font-size:10px;font-weight:700;line-height:1;flex:none}
@@ -114,22 +115,6 @@ h2{font-size:30px;font-weight:700;letter-spacing:-.015em;line-height:1.18;max-wi
 .ph-compose{min-height:43px;padding:7px 10px;background:rgba(250,250,250,.98);display:flex;align-items:center;gap:10px;color:#8b949b;flex:none}
 .ph-compose svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .ph-compose span{flex:1;font-size:12px}
-/* карточки-пояснения демо */
-.pstep{background:var(--paper);border:1px solid var(--hair);border-radius:14px;padding:16px 18px;transition:border-color .18s,box-shadow .18s,background .18s}
-.pstep[data-go]{display:block;color:inherit;text-decoration:none;cursor:pointer}
-.pstep[data-go]:hover{border-color:var(--accent);box-shadow:0 4px 16px rgba(85,65,234,.09)}
-.pstep[data-go]:focus-visible{outline:3px solid rgba(85,65,234,.28);outline-offset:3px}
-.pstep[data-go].locked{cursor:default}
-.pstep[data-go].locked:hover{border-color:var(--hair);box-shadow:none}
-.pday{font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--accent);letter-spacing:.1em;text-transform:uppercase}
-.pday .mention{font-family:var(--sans);letter-spacing:0;text-transform:none}
-.pstep h3{font-size:14.5px;margin:8px 0 6px;color:var(--ink)}
-.pstep p{font-size:12.5px;line-height:1.5;color:var(--ink-soft);margin:0}
-.pstep.ghost{border-style:dashed;background:transparent}
-.pstep.ghost .pday{color:var(--ink-faint)}
-.pstep.active{border-color:var(--accent);background:#f8f6ff;box-shadow:0 0 0 3px rgba(85,65,234,.13)}
-.pstep.flash{animation:flash .55s ease}
-@keyframes flash{0%{box-shadow:0 0 0 4px rgba(85,65,234,.20)}100%{box-shadow:0 0 0 3px rgba(85,65,234,.13)}}
 /* возможности: 4 направления строками */
 .caps{margin-top:26px;border-top:1px solid var(--hair)}
 .capr{display:grid;grid-template-columns:250px 1fr;gap:24px;padding:22px 4px;border-bottom:1px solid var(--hair);align-items:baseline}
@@ -282,7 +267,7 @@ h2{font-size:30px;font-weight:700;letter-spacing:-.015em;line-height:1.18;max-wi
     <div class="sec-h">Демонстрация</div>
     <h2>От сигнала в чате до подтверждённого эффекта — за три клика РП</h2>
     <p class="lead">Пиэмка сама зафиксирует риск, создаст и проконтролирует поручение, подтвердит достигнутый эффект по факту исполнения. Руководитель подтверждает каждый шаг, имея весь необходимый контекст для принятия решения. От него потребуется всего три клика, чтобы отработать риск.</p>
-    <div class="duo">
+    <div class="demo-stage">
       <figure class="shot">
         <div class="phone">
           <div class="tg-status" aria-hidden="true"><span>09:41</span><div class="tg-icons"><svg class="cell" viewBox="0 0 18 12"><path d="M1 11h2V8H1v3zm4 0h2V6H5v5zm4 0h2V3H9v8zm4 0h2V0h-2v11z"/></svg><svg class="wifi" viewBox="0 0 24 24"><path d="M2 8.5a15 15 0 0 1 20 0M5.5 12.5a10 10 0 0 1 13 0M9 16a4.5 4.5 0 0 1 6 0M12 20h.01"/></svg><svg class="battery" viewBox="0 0 26 12"><rect x="1" y="1.5" width="20" height="9" rx="2"/><path class="fill" d="M3.5 4h12v4h-12zM23 4v4"/></svg></div></div>
@@ -331,13 +316,8 @@ h2{font-size:30px;font-weight:700;letter-spacing:-.015em;line-height:1.18;max-wi
           <div class="ph-compose" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 11.5l-8.5 8.5a6 6 0 01-8.5-8.5l9-9a4 4 0 015.7 5.7l-9 9a2 2 0 01-2.9-2.8l8.3-8.3"/></svg><span>Сообщение</span><svg viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="13" rx="4"/><path d="M5 11a7 7 0 0014 0M12 18v4"/></svg></div>
         </div>
       </figure>
-      <div style="display:flex;flex-direction:column;gap:14px">
-        <p class="cap" style="margin:0 0 2px">Шаги открываются по мере прохождения демо. Нажмите на пройденный шаг, чтобы вернуться к нему и сделать другой выбор.</p>
-        <a class="pstep" style="margin:0" id="card1" data-step data-go="1" href="#live"><div class="pday"><span class="demo-date">08.11.2026</span> · Дайджест проекта</div><h3>Факт, план и риск уже собраны</h3><p>Руководитель видит, что сделано, какой контрольный шаг следующий и что мешает его выполнить — без ручной сводки.</p></a>
-        <a class="pstep ghost" style="margin:0" id="card2" data-step data-go="2" href="#live"><div class="pday" id="card2-day">Клик 1 · Откройте риск</div><h3 id="card2-h">Риск уже в реестре</h3><p id="card2-p">Фиксация выполнена системой: источник, прогноз и обоснование доступны для проверки.</p></a>
-        <a class="pstep ghost" style="margin:0" id="card3" data-step data-go="3" href="#live"><div class="pday" id="card3-day">Клик 2 · Примите предложение</div><h3 id="card3-h">Решение остаётся за руководителем</h3><p id="card3-p">Предложение можно принять или отклонить. Пиэмка не утверждает управленческие решения сама.</p></a>
-        <a class="pstep ghost" style="margin:0" id="card4" data-step data-go="4" href="#live"><div class="pday" id="card4-day">Автоматически · Решение и поручение</div><h3 id="card4-h">Система свяжет записи</h3><p id="card4-p">Решение получит атрибуцию руководителя, поручение — ответственного, срок и ссылку на решение.</p></a>
-        <a class="pstep ghost" style="margin:0" id="card5" data-step data-go="5" href="#live"><div class="pday" id="card5-day">Клик 3 · Подтвердите выполнение</div><h3 id="card5-h">Подтверждение остаётся за РП</h3><p id="card5-p">После автоматического отчёта админа <span class="mention">@alex</span> руководитель подтверждает, что поручение действительно выполнено.</p></a>
+      <div class="demo-restart" id="demoRestart" hidden>
+        <button class="btn btn-p" type="button" data-act="restart">↻ Начать демо заново</button>
       </div>
     </div>
   </section>
@@ -433,33 +413,15 @@ h2{font-size:30px;font-weight:700;letter-spacing:-.015em;line-height:1.18;max-wi
 <script>
 (function(){
   var msgDigest=document.getElementById('msgDigest'),msgRisk=document.getElementById('msgRisk'),msgDecision=document.getElementById('msgDecision'),msgReport=document.getElementById('msgReport'),msgImpact=document.getElementById('msgImpact'),
-      card1=document.getElementById('card1'),card2=document.getElementById('card2'),card3=document.getElementById('card3'),card4=document.getElementById('card4'),card5=document.getElementById('card5'),
-      body=document.querySelector('.ph-body'),phStatus=document.getElementById('phStatus'),typing=null,timer=null,reportTimer=null,started=false,decisionPending=false,impactPending=false,lastAct='accept',revision=0,
+      body=document.querySelector('.ph-body'),phStatus=document.getElementById('phStatus'),restart=document.getElementById('demoRestart'),typing=null,timer=null,reportTimer=null,started=false,decisionPending=false,impactPending=false,revision=0,
       reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches,TYPE_DELAY=reduced?0:1200,REPORT_DELAY=reduced?5000:3800;
-  var messages=[msgDigest,msgRisk,msgDecision,msgReport,msgImpact],steps=[card1,card2,card3,card4,card5],maxUnlocked=0;
+  var messages=[msgDigest,msgRisk,msgDecision,msgReport,msgImpact];
   document.querySelectorAll('.demo-date').forEach(function(node){node.textContent=new Date().toLocaleDateString('ru-RU');});
   function put(id,html){document.getElementById(id).innerHTML=html;}
   function scrollDown(){body.scrollTo({top:body.scrollHeight,behavior:reduced?'auto':'smooth'});}
-  function updateStepAccess(){
-    document.querySelectorAll('[data-go]').forEach(function(link){
-      var locked=Number(link.dataset.go)>maxUnlocked;
-      link.classList.toggle('locked',locked);link.setAttribute('aria-disabled',String(locked));
-      if(locked)link.setAttribute('tabindex','-1');else link.removeAttribute('tabindex');
-    });
-  }
-  function unlock(step){if(step>maxUnlocked){maxUnlocked=step;updateStepAccess();}}
-  function setActive(card){
-    steps.forEach(function(c){c.classList.toggle('active',c===card);});
-    if(card)card.classList.remove('ghost');
-  }
-  function flash(card){card.classList.remove('flash');void card.offsetWidth;card.classList.add('flash');}
-  function showMessage(msg){
-    msg.style.display='flex';msg.classList.add('pop');scrollDown();
-    if(msg===msgDigest)unlock(1);else if(msg===msgRisk)unlock(3);else if(msg===msgDecision)unlock(4);else if(msg===msgReport)unlock(5);
-  }
-  updateStepAccess();
+  function showMessage(msg){msg.style.display='flex';msg.classList.add('pop');scrollDown();}
   function clearAsync(){
-    revision++;if(timer)clearTimeout(timer);if(reportTimer)clearTimeout(reportTimer);if(typing)typing.remove();typing=null;
+    revision++;if(timer)clearTimeout(timer);if(reportTimer)clearTimeout(reportTimer);if(typing)typing.remove();typing=null;timer=null;reportTimer=null;
     phStatus.textContent='бот';phStatus.classList.remove('is-typing');body.setAttribute('aria-busy','false');
   }
   function type(cb){
@@ -471,11 +433,11 @@ h2{font-size:30px;font-weight:700;letter-spacing:-.015em;line-height:1.18;max-wi
     body.appendChild(typing);scrollDown();
     timer=setTimeout(function(){
       if(current!==revision)return;
-      typing.remove();typing=null;phStatus.textContent='бот';phStatus.classList.remove('is-typing');body.setAttribute('aria-busy','false');cb();
+      typing.remove();typing=null;timer=null;phStatus.textContent='бот';phStatus.classList.remove('is-typing');body.setAttribute('aria-busy','false');cb();
     },TYPE_DELAY);
   }
   function startDemo(){
-    if(started)return;started=true;setActive(card1);
+    if(started)return;started=true;
     type(function(){showMessage(msgDigest);});
   }
   if('IntersectionObserver' in window){
@@ -484,86 +446,46 @@ h2{font-size:30px;font-weight:700;letter-spacing:-.015em;line-height:1.18;max-wi
     },{threshold:.2});
     observer.observe(document.querySelector('#live .phone'));
   }else{startDemo();}
-  function showRisk(){
-    var open=document.querySelector('[data-act="open"]');open.classList.add('on');open.disabled=true;
-    card2.classList.remove('ghost');card3.classList.remove('ghost');
-    put('card2-day','09:02 · Риск зафиксирован автоматически');
-    put('card2-h','Риск готов к решению');
-    put('card2-p','Отдельное подтверждение не потребовалось: Пиэмка сохранила риск, источник и прогноз.');
-  }
   document.querySelector('[data-act="open"]').addEventListener('click',function(){
-    this.classList.add('on');this.disabled=true;showRisk();setActive(card2);flash(card2);
-    type(function(){showMessage(msgRisk);setActive(card2);});
+    this.classList.add('on');this.disabled=true;
+    type(function(){showMessage(msgRisk);});
   });
   var R={
     accept:{time:'09:03',title:'✅ Решение принято',
-      html:'Поручение создано для админа <span class="mention">@alex</span>.<br>Ожидайте выполнения.<br><span class="demo-link" title="Демонстрационная ссылка, страница не открывается">Реестр поручений →</span>',
-      day:'09:03 · Решение и поручение созданы',head:'Поручение создано для админа <span class="mention">@alex</span>',text:'Система зафиксировала решение и создала поручение. Пиэмка ждёт отчёт админа <span class="mention">@alex</span> в другом чате.'},
+      html:'Поручение создано для админа <span class="mention">@alex</span>.<br>Ожидайте выполнения.<br><span class="demo-link" title="Демонстрационная ссылка, страница не открывается">Реестр поручений →</span>'},
     decline:{time:'09:03',title:'❌ Предложение отклонено · решение зафиксировано',
-      html:'Решение об отклонении сохранено; поручение не создано.<br><b>Атрибуция:</b> Пиэмка от имени руководителя проекта.',
-      day:'09:03 · Предложение отклонено',head:'Наблюдение продолжается',text:'Отказ зафиксирован, риск остаётся в реестре и под наблюдением.'}
+      html:'Решение об отклонении сохранено; поручение не создано.<br><b>Атрибуция:</b> Пиэмка от имени руководителя проекта.'}
   };
   function renderDecision(act){
-    lastAct=act;var r=R[act];card4.classList.remove('ghost');
+    var r=R[act];
     document.querySelectorAll('[data-act="accept"],[data-act="decline"]').forEach(function(b){b.disabled=true;b.classList.toggle('on',b.dataset.act===act);});
-    put('card4-day',r.day);put('card4-h',r.head);put('card4-p',r.text);
     put('resultTitle',r.title);put('resultText',r.html);put('resultTime',r.time);
-    showMessage(msgDecision);setActive(card4);flash(card4);
+    showMessage(msgDecision);restart.hidden=act!=='decline';
   }
   function scheduleReport(){reportTimer=setTimeout(showReport,REPORT_DELAY);}
-  function renderReport(){
-    card5.classList.remove('ghost');
-    put('card4-day','10:03 · Отчёт админа <span class="mention">@alex</span> получен');
-    put('card4-h','Админ <span class="mention">@alex</span> закрыл поручение');
-    put('card4-p','Отчёт поступил автоматически из другого чата. Теперь руководитель подтверждает фактическое выполнение.');
-    put('card5-day','Клик 3 · Подтвердите выполнение');
-    put('card5-h','Подтверждение остаётся за РП');
-    put('card5-p','Проверьте отчёт админа <span class="mention">@alex</span> и подтвердите, что поручение действительно выполнено.');
-    showMessage(msgReport);setActive(card5);flash(card5);
-  }
-  function showReport(){
-    setActive(card4);flash(card4);type(renderReport);
-  }
+  function showReport(){type(function(){showMessage(msgReport);});}
   function showImpact(){
-    type(function(){
-      put('card5-day','После подтверждения · Влияние на проект');
-      put('card5-h','Базовый срок тестирования сохранён');
-      put('card5-p','По подтверждению РП система зафиксировала проверенный доступ и закрытие риска. Базовый срок тестирования сохранён.');
-      showMessage(msgImpact);setActive(card5);flash(card5);impactPending=false;
-    });
+    type(function(){showMessage(msgImpact);restart.hidden=false;impactPending=false;});
   }
   function react(act,btn){
     if(decisionPending||msgDecision.style.display!=='none')return;decisionPending=true;
     document.querySelectorAll('[data-act="accept"],[data-act="decline"]').forEach(function(b){b.disabled=true;b.classList.toggle('on',b===btn);});
-    setActive(card3);flash(card3);
     type(function(){renderDecision(act);decisionPending=false;if(act==='accept')scheduleReport();});
   }
   document.querySelectorAll('[data-act="accept"],[data-act="decline"]').forEach(function(b){b.addEventListener('click',function(){react(b.dataset.act,b);});});
   document.querySelector('[data-act="complete"]').addEventListener('click',function(){
     if(impactPending||msgReport.style.display==='none'||msgImpact.style.display!=='none')return;impactPending=true;
-    this.classList.add('on');this.disabled=true;setActive(card5);showImpact();
+    this.classList.add('on');this.disabled=true;showImpact();
   });
   function resetDemo(){
-    clearAsync();decisionPending=false;impactPending=false;
+    clearAsync();decisionPending=false;impactPending=false;started=false;restart.hidden=true;
     messages.forEach(function(m){m.style.display='none';m.classList.remove('pop');});
-    steps.slice(1).forEach(function(c){c.classList.add('ghost');c.classList.remove('active','flash');});card1.classList.remove('active','flash');
     var open=document.querySelector('[data-act="open"]');open.disabled=false;open.classList.remove('on');
     document.querySelectorAll('[data-act="accept"],[data-act="decline"],[data-act="complete"]').forEach(function(b){b.disabled=false;b.classList.remove('on');});
     put('resultTitle','');put('resultText','');put('resultTime','');
-    put('card2-day','Клик 1 · Откройте риск');put('card2-h','Риск уже в реестре');put('card2-p','Фиксация выполнена системой: источник, прогноз и обоснование доступны для проверки.');
-    put('card4-day','Автоматически · Решение и поручение');put('card4-h','Система свяжет записи');put('card4-p','Решение получит атрибуцию руководителя, поручение — ответственного, срок и ссылку на решение.');
-    put('card5-day','Клик 3 · Подтвердите выполнение');put('card5-h','Подтверждение остаётся за РП');put('card5-p','После автоматического отчёта админа <span class="mention">@alex</span> руководитель подтверждает, что поручение действительно выполнено.');
+    body.scrollTo({top:0,behavior:'auto'});
   }
-  function goToStep(step){
-    resetDemo();started=true;showMessage(msgDigest);
-    if(step===1){lastAct='accept';setActive(card1);body.scrollTo({top:0,behavior:reduced?'auto':'smooth'});return;}
-    showRisk();showMessage(msgRisk);
-    if(step===2){setActive(card2);return;}
-    if(step===3){setActive(card3);return;}
-    if(step===4){renderDecision(lastAct);if(lastAct==='accept')scheduleReport();return;}
-    renderDecision('accept');renderReport();
-  }
-  document.querySelectorAll('[data-go]').forEach(function(link){link.addEventListener('click',function(event){event.preventDefault();var step=Number(link.dataset.go);if(step>maxUnlocked)return;goToStep(step);});});
+  restart.querySelector('button').addEventListener('click',function(){resetDemo();startDemo();});
 })();
 </script>
 <script>
@@ -610,13 +532,18 @@ h2{font-size:30px;font-weight:700;letter-spacing:-.015em;line-height:1.18;max-wi
       })
     }).then(function(response){
       return response.json().catch(function(){return {};}).then(function(data){
-        if(!response.ok||!data.ok)throw new Error(data.error||'Не удалось отправить контакт. Попробуйте ещё раз.');
+        if(!response.ok||data.ok!==true){
+          statusBox.textContent=data.error||(response.status>=500
+            ?'Статус доставки не подтверждён. Не отправляйте форму повторно: сообщение могло быть доставлено'
+            :'Не удалось отправить контакт. Проверьте данные формы.');
+          statusBox.className='form-status error';return;
+        }
         form.reset();
         statusBox.textContent='Готово — контакт отправлен основателю AI PMO в Telegram.';
         statusBox.className='form-status success';
       });
-    }).catch(function(error){
-      statusBox.textContent=error.message||'Не удалось отправить контакт. Проверьте соединение и попробуйте ещё раз.';
+    }).catch(function(){
+      statusBox.textContent='Статус доставки не подтверждён. Проверьте соединение и не отправляйте форму повторно: сообщение могло быть доставлено';
       statusBox.className='form-status error';
     }).finally(function(){
       busy=false;submit.disabled=false;submit.textContent='Отправить контакт →';

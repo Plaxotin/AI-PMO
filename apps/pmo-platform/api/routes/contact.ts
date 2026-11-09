@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
 import { getTelegramConfig } from "../telegram/config";
-import { sendTelegramMessage } from "../telegram/client";
+import { sendTelegramMessage, telegramDeliveryOutcome } from "../telegram/client";
 import { log } from "../lib/logger";
 
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
@@ -52,7 +52,10 @@ function multiLine(value: string) {
 function recipientChatId() {
   const explicit = process.env.CONTACT_TELEGRAM_CHAT_ID?.trim();
   if (explicit) return explicit;
-  return getTelegramConfig().rpUserIds.values().next().value as string | undefined;
+  const config = getTelegramConfig();
+  const founder = config.founderUserIds.values().next().value as string | undefined;
+  if (founder) return founder;
+  return config.rpUserIds.values().next().value as string | undefined;
 }
 
 export const contactRoutes = new Hono();
@@ -76,7 +79,10 @@ contactRoutes.post(
     }
 
     const chatId = recipientChatId();
-    if (!chatId) return c.json({ ok: false, error: "Канал связи временно недоступен" }, 503);
+    if (!chatId) {
+      log.error("contact delivery failed", { outcome: "failed", error: "contact recipient is not configured" });
+      return c.json({ ok: false, outcome: "failed", error: "Канал связи временно недоступен" }, 503);
+    }
 
     const { name, contact, comment } = parsed.data;
     const lines = [
@@ -92,10 +98,25 @@ contactRoutes.post(
 
     try {
       await sendTelegramMessage({ chatId, text: lines.join("\n") });
-      return c.json({ ok: true });
+      log.info("contact delivered", { outcome: "sent" });
+      return c.json({ ok: true, outcome: "sent" });
     } catch (error) {
-      log.error("contact delivery failed", { error: error instanceof Error ? error.message : String(error) });
-      return c.json({ ok: false, error: "Не удалось доставить сообщение. Попробуйте ещё раз" }, 502);
+      const outcome = telegramDeliveryOutcome(error);
+      const detail = error instanceof Error ? error.message : String(error);
+      if (outcome === "failed") {
+        log.error("contact delivery failed", { outcome, error: detail });
+        return c.json({
+          ok: false,
+          outcome,
+          error: "Сообщение не отправлено. Канал связи временно недоступен",
+        }, 502);
+      }
+      log.error("contact delivery unknown", { outcome, error: detail });
+      return c.json({
+        ok: false,
+        outcome,
+        error: "Статус доставки не подтверждён. Не отправляйте форму повторно: сообщение могло быть доставлено",
+      }, 503);
     }
   },
 );
