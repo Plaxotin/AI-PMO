@@ -1,9 +1,11 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { log } from "../lib/logger";
 import { analyzeProjectSignalDetailed } from "../ai/risk";
+import { analyzeCommitmentSignal } from "../ai/commitment";
 import { buildLearningContext, recordLearningContextUsage } from "../queries/learning-context";
+import { acceptCommitmentCandidate, createCommitmentCandidate, hasCommitmentCandidate, ignoreCommitmentCandidate, mergeCommitmentCandidate, rejectCommitmentCandidate } from "../queries/commitment";
 import { getTelegramConfig, telegramCredentialDiagnostics, telegramRole } from "../telegram/config";
 import { getTelegramChatMigration } from "../telegram/migration";
 import { answerTelegramCallback, editTelegramMessage, sendTelegramMessage, type TelegramButton } from "../telegram/client";
@@ -134,6 +136,40 @@ async function handleMessage(message: TelegramMessage, updateId: number, channel
   }
   const { analysis, modelId } = analysisResult;
   if (!analysis.isRisk || analysis.confidence < 0.6) {
+    try {
+      const commitment = await analyzeCommitmentSignal(text, person(user));
+      if (commitment.isCommitment && commitment.confidence >= 0.6) {
+        const evidenceHash = createHash("sha256").update(`${signal.id}:${text}`).digest("hex");
+        const createdCommitment = await createCommitmentCandidate({
+          signalId: signal.id,
+          title: commitment.title,
+          owner: commitment.owner || person(user),
+          due: commitment.due,
+          confidence: commitment.confidence,
+          changeType: commitment.changeType,
+          existingTaskId: commitment.existingTaskId || undefined,
+          evidenceHash,
+        });
+        if (createdCommitment.candidate.status === "pending_merge") {
+          await notifyRp(
+            `🤝 Похоже на существующее поручение ${createdCommitment.candidate.existingTaskId} (совпадение ≥ 92%).\n${createdCommitment.candidate.title}\nОтветственный: ${createdCommitment.candidate.owner}\nСрок: ${createdCommitment.candidate.due}\n\nОбъединить вместо создания нового поручения?`,
+            [[{ text: "Объединить", callback_data: `merge:${createdCommitment.candidate.id}` }], [{ text: "Игнорировать", callback_data: `ignore:${createdCommitment.candidate.id}` }]],
+          );
+        } else {
+          const decisionId = createdCommitment.decisionId!;
+          const bundle = await getRiskProposal(decisionId);
+          if (!bundle) throw new Error("Не удалось прочитать предложение обязательства");
+          await notifyRp(proposalText(bundle), proposalButtons(decisionId, ""));
+        }
+        return "processed" as const;
+      }
+    } catch (error) {
+      const messageText = error instanceof Error ? error.message : String(error);
+      await markTelegramSignal(signal.id, "error", messageText);
+      log.error("Telegram commitment analysis failed", { signalId: signal.id, error: messageText });
+      await notifyRp(`Сигнал ${signal.id} сохранён, но обязательство не удалось проанализировать. Поручение не создано.`);
+      return "error" as const;
+    }
     await markTelegramSignal(signal.id, "ignored");
     return "ignored" as const;
   }
@@ -153,7 +189,8 @@ export async function handleCallback(callback: NonNullable<z.infer<typeof update
     await answerTelegramCallback(callback.id, "Нет доступа к проекту");
     return "ignored" as const;
   }
-  const [action, entityId] = (callback.data || "").split(":");
+  const [action, reasonOrEntity, thirdSegment] = (callback.data || "").split(":");
+  const entityId = thirdSegment ?? reasonOrEntity;
   const message = callback.message;
   if (!message || !entityId) return "ignored" as const;
   const chatId = String(message.chat.id);
@@ -162,6 +199,20 @@ export async function handleCallback(callback: NonNullable<z.infer<typeof update
   if (role !== "rp" || chatId !== String(callback.from.id)) {
     await answerTelegramCallback(callback.id, "Действия доступны РП в личном чате с Пиэмкой");
     return "ignored" as const;
+  }
+
+  if (action === "merge") {
+    const result = await mergeCommitmentCandidate(Number(entityId), { userId: callback.from.id, name: person(callback.from), channel: "telegram" });
+    await editTelegramMessage({ chatId, messageId: message.message_id, text: `✅ Кандидат объединён с поручением ${result.taskId}. Новое поручение не создано.`, buttons: [] });
+    await answerTelegramCallback(callback.id, "Объединено");
+    return "processed" as const;
+  }
+
+  if (action === "ignore") {
+    await ignoreCommitmentCandidate(Number(entityId), { userId: callback.from.id, name: person(callback.from), channel: "telegram" });
+    await editTelegramMessage({ chatId, messageId: message.message_id, text: "Кандидат проигнорирован. Новое поручение не создано.", buttons: [] });
+    await answerTelegramCallback(callback.id, "Игнорировано");
+    return "processed" as const;
   }
 
   if (action === "open") {
@@ -194,16 +245,43 @@ export async function handleCallback(callback: NonNullable<z.infer<typeof update
     return "processed" as const;
   }
 
-  if (action === "accept" || action === "reject") {
+  if (action === "reject") {
+    if (!await hasCommitmentCandidate(entityId)) {
+      const result = await decideProposalRecord({ decisionId: entityId, action: "no" }, { userId: callback.from.id, name: person(callback.from), channel: "telegram" });
+      await editTelegramMessage({ chatId, messageId: message.message_id, text: `Решение ${entityId} ${result.alreadyDecided ? "уже было отклонено" : "отклонено"}. Поручение не создано.`, buttons: [] });
+      await answerTelegramCallback(callback.id, result.alreadyDecided ? "Решение уже отклонено" : "Решение отклонено");
+      return "processed" as const;
+    }
+    await sendTelegramMessage({
+      chatId,
+      text: `Выберите причину отклонения ${entityId}. Решение пока не изменено.`,
+      buttons: [
+        [{ text: "Не обязательство", callback_data: `rejectreason:not_commitment:${entityId}` }],
+        [{ text: "Уже исполнено", callback_data: `rejectreason:already_done:${entityId}` }],
+        [{ text: "Неактуально", callback_data: `rejectreason:wont_do:${entityId}` }],
+      ],
+    });
+    await answerTelegramCallback(callback.id, "Нужна причина отклонения");
+    return "processed" as const;
+  }
+
+  if (action === "rejectreason") {
+    if (!["not_commitment", "already_done", "wont_do"].includes(reasonOrEntity)) return "ignored" as const;
+    const result = await rejectCommitmentCandidate(entityId, reasonOrEntity as "not_commitment" | "already_done" | "wont_do", { userId: callback.from.id, name: person(callback.from), channel: "telegram" });
+    await editTelegramMessage({ chatId, messageId: message.message_id, text: `Решение ${entityId} отклонено с причиной: ${reasonOrEntity}. Поручение не создано.`, buttons: [] });
+    await answerTelegramCallback(callback.id, result.alreadyDecided ? "Решение уже отклонено" : "Причина отклонения сохранена");
+    return "processed" as const;
+  }
+
+  if (action === "accept") {
     const pendingEdit = await getActiveTelegramProposalEdit({ decisionId: entityId, chatId, userId: String(callback.from.id) });
     if (pendingEdit && pendingEdit.status !== "preview") {
       await answerTelegramCallback(callback.id, "Сначала отправьте правку или отмените редактирование");
       return "ignored" as const;
     }
     try {
-      const result = await decideProposalRecord({
+      const result = await acceptCommitmentCandidate({
         decisionId: entityId,
-        action: action === "accept" ? "ok" : "no",
         ...(pendingEdit?.status === "preview" ? {
           title: pendingEdit.previewTitle || undefined,
           owner: pendingEdit.previewOwner || undefined,

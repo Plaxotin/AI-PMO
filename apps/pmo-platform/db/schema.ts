@@ -434,6 +434,57 @@ export const learningContextUsages = mysqlTable("learning_context_usages", {
   projectIdx: index("learning_context_usages_project_idx").on(table.projectId),
 }));
 
+export const commitmentCandidates = mysqlTable("commitment_candidates", {
+  id: serial("id").primaryKey(),
+  projectId: varchar("projectId", { length: 64 }).notNull(),
+  signalId: varchar("signalId", { length: 64 }).notNull(),
+  decisionId: varchar("decisionId", { length: 64 }),
+  taskId: varchar("taskId", { length: 64 }),
+  existingTaskId: varchar("existingTaskId", { length: 64 }),
+  title: text("title").notNull(),
+  owner: varchar("owner", { length: 255 }).notNull(),
+  due: varchar("due", { length: 16 }).notNull(),
+  confidence: int("confidence", { unsigned: true }).notNull(),
+  changeType: mysqlEnum("changeType", ["create", "update"]).default("create").notNull(),
+  status: mysqlEnum("status", ["pending", "pending_merge", "accepted", "edited", "rejected", "merged", "ignored", "completed"]).default("pending").notNull(),
+  rejectionReason: mysqlEnum("rejectionReason", ["not_commitment", "already_done", "wont_do"]),
+  evidenceVersion: int("evidenceVersion", { unsigned: true }).default(1).notNull(),
+  evidenceHash: varchar("evidenceHash", { length: 64 }).notNull(),
+  editDistance: int("editDistance", { unsigned: true }),
+  decidedAt: timestamp("decidedAt"),
+  completedAt: timestamp("completedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => ({
+  signalEvidenceUnique: uniqueIndex("commitment_candidates_signal_evidence_unique").on(table.signalId, table.evidenceVersion),
+  decisionIdx: index("commitment_candidates_decision_idx").on(table.decisionId),
+  taskIdx: index("commitment_candidates_task_idx").on(table.taskId),
+  projectIdx: index("commitment_candidates_project_idx").on(table.projectId),
+}));
+
+export const commitmentOutcomes = mysqlTable("commitment_outcomes", {
+  id: serial("id").primaryKey(),
+  projectId: varchar("projectId", { length: 64 }).notNull(),
+  taskId: varchar("taskId", { length: 64 }).notNull(),
+  decisionId: varchar("decisionId", { length: 64 }),
+  outcome: mysqlEnum("outcome", ["on_time", "late", "ignored", "unknown"]).default("unknown").notNull(),
+  resultText: text("resultText").notNull(),
+  completedAt: timestamp("completedAt"),
+  source: text("source").notNull(),
+  sourceId: varchar("sourceId", { length: 255 }).notNull(),
+  expectedEffect: text("expectedEffect"),
+  effectAssessment: json("effectAssessment").$type<Record<string, unknown>>(),
+  recordedByUserId: bigint("recordedByUserId", { mode: "number", unsigned: true }).notNull(),
+  recordedByName: varchar("recordedByName", { length: 255 }).notNull(),
+  recordedByRole: varchar("recordedByRole", { length: 24 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => ({
+  taskUnique: uniqueIndex("commitment_outcomes_task_unique").on(table.taskId),
+  decisionIdx: index("commitment_outcomes_decision_idx").on(table.decisionId),
+  projectIdx: index("commitment_outcomes_project_idx").on(table.projectId),
+}));
+
 export const auditEvents = mysqlTable("audit_events", {
   id: serial("id").primaryKey(),
   projectId: varchar("projectId", { length: 64 }).notNull(),

@@ -2,6 +2,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { auditEvents, decisions, signals, tasks, telegramCompletionChecks } from "@db/schema";
 import { assessTaskEffect } from "../telegram/completion";
 import { assessTaskOutcome } from "./outcome";
+import { recordCommitmentOutcome } from "./commitment";
 import { getDb } from "./connection";
 import { DEMO_PROJECT_ID } from "./pmo";
 import { telegramSourceLink } from "./proposal-audit";
@@ -94,7 +95,7 @@ export async function answerCompletionCheck(input: {
   actorUserId: number;
   actorName: string;
 }) {
-  return getDb().transaction(async (tx) => {
+  const result = await getDb().transaction(async (tx) => {
     const [check] = await tx.select().from(telegramCompletionChecks).where(eq(telegramCompletionChecks.id, input.checkId)).for("update");
     if (!check || check.chatId !== input.chatId || check.userId !== input.userId) throw new Error("Проверка выполнения не найдена");
     const [task] = await tx.select().from(tasks).where(eq(tasks.id, check.taskId)).for("update");
@@ -157,6 +158,11 @@ export async function answerCompletionCheck(input: {
     });
     return { kind: "done" as const };
   });
+  if (result.kind === "done") {
+    const [check] = await getDb().select().from(telegramCompletionChecks).where(eq(telegramCompletionChecks.id, input.checkId)).limit(1);
+    if (check) await recordCommitmentOutcome(check.taskId, { userId: input.actorUserId, name: input.actorName, channel: "telegram" });
+  }
+  return result;
 }
 
 export async function claimEffectNotification(checkId: number) {

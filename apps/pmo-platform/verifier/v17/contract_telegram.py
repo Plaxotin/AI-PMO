@@ -24,13 +24,16 @@ state = {'ai_fail': False, 'ai_chat_calls': 0, 'next_message_id': 7000, 'telegra
 
 
 def analysis_for(text):
+    commitment_defaults = {'isCommitment': False, 'title': '', 'changeType': 'create', 'existingTaskId': None}
     if 'Обычное обсуждение' in text:
         return {
+            **commitment_defaults,
             'isRisk': False, 'confidence': 0.96, 'riskTitle': '', 'impact': '',
             'probability': 'низкая', 'proposalTitle': '', 'rationale': '',
             'effect': '', 'measure': '', 'owner': '', 'due': ''
         }
     return {
+        **commitment_defaults,
         'isRisk': True,
         'confidence': 0.94,
         'riskTitle': 'Перенос поставки лицензий блокирует тестирование интеграции',

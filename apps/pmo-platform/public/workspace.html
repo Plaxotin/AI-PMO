@@ -2469,7 +2469,7 @@ const AI_PROPOSALS = {
   ],
   'PRJ-02': []
 };
-let SERVER_EVENTS=[],SERVER_SIGNALS=[],SERVER_PROPOSAL_VERSIONS=[],SERVER_OUTCOME_MEASUREMENTS=[],SERVER_OUTCOME_SOURCES=[],SERVER_OUTCOME_BINDINGS=[],SERVER_OUTCOME_OBSERVATIONS=[],SERVER_LEARNING_USAGES=[],SERVER_USER=null,SERVER_OVERVIEW=null,SERVER_READY=false,SERVER_ERROR='',SERVER_DATA_AT=null;
+let SERVER_EVENTS=[],SERVER_SIGNALS=[],SERVER_PROPOSAL_VERSIONS=[],SERVER_OUTCOME_MEASUREMENTS=[],SERVER_OUTCOME_SOURCES=[],SERVER_OUTCOME_BINDINGS=[],SERVER_OUTCOME_OBSERVATIONS=[],SERVER_LEARNING_USAGES=[],SERVER_COMMITMENT_CANDIDATES=[],SERVER_COMMITMENT_OUTCOMES=[],SERVER_USER=null,SERVER_OVERVIEW=null,SERVER_READY=false,SERVER_ERROR='',SERVER_DATA_AT=null;
 function persistDemoState(){/* P0: связанные решения и поручения сохраняются только на сервере */}
 async function pmoApi(path,input,method,namespace){
   let url='/api/trpc/'+(namespace||'pmo')+'.'+path;
@@ -2499,7 +2499,7 @@ function applyServerState(state){
   DECISIONS['PRJ-01'].splice(0,DECISIONS['PRJ-01'].length,...state.decisions);
   RISKS['PRJ-01'].splice(0,RISKS['PRJ-01'].length,...state.risks);
   SERVER_EVENTS=state.events||[];SERVER_SIGNALS=state.signals||[];SERVER_PROPOSAL_VERSIONS=state.proposalVersions||[];SERVER_OVERVIEW=state.overview||null;
-  SERVER_OUTCOME_MEASUREMENTS=state.outcomeMeasurements||[];SERVER_OUTCOME_SOURCES=state.outcomeSources||[];SERVER_OUTCOME_BINDINGS=state.outcomeBindings||[];SERVER_OUTCOME_OBSERVATIONS=state.outcomeObservations||[];SERVER_LEARNING_USAGES=state.learningContextUsages||[];
+  SERVER_OUTCOME_MEASUREMENTS=state.outcomeMeasurements||[];SERVER_OUTCOME_SOURCES=state.outcomeSources||[];SERVER_OUTCOME_BINDINGS=state.outcomeBindings||[];SERVER_OUTCOME_OBSERVATIONS=state.outcomeObservations||[];SERVER_LEARNING_USAGES=state.learningContextUsages||[];SERVER_COMMITMENT_CANDIDATES=state.commitmentCandidates||[];SERVER_COMMITMENT_OUTCOMES=state.commitmentOutcomes||[];
   SERVER_USER=state.user;USER_ROLE=state.role;SERVER_READY=true;SERVER_ERROR='';SERVER_DATA_AT=new Date();
   document.body.dataset.projectRole=state.role;
   const accountName=document.querySelector('.acct-name');if(accountName)accountName.textContent=state.user.name;
@@ -2804,14 +2804,17 @@ function outcomeAssessmentHTML(task){
   const a=task.effectAssessment;
   const rows=SERVER_OUTCOME_MEASUREMENTS.filter(m=>m.taskId===task.id).sort((x,y)=>y.version-x.version);
   const m=rows.find(x=>x.id===a?.measurementId)||rows[0];
-  if(!a&&!m)return '';
+  const co=SERVER_COMMITMENT_OUTCOMES.find(x=>x.taskId===task.id);
+  const cc=SERVER_COMMITMENT_CANDIDATES.find(x=>x.taskId===task.id||x.existingTaskId===task.id);
+  if(!a&&!m&&!co&&!cc)return '';
   const origin={manual:'ручное измерение РП',automatic:'автоматический сбор',legacy:'legacy'}[m?.origin]||'не указано';
   const dataClass={real:'real',synthetic:'synthetic',unknown:'unknown'}[m?.dataClass]||'unknown';
   const comparability={comparable:'сопоставимо',incomparable:'несопоставимо',unknown:'сопоставимость не подтверждена'}[m?.comparabilityStatus]||'не подтверждена';
   const target={met:'цель достигнута',not_met:'цель не достигнута',not_set:'цель не задана'}[a?.targetStatus]||'цель не задана';
   const assessment=a?`<b>Оценка эффекта:</b> ${escAudit(a.text)}<div style="margin-top:3px">${escAudit(target)} · ${escAudit(a.basis)}</div>`:'<b>Оценка эффекта:</b> данных пока недостаточно';
   const measurement=m?`<div style="margin-top:4px">Измерение v${escAudit(m.version)} · ${escAudit(origin)} · ${escAudit(dataClass)} · ${escAudit(comparability)}<br>Источник: ${escAudit(m.source)} · ${escAudit(m.sourceId)}${m.actualObservedAt?' · actual '+new Date(m.actualObservedAt).toLocaleString('ru-RU'):''}</div>`:'';
-  return `<div style="margin-top:7px;padding:8px 10px;background:var(--cream);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;font-size:11px;line-height:1.5">${assessment}${measurement}</div>`;
+  const commitment=co||cc?`<div style="margin-top:4px">Исход обязательства: ${escAudit(co?.outcome||cc?.status)}${cc?.rejectionReason?` · причина: ${escAudit(cc.rejectionReason)}`:''}${cc?.editDistance!=null?` · правка: ${escAudit(cc.editDistance)}`:''}</div>`:'';
+  return `<div style="margin-top:7px;padding:8px 10px;background:var(--cream);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;font-size:11px;line-height:1.5">${assessment}${measurement}${commitment}</div>`;
 }
 function renderTasksView(t){
   if(!SERVER_READY&&!tasksSync.tried&&!tasksLoading)loadTasksLive(false);

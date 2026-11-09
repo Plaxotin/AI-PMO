@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { auditEvents, decisions, learningContextUsages, outcomeMeasurements, outcomeMetricBindings, outcomeObservations, outcomeSources, projectCounters, projects, proposalVersions, risks, signals, tasks, type User } from "@db/schema";
+import { auditEvents, commitmentCandidates, commitmentOutcomes, decisions, learningContextUsages, outcomeMeasurements, outcomeMetricBindings, outcomeObservations, outcomeSources, projectCounters, projects, proposalVersions, risks, signals, tasks, type User } from "@db/schema";
 import { assessTaskOutcome } from "./outcome";
 import { getDb } from "./connection";
 import { buildProposalDiff, telegramSourceLink, type ProposalSnapshot } from "./proposal-audit";
@@ -60,7 +60,7 @@ export async function ensureSeed() {
 
 export async function getProjectState(user: User) {
   const db = getDb();
-  const [role, riskRows, decisionRows, versionRows, taskRows, signalRows, eventRows, outcomeRows, sourceRows, bindingRows, observationRows, learningRows] = await Promise.all([
+  const [role, riskRows, decisionRows, versionRows, taskRows, signalRows, eventRows, outcomeRows, sourceRows, bindingRows, observationRows, learningRows, commitmentRows, commitmentOutcomeRows] = await Promise.all([
     resolveProjectRole(user),
     db.select().from(risks).where(eq(risks.projectId, DEMO_PROJECT_ID)).orderBy(asc(risks.id)),
     db.select().from(decisions).where(eq(decisions.projectId, DEMO_PROJECT_ID)).orderBy(asc(decisions.id)),
@@ -73,6 +73,8 @@ export async function getProjectState(user: User) {
     db.select().from(outcomeMetricBindings).where(eq(outcomeMetricBindings.projectId, DEMO_PROJECT_ID)).orderBy(desc(outcomeMetricBindings.createdAt), desc(outcomeMetricBindings.id)).limit(100),
     db.select().from(outcomeObservations).where(eq(outcomeObservations.projectId, DEMO_PROJECT_ID)).orderBy(desc(outcomeObservations.createdAt), desc(outcomeObservations.id)).limit(100),
     db.select().from(learningContextUsages).where(eq(learningContextUsages.projectId, DEMO_PROJECT_ID)).orderBy(desc(learningContextUsages.createdAt), desc(learningContextUsages.id)).limit(100),
+    db.select().from(commitmentCandidates).where(eq(commitmentCandidates.projectId, DEMO_PROJECT_ID)).orderBy(desc(commitmentCandidates.createdAt), desc(commitmentCandidates.id)).limit(100),
+    db.select().from(commitmentOutcomes).where(eq(commitmentOutcomes.projectId, DEMO_PROJECT_ID)).orderBy(desc(commitmentOutcomes.createdAt), desc(commitmentOutcomes.id)).limit(100),
   ]);
   const outcomeAssessments = new Map(await Promise.all(taskRows.map(async (task) => [task.id, await assessTaskOutcome(task.id)] as const)));
   const chain = buildProjectChain(signalRows, riskRows, decisionRows, taskRows);
@@ -97,6 +99,8 @@ export async function getProjectState(user: User) {
     outcomeBindings: bindingRows.map((x) => ({ id: x.id, key: x.key, sourceId: x.sourceId, decisionId: x.decisionId, taskId: x.taskId, metric: x.metric, unit: x.unit, direction: x.direction, currencyCode: x.currencyCode, externalKey: x.externalKey, selectorConfig: x.selectorConfig, isPrimary: x.isPrimary, status: x.status, version: x.version, approvedByName: x.approvedByName, approvedAt: x.approvedAt, collectingAt: x.collectingAt, lastAttemptAt: x.lastAttemptAt })),
     outcomeObservations: observationRows.map((x) => ({ id: x.id, sourceId: x.sourceId, bindingId: x.bindingId, externalObservationId: x.externalObservationId, payloadHash: x.payloadHash, role: x.role, value: x.value, unit: x.unit, currencyCode: x.currencyCode, observedAt: x.observedAt, collectedAt: x.collectedAt, dataClass: x.dataClass, validationStatus: x.validationStatus, validationErrors: x.validationErrors, sourceRecordUrl: x.sourceRecordUrl })),
     learningContextUsages: learningRows.map((x) => ({ id: x.id, proposalId: x.proposalId, proposalVersion: x.proposalVersion, contextHash: x.contextHash, modelId: x.modelId, measurementRefs: x.measurementRefs, createdAt: x.createdAt })),
+    commitmentCandidates: commitmentRows.map((x) => ({ id: x.id, signalId: x.signalId, decisionId: x.decisionId, taskId: x.taskId, existingTaskId: x.existingTaskId, title: x.title, owner: x.owner, due: x.due, confidence: x.confidence, changeType: x.changeType, status: x.status, rejectionReason: x.rejectionReason, evidenceVersion: x.evidenceVersion, evidenceHash: x.evidenceHash, editDistance: x.editDistance, decidedAt: x.decidedAt, completedAt: x.completedAt, createdAt: x.createdAt })),
+    commitmentOutcomes: commitmentOutcomeRows.map((x) => ({ id: x.id, taskId: x.taskId, decisionId: x.decisionId, outcome: x.outcome, resultText: x.resultText, completedAt: x.completedAt, source: x.source, sourceId: x.sourceId, expectedEffect: x.expectedEffect, effectAssessment: x.effectAssessment, recordedByName: x.recordedByName, recordedByRole: x.recordedByRole, createdAt: x.createdAt, updatedAt: x.updatedAt })),
     events: eventRows.map((x) => ({ id: x.id, entityType: x.entityType, entityId: x.entityId, eventType: x.eventType, relatedId: x.relatedId, actorName: x.actorName, actorRole: x.actorRole, attribution: x.attribution, channel: x.channel, version: x.version, sourceLinks: x.sourceLinks, diff: x.diff, metadata: x.metadata, detail: x.detail, createdAt: x.createdAt })),
   };
 }

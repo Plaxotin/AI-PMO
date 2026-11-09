@@ -78,6 +78,13 @@
       "when": 1794081600000,
       "tag": "0010_bl48_kpi_learning_loop",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1794172800000,
+      "tag": "0011_bl50_commitment_tracking",
+      "breakpoints": true
     }
   ]
 }
