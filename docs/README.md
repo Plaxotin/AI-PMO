@@ -54,6 +54,7 @@
 | [2026-11-10-contact-hotfix.md](reports/2026-11-10-contact-hotfix.md) | Contact-only production hotfix, контрольная отправка `sent` |
 | [2026-11-10-bl48-real-pilot.md](reports/2026-11-10-bl48-real-pilot.md) | Реальный пилот P-03: +1 день, `confirmed`, `met`, restart без дублей |
 | [2026-11-10-bl50-real-pilot-scenario.md](reports/2026-11-10-bl50-real-pilot-scenario.md) | BL-50 — отдельный сценарий реального пилота, требуется подтверждение |
+| [2026-11-10-wave-1-bl50-bl55-report.md](reports/2026-11-10-wave-1-bl50-bl55-report.md) | Волна 1: BL-50/55 реализация, BL-52/43 спецификации и задачи приёмки |
 
 ## Процесс разработки
 
