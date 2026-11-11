@@ -3262,7 +3262,9 @@ function labelRegistryTables(){
 }
 new MutationObserver(labelRegistryTables).observe(document.getElementById('docView'),{childList:true,subtree:true});
 buildTicker();labelRegistryTables();
-renderTabs();restoreServerState();
+renderTabs();
+if(new URLSearchParams(window.location.search).get('view')==='tasks') tasksCard();
+restoreServerState();
 /* первое сообщение ассистента приходит с задержкой — как живое входящее */
 const WELCOME_TXT = `<b>Проверка, исправление и аудит проекта.</b><br>Ежедневные решения живут в канале проекта. Здесь Пиэмка помогает проверить источник, исправить запись и проследить цепочку <b>сигнал → риск → предложение → решение → поручение → результат</b>.<div id="auditOverviewHome">Серверный audit-обзор загружается…</div><span class="card-actions" style="border:0;background:transparent;padding:10px 0 4px;display:flex;justify-content:flex-start"><button class="btn primary" onclick="decisionsCard()">Проверить решения</button><button class="btn ghost" onclick="risksCard()">Реестр рисков</button><button class="btn ghost" onclick="tasksCard()">Поручения</button></span><br><span style="color:var(--ink-faint)">Основной канальный сценарий не требует открытия веба. Решения, связанные поручения и аудит сохраняются на сервере и доступны между сессиями.</span>`
 setTimeout(()=>{

@@ -33,7 +33,7 @@ try {
     const hash = createHash("sha256").update(payload).digest("hex");
     await db.execute(sql`INSERT INTO __drizzle_migrations (hash, created_at) VALUES (${hash}, ${createdAt})`);
   }
-  console.log(JSON.stringify({ baseline: migrations.map(([tag]) => tag), targets: ["0003_bl42_sla_notifications", "0004_bl35_project_roles", "0005_bl54_first_value", "0006_bl41_telegram_edits", "0007_short_task_ids", "0008_short_decision_ids", "0009_bl48_outcome_measurements", "0010_bl48_kpi_learning_loop", "0011_bl50_commitment_tracking", "0012_bl55_learning_loop"] }));
+  console.log(JSON.stringify({ baseline: migrations.map(([tag]) => tag), targets: ["0003_bl42_sla_notifications", "0004_bl35_project_roles", "0005_bl54_first_value", "0006_bl41_telegram_edits", "0007_short_task_ids", "0008_short_decision_ids", "0009_bl48_outcome_measurements", "0010_bl48_kpi_learning_loop", "0011_bl50_commitment_tracking", "0012_bl55_learning_loop", "0013_bl57_commitment_signal_status"] }));
 } finally {
   if (typeof db.$client?.end === "function") await db.$client.end();
 }

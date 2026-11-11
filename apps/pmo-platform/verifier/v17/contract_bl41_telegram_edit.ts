@@ -14,6 +14,7 @@ process.env.TELEGRAM_RP_USER_IDS = String(RP_ID);
 process.env.TELEGRAM_MEMBER_USER_IDS = String(MEMBER_ID);
 process.env.TELEGRAM_API_BASE_URL = "http://synthetic-telegram";
 process.env.TELEGRAM_GATEWAY_SECRET = "";
+process.env.PMO_WORKSPACE_URL = "https://synthetic-workspace.example/workspace.html";
 process.env.KIMI_AGENTGW_BASE_URL = "http://synthetic-ai";
 process.env.KIMI_AGENTGW_API_KEY = "synthetic-bl41-ai";
 
@@ -159,7 +160,8 @@ const checks = {
     && afterPreviewDecision.proposalVersion === 1
     && previewVersions.length === 1
     && String(previewMessage?.payload.text || "").includes("Edited synthetic proposal")
-    && String(previewMessage?.payload.text || "").includes("Diff:"),
+    && !String(previewMessage?.payload.text || "").includes("Diff:")
+    && !String(previewMessage?.payload.text || "").includes("Исходная версия не изменена"),
   accept_applies_version_diff_attribution_decision_and_task_atomically: accepted === "processed"
     && acceptedDecision.status === "ok"
     && acceptedDecision.proposalVersion === 2
@@ -172,7 +174,9 @@ const checks = {
     && acceptedEvents.filter((row) => row.eventType === "proposal.edited" && row.channel === "telegram").length === 1
     && acceptedEvents.filter((row) => row.eventType === "decision.accepted").length === 1
     && acceptedEvents.filter((row) => row.eventType === "task.created").length === 1
-    && acceptedEdit.status === "accepted",
+    && acceptedEdit.status === "accepted"
+    && telegramCalls.some((call) => call.method === "editMessageText"
+      && String(call.payload.text || "").includes("Реестр поручений: https://synthetic-workspace.example/workspace.html?view=tasks")),
   repeated_accept_has_no_duplicates: repeatedAccept === "processed"
     && repeatedTasks.length === 1
     && repeatedEvents.filter((row) => row.eventType === "proposal.edited").length === 1

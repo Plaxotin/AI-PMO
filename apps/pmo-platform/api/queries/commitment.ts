@@ -14,6 +14,7 @@ import { getDb } from "./connection";
 import { DEMO_PROJECT_ID, decideProposalRecord, type ManagementActor } from "./pmo";
 import { buildProposalDiff, telegramSourceLink, type ProposalSnapshot } from "./proposal-audit";
 import { assessTaskOutcome } from "./outcome";
+import { commitmentRationale } from "../telegram/presentation";
 
 export type CommitmentCandidateInput = {
   signalId: string;
@@ -69,7 +70,10 @@ export async function createCommitmentCandidate(input: CommitmentCandidateInput)
     const evidenceVersion = input.evidenceVersion || 1;
     const [existing] = await tx.select().from(commitmentCandidates)
       .where(and(eq(commitmentCandidates.signalId, input.signalId), eq(commitmentCandidates.evidenceVersion, evidenceVersion))).for("update").limit(1);
-    if (existing) return { candidate: existing, decisionId: existing.decisionId, idempotent: true };
+    if (existing) {
+      await tx.update(signals).set({ status: "commitment_created", error: null }).where(eq(signals.id, signal.id));
+      return { candidate: existing, decisionId: existing.decisionId, idempotent: true };
+    }
 
     let existingTaskId = input.existingTaskId || null;
     if (existingTaskId) {
@@ -97,7 +101,7 @@ export async function createCommitmentCandidate(input: CommitmentCandidateInput)
         projectId: DEMO_PROJECT_ID,
         riskId: null,
         title,
-        rationale: `Обязательство из сообщения ${signal.id}`,
+        rationale: commitmentRationale(signal),
         effect: "Исполнить обязательство в срок",
         status: "wait",
         displayDate: new Date().toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" }),
@@ -109,7 +113,7 @@ export async function createCommitmentCandidate(input: CommitmentCandidateInput)
         proposalId: decisionId,
         version: 1,
         title,
-        rationale: `Обязательство из сообщения ${signal.id}`,
+        rationale: commitmentRationale(signal),
         effect: "Исполнить обязательство в срок",
         owner,
         due,
@@ -133,6 +137,7 @@ export async function createCommitmentCandidate(input: CommitmentCandidateInput)
       evidenceHash: input.evidenceHash,
     }).$returningId();
     const [candidate] = await tx.select().from(commitmentCandidates).where(eq(commitmentCandidates.id, inserted.id)).limit(1);
+    await tx.update(signals).set({ status: "commitment_created", error: null }).where(eq(signals.id, signal.id));
     await tx.insert(auditEvents).values({
       projectId: DEMO_PROJECT_ID,
       entityType: "commitment",
@@ -232,8 +237,14 @@ export async function acceptCommitmentCandidate(
         decidedAt: new Date(),
         attribution: `Пиэмка от имени ${actor.name}`,
       }).where(eq(decisions.id, decisionId));
-      await tx.update(commitmentCandidates).set({ status: "accepted", decidedAt: new Date(), editDistance })
-        .where(eq(commitmentCandidates.id, candidate.id));
+      await tx.update(commitmentCandidates).set({
+        title: after.title,
+        owner: after.owner,
+        due: after.due,
+        status: "accepted",
+        decidedAt: new Date(),
+        editDistance,
+      }).where(eq(commitmentCandidates.id, candidate.id));
       await tx.insert(auditEvents).values({
         projectId: DEMO_PROJECT_ID,
         entityType: "commitment",
@@ -255,8 +266,15 @@ export async function acceptCommitmentCandidate(
   const result = await decideProposalRecord({ ...input, action: "ok" }, actor);
   const [latestVersion] = await getDb().select().from(proposalVersions)
     .where(eq(proposalVersions.proposalId, decisionId)).orderBy(desc(proposalVersions.version)).limit(1);
-  await getDb().update(commitmentCandidates).set({ status: "accepted", taskId: result.taskId, decidedAt: new Date(), editDistance: latestVersion?.editDistance || 0 })
-    .where(eq(commitmentCandidates.id, candidate.id));
+  await getDb().update(commitmentCandidates).set({
+    title: latestVersion?.title || candidate.title,
+    owner: latestVersion?.owner || candidate.owner,
+    due: latestVersion?.due || candidate.due,
+    status: "accepted",
+    taskId: result.taskId,
+    decidedAt: new Date(),
+    editDistance: latestVersion?.editDistance || 0,
+  }).where(eq(commitmentCandidates.id, candidate.id));
   return result;
 }
 

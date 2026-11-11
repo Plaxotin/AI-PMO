@@ -92,6 +92,13 @@
       "when": 1794176400000,
       "tag": "0012_bl55_learning_loop",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1794438018399,
+      "tag": "0013_bl57_commitment_signal_status",
+      "breakpoints": true
     }
   ]
 }

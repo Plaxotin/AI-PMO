@@ -171,7 +171,7 @@ export const signals = mysqlTable("signals", {
   authorId: varchar("authorId", { length: 64 }).notNull(),
   authorName: varchar("authorName", { length: 255 }).notNull(),
   content: text("content").notNull(),
-  status: mysqlEnum("status", ["processing", "risk_created", "ignored", "error"]).default("processing").notNull(),
+  status: mysqlEnum("status", ["processing", "risk_created", "commitment_created", "ignored", "error"]).default("processing").notNull(),
   riskId: varchar("riskId", { length: 64 }),
   error: text("error"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

@@ -11,6 +11,8 @@ import {
   rejectCommitmentCandidate,
 } from "../../api/queries/commitment";
 import { getDb } from "../../api/queries/connection";
+import { getRiskProposal } from "../../api/queries/telegram";
+import { proposalButtons, proposalText } from "../../api/routes/telegram";
 import {
   auditEvents,
   commitmentCandidates,
@@ -55,8 +57,15 @@ const newCandidate = await createCommitmentCandidate({
 const repeatedCandidate = await createCommitmentCandidate({
   signalId: "S-BL50-NEW", title: "Подготовить отчёт для спонсора до 15.11.2026", owner: "Synthetic owner", due: "15.11.2026", confidence: 0.94, changeType: "create", evidenceHash: "hash-new",
 });
-const accepted = await acceptCommitmentCandidate({ decisionId: newCandidate.decisionId! }, actor);
+const proposalBundle = await getRiskProposal(newCandidate.decisionId!);
+const commitmentCard = proposalBundle ? proposalText(proposalBundle) : "";
+const commitmentButtonLabels = proposalButtons(newCandidate.decisionId!, "").flat().map((button) => button.text);
+const accepted = await acceptCommitmentCandidate({ decisionId: newCandidate.decisionId!, due: "16.11.2026", expectedVersion: 1 }, actor);
 const newTaskCount = (await db.select().from(tasks).where(eq(tasks.decisionId, newCandidate.decisionId!))).length;
+const [acceptedCandidate] = await db.select().from(commitmentCandidates).where(eq(commitmentCandidates.id, newCandidate.candidate.id)).limit(1);
+const [acceptedTask] = await db.select().from(tasks).where(eq(tasks.decisionId, newCandidate.decisionId!)).limit(1);
+const [acceptedDecision] = await db.select().from(decisions).where(eq(decisions.id, newCandidate.decisionId!)).limit(1);
+const [newSignal] = await db.select().from(signals).where(eq(signals.id, "S-BL50-NEW")).limit(1);
 
 const rejectedCandidate = await createCommitmentCandidate({
   signalId: "S-BL50-REJECT", title: "Согласовать встречу до 16.11.2026", owner: "Synthetic owner", due: "16.11.2026", confidence: 0.9, changeType: "create", evidenceHash: "hash-reject",
@@ -76,6 +85,7 @@ const updateCandidate = await createCommitmentCandidate({
 });
 const updated = await acceptCommitmentCandidate({ decisionId: updateCandidate.decisionId!, due: "25.11.2026", expectedVersion: 1 }, actor);
 const [updatedTask] = await db.select().from(tasks).where(eq(tasks.id, "P-BL50-EXIST")).limit(1);
+const [updatedCandidate] = await db.select().from(commitmentCandidates).where(eq(commitmentCandidates.id, updateCandidate.candidate.id)).limit(1);
 const updateEvents = await db.select().from(auditEvents).where(and(eq(auditEvents.entityType, "commitment"), eq(auditEvents.entityId, String(updateCandidate.candidate.id))));
 
 await db.update(tasks).set({ status: "done", completedAt: new Date("2026-11-21T12:00:00.000Z"), completedByName: actorName, result: "Отчёт готов" }).where(eq(tasks.id, "P-BL50-EXIST"));
@@ -91,11 +101,23 @@ const outcomeAudit = await db.select().from(auditEvents).where(and(eq(auditEvent
 const allCandidates = await db.select().from(commitmentCandidates);
 
 const checks = {
-  valid_commitment_creates_one_candidate_and_task: newCandidate.candidate.status === "pending" && newTaskCount === 1 && accepted.taskId,
+  valid_commitment_creates_one_candidate_and_task: newCandidate.candidate.status === "pending"
+    && newTaskCount === 1
+    && Boolean(accepted.taskId)
+    && acceptedCandidate.due === "16.11.2026"
+    && acceptedTask.due === "16.11.2026"
+    && newSignal.status === "commitment_created"
+    && !acceptedDecision.rationale.includes("S-BL50-NEW")
+    && commitmentCard.includes("https://t.me/c/500/501")
+    && commitmentCard.includes("Synthetic member")
+    && commitmentCard.includes("Подготовить отчёт для спонсора до 15.11.2026")
+    && !commitmentCard.includes("Риск")
+    && !commitmentCard.includes("S-BL50-NEW")
+    && !commitmentButtonLabels.some((label) => label.includes("Риск")),
   same_evidence_is_idempotent: repeatedCandidate.idempotent && repeatedCandidate.candidate.id === newCandidate.candidate.id,
   reject_requires_reason_and_no_task: rejected.status === "no" && rejectedTaskCount === 0 && rejectedState[0].rejectionReason === "not_commitment",
   merge_instead_of_duplicate: mergeCandidate.candidate.status === "pending_merge" && mergeDecisionCount === 0 && merged.taskId === "P-BL50-EXIST" && merged.merged,
-  update_changes_existing_due_without_new_task: updated.taskId === "P-BL50-EXIST" && updatedTask.due === "25.11.2026",
+  update_changes_existing_due_without_new_task: updated.taskId === "P-BL50-EXIST" && updatedTask.due === "25.11.2026" && updatedCandidate.due === "25.11.2026",
   update_has_old_new_and_edit_distance: updateEvents.some((event) => event.eventType === "commitment.rescheduled"
     && (event.metadata as { oldDue?: string }).oldDue === "20.11.2026"
     && (event.metadata as { newDue?: string }).newDue === "25.11.2026"

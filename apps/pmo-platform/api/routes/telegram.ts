@@ -16,7 +16,8 @@ import { deliverEffectNotification } from "../telegram/completion-scheduler";
 import { deliverOnboardingMessages } from "../telegram/first-value";
 import { recordRiskOpened } from "../queries/first-value";
 import { reviseProjectProposal } from "../ai/proposal-edit";
-import { buildProposalDiff, telegramSourceLink } from "../queries/proposal-audit";
+import { telegramSourceLink } from "../queries/proposal-audit";
+import { commitmentRationale, taskRegistryUrl } from "../telegram/presentation";
 import { cancelTelegramProposalEdit, claimTelegramEditInstruction, completeTelegramProposalEdit, failTelegramProposalPreview, getActiveTelegramProposalEdit, saveTelegramProposalPreview, startTelegramProposalEdit } from "../queries/telegram-edit";
 
 const userSchema = z.object({ id: z.number(), first_name: z.string(), last_name: z.string().optional(), username: z.string().optional(), is_bot: z.boolean().optional() });
@@ -36,23 +37,34 @@ function safeSecretEqual(actual: string, expected: string) {
   return timingSafeEqual(a, b);
 }
 
-function proposalText(bundle: NonNullable<Awaited<ReturnType<typeof getRiskProposal>>>) {
+type ProposalBundle = NonNullable<Awaited<ReturnType<typeof getRiskProposal>>>;
+type ProposalSignal = ProposalBundle["signal"];
+
+export function proposalText(bundle: ProposalBundle) {
   const { decision, risk, signal } = bundle;
+  if (!risk) {
+    const rationale = signal ? commitmentRationale(signal) : "Источник обязательства сохранён в реестре.";
+    return `📌 Обязательство\n${decision.title}\n\nОтветственный: ${decision.proposalOwner || "Руководитель проекта"}\nСрок: ${decision.proposalDue || "—"}\n\nОбоснование:\n${rationale}\n\nЭффект: ${decision.effect}`;
+  }
   const source = signal ? telegramSourceLink(signal.chatId, signal.messageId) : null;
   const sourceText = source?.url || `источник недоступен; сохранён sourceId ${source?.sourceId || "—"}`;
-  return `⚠️ ${risk?.id || "Риск"} · ${risk?.probability || "оценка"}\n${risk?.title || ""}\n\nВлияние: ${risk?.impact || "—"}\n\nПредложение ${decision.id}:\n${decision.title}\n\nОтветственный: ${decision.proposalOwner || "Руководитель проекта"}\nСрок: ${decision.proposalDue || "—"}\n\nИсточник: ${sourceText} · ${signal?.authorName || "—"}`;
+  return `⚠️ ${risk.id} · ${risk.probability || "оценка"}\n${risk.title}\n\nВлияние: ${risk.impact || "—"}\n\nПредложение ${decision.id}:\n${decision.title}\n\nОтветственный: ${decision.proposalOwner || "Руководитель проекта"}\nСрок: ${decision.proposalDue || "—"}\n\nИсточник: ${sourceText} · ${signal?.authorName || "—"}`;
 }
 
-function proposalButtons(decisionId: string, riskId: string, opened = false) {
-  if (opened) return [[{ text: "✅ Принять", callback_data: `accept:${decisionId}` }, { text: "Изменить", callback_data: `edit:${decisionId}` }], [{ text: "Отклонить", callback_data: `reject:${decisionId}` }]];
+export function proposalButtons(decisionId: string, riskId: string, opened = false) {
+  if (opened || !riskId) return [[{ text: "✅ Принять", callback_data: `accept:${decisionId}` }, { text: "Изменить", callback_data: `edit:${decisionId}` }], [{ text: "Отклонить", callback_data: `reject:${decisionId}` }]];
   return [[{ text: "⚠️ Открыть риск", callback_data: `open:${riskId}` }, { text: "✅ Принять", callback_data: `accept:${decisionId}` }], [{ text: "Изменить", callback_data: `edit:${decisionId}` }]];
 }
 
-function previewText(decision: { id: string; title: string; rationale: string; effect: string; proposalOwner: string | null; proposalDue: string | null; proposalVersion: number }, edit: { previewTitle: string | null; previewOwner: string | null; previewDue: string | null }) {
-  const before = { title: decision.title, rationale: decision.rationale, effect: decision.effect, owner: decision.proposalOwner || "Руководитель проекта", due: decision.proposalDue || "—" };
-  const after = { ...before, title: edit.previewTitle || before.title, owner: edit.previewOwner || before.owner, due: edit.previewDue || before.due };
-  const change = buildProposalDiff(before, after);
-  return `Новый предпросмотр ${decision.id} · версия ${decision.proposalVersion} → ${decision.proposalVersion + 1}\n\nПредложение:\n${after.title}\n\nОтветственный: ${after.owner}\nСрок: ${after.due}\n\nОбоснование: ${after.rationale}\nЭффект: ${after.effect}\n\nDiff:\n${change.diff || "Изменений нет"}\n\nИсходная версия не изменена. Решение и поручение будут созданы только после «Принять».`;
+export function previewText(
+  decision: { id: string; riskId: string | null; title: string; rationale: string; effect: string; proposalOwner: string | null; proposalDue: string | null; proposalVersion: number },
+  edit: { previewTitle: string | null; previewOwner: string | null; previewDue: string | null },
+  signal?: ProposalSignal,
+) {
+  const rationale = decision.riskId
+    ? decision.rationale
+    : signal ? commitmentRationale(signal) : "Источник обязательства сохранён в реестре.";
+  return `Новый предпросмотр ${decision.id}\n\nПредложение:\n${edit.previewTitle || decision.title}\n\nОтветственный: ${edit.previewOwner || decision.proposalOwner || "Руководитель проекта"}\nСрок: ${edit.previewDue || decision.proposalDue || "—"}\n\nОбоснование:\n${rationale}\nЭффект: ${decision.effect}\n\nИзменения будут сохранены только после «Принять».`;
 }
 
 function statusText(role: "rp" | "member") {
@@ -87,19 +99,20 @@ export async function handlePrivateMessage(message: TelegramMessage) {
     });
     const preview = await saveTelegramProposalPreview({ editId: claimed.edit.id, ...revised });
     if (!preview) {
-      await sendTelegramMessage({ chatId, text: "Ветка редактирования отменена; исходное предложение не изменено." });
+      await sendTelegramMessage({ chatId, text: "Ветка редактирования отменена." });
       return "ignored" as const;
     }
+    const bundle = await getRiskProposal(claimed.decision.id);
     await sendTelegramMessage({
       chatId,
-      text: previewText(claimed.decision, preview),
+      text: previewText(claimed.decision, preview, bundle?.signal),
       buttons: [[{ text: "✅ Принять", callback_data: `accept:${claimed.decision.id}` }, { text: "Отменить правку", callback_data: `editcancel:${claimed.decision.id}` }]],
     });
     return "processed" as const;
   } catch (error) {
     const messageText = error instanceof Error ? error.message : String(error);
     await failTelegramProposalPreview(claimed.edit.id, messageText);
-    await sendTelegramMessage({ chatId, text: `Не удалось подготовить новый предпросмотр. Исходное предложение не изменено. Отправьте правку ещё раз или отмените редактирование.\n${messageText.slice(0, 500)}` });
+    await sendTelegramMessage({ chatId, text: `Не удалось подготовить новый предпросмотр. Отправьте правку ещё раз или отмените редактирование.\n${messageText.slice(0, 500)}` });
     return "error" as const;
   }
 }
@@ -230,7 +243,7 @@ export async function handleCallback(callback: NonNullable<z.infer<typeof update
     await answerTelegramCallback(callback.id, "Отправьте одну текстовую правку");
     await sendTelegramMessage({
       chatId,
-      text: `Редактирование ${entityId}, версия ${started.decision.proposalVersion}. Отправьте одну текстовую инструкцию: что изменить в предложении, ответственном или сроке. Исходная версия не изменится до принятия нового предпросмотра.`,
+      text: `Редактирование ${entityId}. Отправьте одну текстовую инструкцию: что изменить в предложении, ответственном или сроке.`,
       buttons: [[{ text: "Отменить правку", callback_data: `editcancel:${entityId}` }]],
     });
     return "processed" as const;
@@ -241,7 +254,7 @@ export async function handleCallback(callback: NonNullable<z.infer<typeof update
     if (!cancelled) { await answerTelegramCallback(callback.id, "Активная правка не найдена"); return "ignored" as const; }
     const bundle = await getRiskProposal(entityId);
     await answerTelegramCallback(callback.id, "Правка отменена");
-    if (bundle) await sendTelegramMessage({ chatId, text: `Правка отменена. Исходная версия ${bundle.decision.proposalVersion} не изменена.\n\n${proposalText(bundle)}`, buttons: bundle.decision.status === "wait" && bundle.risk ? proposalButtons(bundle.decision.id, bundle.risk.id, true) : undefined });
+    if (bundle) await sendTelegramMessage({ chatId, text: `Правка отменена.\n\n${proposalText(bundle)}`, buttons: bundle.decision.status === "wait" ? proposalButtons(bundle.decision.id, bundle.risk?.id || "", Boolean(bundle.risk)) : undefined });
     return "processed" as const;
   }
 
@@ -297,7 +310,7 @@ export async function handleCallback(callback: NonNullable<z.infer<typeof update
         const taskText = result.alreadyDecided
           ? `Поручение ${result.taskId} уже связано с решением.`
           : `Поручение ${result.taskId} создано и связано с решением.`;
-        await editTelegramMessage({ chatId, messageId: message.message_id, text: `✅ Решение ${entityId} ${result.alreadyDecided ? "уже было принято" : "принято"}\n${bundle.decision.title}\n\n${taskText}\nОтветственный: ${taskBundle?.task.owner || "—"}\nСрок: ${taskBundle?.task.due || "—"}\n\n${bundle.decision.attribution || `Пиэмка от имени ${person(callback.from)}`}`, buttons: [] });
+        await editTelegramMessage({ chatId, messageId: message.message_id, text: `✅ Решение ${entityId} ${result.alreadyDecided ? "уже было принято" : "принято"}\n${bundle.decision.title}\n\n${taskText}\nОтветственный: ${taskBundle?.task.owner || "—"}\nСрок: ${taskBundle?.task.due || "—"}\n\n${bundle.decision.attribution || `Пиэмка от имени ${person(callback.from)}`}\n\nРеестр поручений: ${taskRegistryUrl()}`, buttons: [] });
       } else {
         await editTelegramMessage({ chatId, messageId: message.message_id, text: `Решение ${entityId} ${result.alreadyDecided ? "уже было отклонено" : "отклонено"}.\n${bundle.decision.attribution || `Пиэмка от имени ${person(callback.from)}`}` });
       }

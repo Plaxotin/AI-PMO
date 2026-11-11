@@ -1,5 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
-import { auditEvents, channelExternalIds, channels, decisions, projectCounters, proposalVersions, risks, signals, tasks, telegramUpdates } from "@db/schema";
+import { auditEvents, channelExternalIds, channels, commitmentCandidates, decisions, projectCounters, proposalVersions, risks, signals, tasks, telegramUpdates } from "@db/schema";
 import { DEMO_PROJECT_ID } from "./pmo";
 import { getDb } from "./connection";
 import { telegramSourceLink } from "./proposal-audit";
@@ -240,7 +240,14 @@ export async function getRiskProposal(decisionId: string) {
   const [decision] = await db.select().from(decisions).where(and(eq(decisions.id, decisionId), eq(decisions.projectId, DEMO_PROJECT_ID)));
   if (!decision) return null;
   const [risk] = decision.riskId ? await db.select().from(risks).where(eq(risks.id, decision.riskId)) : [];
-  const [signal] = await db.select().from(signals).where(eq(signals.riskId, decision.riskId || ""));
+  let signal = decision.riskId
+    ? (await db.select().from(signals).where(eq(signals.riskId, decision.riskId)).limit(1))[0]
+    : undefined;
+  if (!signal) {
+    const [candidate] = await db.select().from(commitmentCandidates)
+      .where(and(eq(commitmentCandidates.projectId, DEMO_PROJECT_ID), eq(commitmentCandidates.decisionId, decisionId))).limit(1);
+    if (candidate) signal = (await db.select().from(signals).where(eq(signals.id, candidate.signalId)).limit(1))[0];
+  }
   return { decision, risk, signal };
 }
 
