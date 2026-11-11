@@ -43,7 +43,7 @@
     "Deploy incident: copied .credentials lost service-user ownership -> webhook 503 for 9 min; Telegram dropped the first delivery (pending_update_count=0); fixed, pipeline verified; no side effects created",
     "AI quality: due date not extracted from natural text (fixed via RP Edit branch)",
     "UI: commitment proposal card uses legacy risk wording (Риск/Открыть риск)",
-    "UX (owner decision needed): user-facing messages must not show 'исходная версия не изменена'/raw diff; rationale must not use internal IDs - link to source message or author+text+received time",
+    "UX (owner decision needed): user-facing messages must not show 'исходная версия не изменена'/raw diff; rationale must not use internal IDs - link to source message or author+text+received time; task-creation response must include a link to the task registry",
     "Data consistency: candidate.due column not synced after Edit (decision/proposal due updated)",
     "Signal status remains 'processing' after pipeline completion - finalize semantics",
     "Cleanup: release .env still points at stale external DB endpoint; real DB comes from systemd drop-in 20-local-db.conf"
