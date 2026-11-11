@@ -1,0 +1,56 @@
+{
+  "scope": "BL-50 real pilot",
+  "date": "2026-11-11",
+  "status": "executed-awaiting-outcome",
+  "productionChanged": true,
+  "realChatOrUserIdsIncluded": false,
+  "pseudonyms": {
+    "PROJECT-BL50": "PRJ-01",
+    "SOURCE-BL50": "agreed work chat (TG, in server allowlist)",
+    "RP-BL50": "owner (TG identity bound in allowlists)",
+    "SIGNAL-BL50-01": "single agreed real message with one obligation"
+  },
+  "production": {
+    "release": "/opt/aipmo-platform/releases/bl50-commitment-v1-20261111",
+    "gitCommit": "ca4b0bd",
+    "bl55Included": false,
+    "migration": "0011_bl50_commitment_tracking additive via Drizzle; journal 11 -> 12",
+    "serviceAfterRestart": "active, NRestarts=0, landing 200, workspace 200",
+    "backup": {
+      "file": "/opt/aipmo-platform/backups/aipmo-bl50-pre-20261110_211337.sql.gz",
+      "sha256": "60c9218803f4cec8bb8dded4ebaf64b83d9aac44dd4d36c1a396cc5fe47b8f8c",
+      "tables": 25
+    },
+    "envUntouched": "webhook/gateway, canonical UI/PNG, credentials values unchanged; only file ownership of copied .env/.credentials restored to service user"
+  },
+  "pilotRecords": {
+    "signal": "SIGNAL-BL50-01 -> risk-free commitment contour",
+    "candidate": "commitment candidate #1, status accepted, evidence v1 hash recorded",
+    "decision": "R-07 ok (proposal v1 -> v2)",
+    "task": "P-08 new, due 12.11.2026",
+    "audit": ["commitment.proposed", "proposal.edited", "decision.accepted", "task.created"]
+  },
+  "checks": {
+    "editBranch": "AI missed due date in source message; RP Edit set due 12.11.2026; version 1->2, editDistance 10, original preserved",
+    "acceptCreatesAtomically": "decision R-07 ok + task P-08 created at accept time only",
+    "callbackDedupe": "replayed stored callback update -> duplicate:true, no new records",
+    "messageDedupe": "replayed stored message update -> duplicate:true, no new records",
+    "restartRecovery": "service restart -> active, landing/workspace 200, replay after restart duplicate:true",
+    "noGroupOutgoing": "no messages sent to work group; no unplanned personal sends",
+    "bl48untouched": true
+  },
+  "findings": [
+    "Deploy incident: copied .credentials lost service-user ownership -> webhook 503 for 9 min; Telegram dropped the first delivery (pending_update_count=0); fixed, pipeline verified; no side effects created",
+    "AI quality: due date not extracted from natural text (fixed via RP Edit branch)",
+    "UI: commitment proposal card uses legacy risk wording (Риск/Открыть риск)",
+    "UX (owner decision needed): user-facing messages must not show 'исходная версия не изменена'/raw diff; rationale must not use internal IDs - link to source message or author+text+received time",
+    "Data consistency: candidate.due column not synced after Edit (decision/proposal due updated)",
+    "Signal status remains 'processing' after pipeline completion - finalize semantics",
+    "Cleanup: release .env still points at stale external DB endpoint; real DB comes from systemd drop-in 20-local-db.conf"
+  ],
+  "remaining": [
+    "Outcome (on_time/late) recorded only after the task is factually completed; unknown not reported as success",
+    "BL-35 workspace visual check by owner (cards verified in bot; chain in DB verified)",
+    "BL-55 not activated (per authorization); metrics check deferred to its own release"
+  ]
+}
